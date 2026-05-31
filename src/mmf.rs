@@ -24,20 +24,24 @@ pub struct MMF;
 impl MMF {
 
     pub fn init() -> Result<(), FrameworkError> {
-        let mut mmf_data = MMF_DATA.write().unwrap();
-        if mmf_data.is_some() {
-            return Err(FrameworkError::FrameworkAlreadyInitialized);
+        {
+            let mut mmf_data = MMF_DATA.write().unwrap();
+            if mmf_data.is_some() {
+                return Err(FrameworkError::FrameworkAlreadyInitialized);
+            }
+            *mmf_data = Some(MMFData::new());
         }
-        *mmf_data = Some(MMFData::new());
         Ok(())
     }
 
     pub fn close() -> Result<(), FrameworkError> {
-        let mut mmf_data = MMF_DATA.write().unwrap();
-        if mmf_data.is_none() {
-            return Err(FrameworkError::FrameworkNotInitialized);
+        {    
+            let mut mmf_data = MMF_DATA.write().unwrap();
+            if mmf_data.is_none() {
+                return Err(FrameworkError::FrameworkNotInitialized);
+            }
+            *mmf_data = None;
         }
-        *mmf_data = None;
         Ok(())
     }
 
