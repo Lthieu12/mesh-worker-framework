@@ -1,10 +1,10 @@
 use crate::message::FrameworkMessage;
-use crate::error::FrameworkError;
+//use crate::error::FrameworkError;
 
 pub type ModuleID = String;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ModuleState {
+pub(crate) enum ModuleState {
     Created,
     Initialized,
 }

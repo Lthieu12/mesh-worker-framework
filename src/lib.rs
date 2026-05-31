@@ -1,21 +1,44 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
-
 pub mod error;
 pub mod module;
 pub mod message;
 pub mod registry;
-pub mod framework;
+pub mod mmf;
 pub mod logging;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+
+    use crate::error::FrameworkError;
+    use crate::mmf::MMF;
 
     #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+    fn test_mmf_init_close() {
+        assert!(!MMF::is_initialized());
+        assert!(MMF::init().is_ok());
+        assert!(MMF::is_initialized());
+        assert!(MMF::close().is_ok());
+        assert!(!MMF::is_initialized());
+    }
+
+    #[test]
+    fn test_mmf_double_init() {
+        assert!(MMF::init().is_ok());
+        assert!(
+            matches!(
+                MMF::init(),
+                Err(FrameworkError::FrameworkAlreadyInitialized)
+            )
+        );
+        assert!(MMF::close().is_ok());
+    }
+
+    #[test]
+    fn test_mmf_double_close() {
+        assert!(
+            matches!(
+                MMF::close(),
+                Err(FrameworkError::FrameworkNotInitialized)
+            )
+        );
     }
 }
