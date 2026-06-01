@@ -12,8 +12,7 @@ use crate::error::FrameworkError;
 #[derive(Debug, Clone)]
 pub(crate) struct RegistryEntry {
 
-    /// Parent module identifier.
-    /// None indicates a root module.
+    /// Parent module identifier. None indicates a root module.
     father_module_id: Option<ModuleID>,
 
     /// Current module state.
