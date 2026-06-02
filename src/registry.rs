@@ -70,7 +70,9 @@ impl Registry {
             return Err(FrameworkError::ModuleAlreadyExists);
         }
 
-        self.module_map.insert(module_id.clone(), RegistryEntry::new(father_module_id.clone()));
+        let registry_entry = RegistryEntry::new(father_module_id.clone());
+
+        self.module_map.insert(module_id.clone(), registry_entry);
 
         if let Some(father_module_id) = father_module_id {
             self.child_module_map.entry(father_module_id).or_insert(Vec::new()).push(module_id);
@@ -82,11 +84,8 @@ impl Registry {
     /// Remove a module from the registry.
     pub(crate) fn remove_module(&mut self, module_id: &ModuleID) -> Result<(), FrameworkError> {
 
-        let father_module_id = self.module_map
-            .get(module_id)
-            .ok_or(FrameworkError::ModuleNotFound)?
-            .father_module_id
-            .clone();
+        let registry_entry = self.module_map.get(module_id).ok_or(FrameworkError::ModuleNotFound)?;
+        let father_module_id = registry_entry.father_module_id.clone();
 
         self.module_map.remove(module_id);
 
