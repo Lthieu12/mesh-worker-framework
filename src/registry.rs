@@ -70,12 +70,19 @@ impl Registry {
             return Err(FrameworkError::ModuleAlreadyExists);
         }
 
+        if let Some(father_module_id_ref) = &father_module_id {
+
+            if !self.module_map.contains_key(father_module_id_ref) {
+                return Err(FrameworkError::ModuleNotFound);
+            }
+        }
+
         let registry_entry = RegistryEntry::new(father_module_id.clone());
 
         self.module_map.insert(module_id.clone(), registry_entry);
 
-        if let Some(father_module_id) = father_module_id {
-            self.child_module_map.entry(father_module_id).or_insert(Vec::new()).push(module_id);
+        if let Some(father_module_id_ref) = father_module_id {
+            self.child_module_map.entry(father_module_id_ref).or_insert(Vec::new()).push(module_id);
         }
 
         Ok(())
@@ -89,14 +96,14 @@ impl Registry {
 
         self.module_map.remove(module_id);
 
-        if let Some(father_module_id) = father_module_id {
+        if let Some(father_module_id_ref) = father_module_id {
 
-            if let Some(child_module_list) = self.child_module_map.get_mut(&father_module_id) {
+            if let Some(child_module_list) = self.child_module_map.get_mut(&father_module_id_ref) {
 
                 child_module_list.retain(|child_id| child_id != module_id);
 
                 if child_module_list.is_empty() {
-                    self.child_module_map.remove(&father_module_id);
+                    self.child_module_map.remove(&father_module_id_ref);
                 }
             }
         }
