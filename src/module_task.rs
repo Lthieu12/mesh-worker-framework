@@ -18,17 +18,36 @@
 
 use tokio::task::JoinHandle;
 
-use crate::{channel::{LifecycleReceiverChannel, MessageReceiverChannel}, module::Module};
+use crate::channel::{LifecycleCommand, LifecycleReceiverChannel, MessageReceiverChannel};
+use crate::module::Module;
 
 pub(crate) fn spawn_module_task<T>(module: T, lifecycle_receiver: LifecycleReceiverChannel, message_receiver: MessageReceiverChannel) -> JoinHandle<()>
 where T: Module + Send + 'static{
    
     tokio::spawn(async move {
 
-        let mut _module = module;
+        let mut module = module;
 
-        let _lifecycle_receiver = lifecycle_receiver;
+        let mut lifecycle_receiver = lifecycle_receiver;
         let _message_receiver = message_receiver;
 
+        while let Some(command) =
+        lifecycle_receiver.recv().await
+        {
+            match command {
+
+                LifecycleCommand::Init => {
+
+                    module.on_init().await;
+                }
+
+                LifecycleCommand::Close => {
+
+                    module.on_close().await;
+
+                    break;
+                }
+            }
+        }
     })
 }

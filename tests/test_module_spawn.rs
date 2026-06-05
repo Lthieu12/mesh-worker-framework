@@ -1,9 +1,12 @@
+use async_trait::async_trait;
+
 use mesh_module_framework::mmf::MMF;
 use mesh_module_framework::module::Module;
 use mesh_module_framework::message::FrameworkMessage;
 
 struct TestModule;
 
+#[async_trait]
 impl Module for TestModule {
 
     async fn on_init(&mut self) {}

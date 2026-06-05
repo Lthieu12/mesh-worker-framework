@@ -3,6 +3,8 @@
 //! This module defines the Module trait and the types used
 //! to identify and manage modules within the framework.
 
+use async_trait::async_trait;
+
 use crate::message::FrameworkMessage;
 
 /// Unique identifier of a module instance.
@@ -21,7 +23,7 @@ pub(crate) enum ModuleState {
 
 
 /// Interface that must be implemented by all MMF modules.
-#[allow(async_fn_in_trait)]
+#[async_trait]
 pub trait Module {
 
     /// Called once when the module is initialized.
