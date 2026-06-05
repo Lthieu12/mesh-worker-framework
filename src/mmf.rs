@@ -9,6 +9,7 @@ use crate::error::FrameworkError;
 use crate::logging::LoggingData;
 use crate::module::{Module, ModuleID};
 use crate::registry::Registry;
+use crate::module_task::spawn_module_task;
 
 /// Global MMF runtime storage.
 static MMF_DATA: LazyLock<RwLock<Option<MMFData>>> = LazyLock::new(|| RwLock::new(None));
@@ -21,6 +22,9 @@ struct MMFData {
 
     /// Logging configuration.
     logging_data: LoggingData,
+
+    /// Capacity of module event queues.
+    module_channel_capacity: usize,
 }
 
 impl MMFData {
@@ -30,6 +34,7 @@ impl MMFData {
         Self {
             registry: Registry::new(),
             logging_data: LoggingData::new(),
+            module_channel_capacity: 100,
         }
     }
 }
@@ -74,14 +79,47 @@ impl MMF {
         MMF_DATA.read().unwrap().is_some()
     }
 
-    /// Spawn a new module and wait for its initialization.
-    pub fn spawn_module<T>(father_module_id: Option<ModuleID>, module: T) -> Result<ModuleID, FrameworkError> where T: Module + Send + 'static {
-        
+    /// Create and register a new module instance.
+    ///
+    /// Steps:
+    /// 1. Generate a unique ModuleID.
+    /// 2. Create communication channels used by MMF.
+    /// 3. Spawn the Tokio task that will own the module instance.
+    /// 4. Register the module resources in the Registry.
+    ///
+    /// After this function returns:
+    /// - MMF owns the ModuleID, channels and JoinHandle.
+    /// - The Tokio task owns the module instance itself.
+    pub fn spawn_module<T>(module: T, father_module_id: Option<ModuleID>) -> Result<ModuleID, FrameworkError>
+    where T: Module + Send + 'static {
+
         let mut mmf_data_guard = MMF_DATA.write().unwrap();
 
         let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::FrameworkNotInitialized)?;
 
         let module_id = mmf_data.registry.generate_module_id::<T>();
+
+        // Channel used to send Lifecycle commands (like Init and Close) to the module.
+        let (lifecycle_sender, lifecycle_receiver) = tokio::sync::mpsc::channel(mmf_data.module_channel_capacity);
+
+        // Channel used to send FrameworkMessages to the module.
+        let (message_sender, message_receiver) = tokio::sync::mpsc::channel(mmf_data.module_channel_capacity);
+
+        // Spawn the Tokio task that will own the module instance.
+        //
+        // Once spawned, MMF no longer owns the module.
+        // MMF communicates with the module through channels and
+        // tracks its execution through the JoinHandle.
+        let join_handle = spawn_module_task(module, lifecycle_receiver, message_receiver);
+
+        // Store the module resources in the Registry.
+        //
+        // The Registry stores:
+        // - Module hierarchy information.
+        // - Module state.
+        // - Communication channels.
+        // - JoinHandle associated with the Tokio task.
+        mmf_data.registry.add_module(module_id.clone(), father_module_id, lifecycle_sender, message_sender, join_handle,)?;
 
         Ok(module_id)
     }

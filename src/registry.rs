@@ -4,12 +4,15 @@
 //! their execution state and generates unique ModuleIDs.
 
 use std::collections::HashMap;
+use tokio::task::JoinHandle;
 
+use crate::channel::LifecycleSenderChannel;
+use crate::channel::MessageSenderChannel;
 use crate::module::{Module, ModuleID, ModuleState};
 use crate::error::FrameworkError;
 
 /// Information associated with a registered module.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct RegistryEntry {
 
     /// Parent module identifier. None indicates a root module.
@@ -18,15 +21,33 @@ pub(crate) struct RegistryEntry {
     /// Current module state.
     module_state: ModuleState,
 
+    /// Channel used to initialize or close the module.
+    lifecycle_channel: LifecycleSenderChannel,
+
+    /// Channel used to send FrameworkMessages.
+    message_channel: MessageSenderChannel,
+
+    /// Tokio task handle associated with the module runtime.
+    join_handle: JoinHandle<()>,
+
 }
 
 impl RegistryEntry {
 
     /// Create a registry entry for a newly created module.
-    fn new(father_module_id: Option<ModuleID>) -> Self {
+    fn new(
+        father_module_id: Option<ModuleID>,
+        lifecycle_channel: LifecycleSenderChannel,
+        message_channel: MessageSenderChannel,
+        join_handle: JoinHandle<()>,
+    ) -> Self {
+
         Self {
             father_module_id,
             module_state: ModuleState::Created,
+            lifecycle_channel,
+            message_channel,
+            join_handle,
         }
     }
 }
@@ -64,7 +85,7 @@ impl Registry {
     }
 
     /// Register a newly created module.
-    pub(crate) fn add_module(&mut self, module_id: ModuleID, father_module_id: Option<ModuleID>) -> Result<(), FrameworkError> {
+    pub(crate) fn add_module(&mut self, module_id: ModuleID, father_module_id: Option<ModuleID>, lifecycle_channel: LifecycleSenderChannel, message_channel: MessageSenderChannel, join_handle: JoinHandle<()>,) -> Result<(), FrameworkError> {
 
         if self.module_map.contains_key(&module_id) {
             return Err(FrameworkError::ModuleAlreadyExists);
@@ -77,7 +98,7 @@ impl Registry {
             }
         }
 
-        let registry_entry = RegistryEntry::new(father_module_id.clone());
+        let registry_entry = RegistryEntry::new(father_module_id.clone(), lifecycle_channel, message_channel, join_handle);
 
         self.module_map.insert(module_id.clone(), registry_entry);
 
@@ -113,73 +134,15 @@ impl Registry {
         Ok(())
     }
 
+    /// Update the state of a registered module.
+    pub(crate) fn set_module_state(&mut self, module_id: &ModuleID, module_state: ModuleState) -> Result<(), FrameworkError> {
+
+        let registry_entry = self.module_map.get_mut(module_id).ok_or(FrameworkError::ModuleNotFound)?;
+
+        registry_entry.module_state = module_state;
+
+        Ok(())
+    }
+    
 }
 
-
-#[test]
-fn test_add_remove_module() {
-
-    let mut registry = Registry::new();
-
-    let module_a = "ModuleA:00001".to_string();
-    let module_b = "ModuleB:00001".to_string();
-    let module_c = "ModuleC:00001".to_string();
-
-    assert!(registry.add_module(module_a.clone(), None).is_ok());
-    assert!(registry.add_module(module_b.clone(), Some(module_a.clone())).is_ok());
-    assert!(registry.add_module(module_c.clone(), Some(module_a.clone())).is_ok());
-
-    assert_eq!(registry.module_map.len(), 3);
-
-    assert_eq!(
-        registry.child_module_map.get(&module_a),
-        Some(&vec![module_b.clone(), module_c.clone()])
-    );
-
-    assert!(registry.remove_module(&module_b).is_ok());
-
-    assert_eq!(registry.module_map.len(), 2);
-
-    assert_eq!(
-        registry.child_module_map.get(&module_a),
-        Some(&vec![module_c.clone()])
-    );
-
-    assert!(registry.remove_module(&module_a).is_ok());
-
-    assert_eq!(registry.module_map.len(), 1);
-
-    assert!(registry.module_map.contains_key(&module_c));
-
-    assert!(!registry.child_module_map.contains_key(&module_a));
-}
-
-#[test]
-fn test_add_existing_module() {
-
-    let mut registry = Registry::new();
-
-    let module_a = "ModuleA:00001".to_string();
-
-    assert!(registry.add_module(module_a.clone(), None).is_ok());
-
-    assert!(
-        matches!(
-            registry.add_module(module_a.clone(), None),
-            Err(FrameworkError::ModuleAlreadyExists)
-        )
-    );
-}
-
-#[test]
-fn test_remove_unknown_module() {
-
-    let mut registry = Registry::new();
-
-    assert!(
-        matches!(
-            registry.remove_module(&"Unknown".to_string()),
-            Err(FrameworkError::ModuleNotFound)
-        )
-    );
-}

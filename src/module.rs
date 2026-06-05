@@ -19,8 +19,6 @@ pub(crate) enum ModuleState {
     Initialized,
 }
 
-// TODO:
-// Revisit async trait design when runtime architecture is finalized.
 
 /// Interface that must be implemented by all MMF modules.
 #[allow(async_fn_in_trait)]

@@ -11,12 +11,16 @@
 //! - Request/reply messaging patterns
 //!
 //! Applications interact with the framework through the MMF API.
-
-
-pub mod error;
-pub mod module;
-pub mod message;
 pub mod registry;
 pub mod mmf;
 pub mod logging;
+pub mod error;
+pub mod module;
+pub mod message;
+pub mod channel;
+pub mod module_task;
+
+
+
+
 
