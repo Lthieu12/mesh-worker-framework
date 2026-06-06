@@ -6,23 +6,37 @@ use std::error::Error;
 use std::fmt;
 
 /// Errors returned by MMF functions.
+///
+/// Naming convention:
+/// - Category_Error
+/// - Examples:
+///   - Framework_NotInitialized
+///   - Module_NotFound
+///   - Module_ChannelClosed
 #[derive(Debug)]
+#[allow(non_camel_case_types)]
 pub enum FrameworkError {
 
     /// The framework has not been initialized.
-    FrameworkNotInitialized,
+    Framework_NotInitialized,
 
     /// The framework is already initialized.
-    FrameworkAlreadyInitialized,
+    Framework_AlreadyInitialized,
 
     /// A module failed during its initialization.
-    ModuleInitializationFailed,
+    Module_InitializationFailed,
 
     /// The requested module was not found.
-    ModuleNotFound,
+    Module_NotFound,
+
+    /// A module communication channel is closed.
+    Module_ChannelClosed,
 
     /// The requested module already exists.
-    ModuleAlreadyExists,
+    Module_AlreadyExists,
+
+    /// The requested module is already initialized.
+    Module_AlreadyInitialized
 }
 
 /// Human-readable representation of FrameworkError.
@@ -32,20 +46,27 @@ impl fmt::Display for FrameworkError {
 
         match self {
 
-            FrameworkError::FrameworkNotInitialized =>
-                write!(f, "Framework not initialized"),
+            FrameworkError::Framework_NotInitialized =>
+                write!(f, "The framework has not been initialized."),
 
-            FrameworkError::FrameworkAlreadyInitialized =>
-                write!(f, "Framework already initialized"),
+            FrameworkError::Framework_AlreadyInitialized =>
+                write!(f, "The framework is already initialized."),
 
-            FrameworkError::ModuleInitializationFailed =>
-                write!(f, "Module initialization failed"),
+            FrameworkError::Module_InitializationFailed =>
+                write!(f, "A module failed during its initialization."),
 
-            FrameworkError::ModuleNotFound =>
-                write!(f, "Module not found"),
+            FrameworkError::Module_NotFound =>
+                write!(f, "The requested module was not found."),
 
-            FrameworkError::ModuleAlreadyExists =>
-                write!(f, "Module already exists"),
+            FrameworkError::Module_ChannelClosed =>
+                write!(f, "A module communication channel is closed."),
+
+            FrameworkError::Module_AlreadyExists =>
+                write!(f, "The requested module already exists."),
+            
+            FrameworkError::Module_AlreadyInitialized =>
+                write!(f, "The requested module is already initialized."),
+
         }
     }
 }

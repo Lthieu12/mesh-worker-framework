@@ -7,9 +7,10 @@ use std::sync::{LazyLock, RwLock};
 
 use crate::error::FrameworkError;
 use crate::logging::LoggingData;
-use crate::module::{Module, ModuleID};
+use crate::module::{Module, ModuleID, ModuleState};
 use crate::registry::Registry;
 use crate::module_task::spawn_module_task;
+use crate::channel::LifecycleCommand;
 
 /// Global MMF runtime storage.
 static MMF_DATA: LazyLock<RwLock<Option<MMFData>>> = LazyLock::new(|| RwLock::new(None));
@@ -50,7 +51,7 @@ impl MMF {
             let mut mmf_data = MMF_DATA.write().unwrap();
 
             if mmf_data.is_some() {
-                return Err(FrameworkError::FrameworkAlreadyInitialized);
+                return Err(FrameworkError::Framework_AlreadyInitialized);
             }
 
             *mmf_data = Some(MMFData::new());
@@ -65,7 +66,7 @@ impl MMF {
             let mut mmf_data = MMF_DATA.write().unwrap();
 
             if mmf_data.is_none() {
-                return Err(FrameworkError::FrameworkNotInitialized);
+                return Err(FrameworkError::Framework_NotInitialized);
             }
 
             *mmf_data = None;
@@ -95,7 +96,7 @@ impl MMF {
 
         let mut mmf_data_guard = MMF_DATA.write().unwrap();
 
-        let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::FrameworkNotInitialized)?;
+        let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
 
         let module_id = mmf_data.registry.generate_module_id::<T>();
 
@@ -123,6 +124,46 @@ impl MMF {
 
         Ok(module_id)
     }
+
+    pub fn get_module_state(module_id: &ModuleID) -> Result<ModuleState, FrameworkError>{
+
+        let mmf_data_guard = MMF_DATA.read().unwrap();
+
+        let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+
+        let module_state = mmf_data.registry.get_module_state(module_id)?;
+
+        Ok(module_state)
+    }
+
+    pub async fn init_module(module_id: &ModuleID) -> Result<(), FrameworkError> {
+
+        let module_state = MMF::get_module_state(module_id)?;
+
+        if module_state != ModuleState::Created {
+
+            return Err(FrameworkError::Module_AlreadyInitialized);
+        }
+
+        let mmf_data_guard = MMF_DATA.read().unwrap();
+
+        let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+
+        let lifecycle_channel = mmf_data.registry.get_lifecycle_channel(module_id)?;
+
+        drop(mmf_data_guard);
+
+        lifecycle_channel.send(LifecycleCommand::Init).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+
+        let mut mmf_data_guard = MMF_DATA.write().unwrap();
+
+        let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
+
+        mmf_data.registry.set_module_state(module_id, ModuleState::Initialized)?;
+
+        Ok(())
+    }
+
 }
 
 
@@ -152,7 +193,7 @@ mod tests {
         assert!(
             matches!(
                 MMF::init(),
-                Err(FrameworkError::FrameworkAlreadyInitialized)
+                Err(FrameworkError::Framework_AlreadyInitialized)
             )
         );
 
@@ -164,7 +205,7 @@ mod tests {
         assert!(
             matches!(
                 MMF::close(),
-                Err(FrameworkError::FrameworkNotInitialized)
+                Err(FrameworkError::Framework_NotInitialized)
             )
         );
     }

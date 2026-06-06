@@ -76,6 +76,21 @@ impl Registry {
         }
     }
 
+    /// Get lifecycle channel from ModuleID.
+    pub(crate) fn get_lifecycle_channel(&self, module_id: &ModuleID) -> Result<LifecycleSenderChannel, FrameworkError> {
+
+        let registry_entry = self.module_map.get(module_id).ok_or(FrameworkError::Module_NotFound)?;
+
+        Ok(registry_entry.lifecycle_channel.clone())
+    }
+
+    pub(crate) fn get_module_state(&self, module_id: &ModuleID) -> Result<ModuleState, FrameworkError> {
+
+        let registry_entry = self.module_map.get(module_id).ok_or(FrameworkError::Module_NotFound)?;
+
+        Ok(registry_entry.module_state)
+    }
+
     /// Generate a unique ModuleID for a module type.
     pub(crate) fn generate_module_id<T>(&mut self) -> ModuleID where T: Module {
         let module_name = std::any::type_name::<T>().to_string();
@@ -88,13 +103,13 @@ impl Registry {
     pub(crate) fn add_module(&mut self, module_id: ModuleID, father_module_id: Option<ModuleID>, lifecycle_channel: LifecycleSenderChannel, message_channel: MessageSenderChannel, join_handle: JoinHandle<()>,) -> Result<(), FrameworkError> {
 
         if self.module_map.contains_key(&module_id) {
-            return Err(FrameworkError::ModuleAlreadyExists);
+            return Err(FrameworkError::Module_AlreadyExists);
         }
 
         if let Some(father_module_id_ref) = &father_module_id {
 
             if !self.module_map.contains_key(father_module_id_ref) {
-                return Err(FrameworkError::ModuleNotFound);
+                return Err(FrameworkError::Module_NotFound);
             }
         }
 
@@ -112,7 +127,7 @@ impl Registry {
     /// Remove a module from the registry.
     pub(crate) fn remove_module(&mut self, module_id: &ModuleID) -> Result<(), FrameworkError> {
 
-        let registry_entry = self.module_map.get(module_id).ok_or(FrameworkError::ModuleNotFound)?;
+        let registry_entry = self.module_map.get(module_id).ok_or(FrameworkError::Module_NotFound)?;
         let father_module_id = registry_entry.father_module_id.clone();
 
         self.module_map.remove(module_id);
@@ -137,7 +152,7 @@ impl Registry {
     /// Update the state of a registered module.
     pub(crate) fn set_module_state(&mut self, module_id: &ModuleID, module_state: ModuleState) -> Result<(), FrameworkError> {
 
-        let registry_entry = self.module_map.get_mut(module_id).ok_or(FrameworkError::ModuleNotFound)?;
+        let registry_entry = self.module_map.get_mut(module_id).ok_or(FrameworkError::Module_NotFound)?;
 
         registry_entry.module_state = module_state;
 

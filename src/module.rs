@@ -12,13 +12,17 @@ pub type ModuleID = String;
 
 /// Current state of a module within the framework.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ModuleState {
+pub enum ModuleState {
 
     /// Module has been created but not initialized.
     Created,
-
+    /// Module initialization is in progress.
+    Initializing,
     /// Module initialization has completed successfully.
     Initialized,
+    /// Module Closing is in progress.
+    Closing,
+
 }
 
 
