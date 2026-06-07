@@ -72,7 +72,7 @@ async fn test_module_message_fifo() {
         .unwrap();
 
     MMF::send_message(
-        &module_id,
+        &SenderID::Module(module_id.clone()),
         &module_id,
         &"Message1".to_string(),
         Bytes::new(),
@@ -81,7 +81,7 @@ async fn test_module_message_fifo() {
     .unwrap();
 
     MMF::send_message(
-        &module_id,
+        &SenderID::Module(module_id.clone()),
         &module_id,
         &"Message2".to_string(),
         Bytes::new(),

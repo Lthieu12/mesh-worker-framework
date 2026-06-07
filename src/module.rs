@@ -10,6 +10,17 @@ use crate::message::FrameworkMessage;
 /// Unique identifier of a module instance.
 pub type ModuleID = String;
 
+/// Identifier of a message sender.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SenderID {
+
+    /// Message sent by a MMF module.
+    Module(ModuleID),
+
+    /// Message sent from outside MMF.
+    External(String),
+}
+
 /// Current state of a module within the framework.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModuleState {

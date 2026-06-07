@@ -28,6 +28,7 @@ pub use mmf::MMF;
 
 pub use module::Module;
 pub use module::ModuleID;
+pub use module::SenderID;
 pub use module::ModuleState;
 
 pub use message::FrameworkMessage;

@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::error::FrameworkError;
 use crate::logging::LoggingData;
-use crate::module::{Module, ModuleID, ModuleState};
+use crate::module::{Module, ModuleID, SenderID, ModuleState};
 use crate::registry::Registry;
 use crate::module_task::spawn_module_task;
 use crate::channel::ModuleCommand;
@@ -277,7 +277,7 @@ impl MMF {
     }
 
     /// Send a message to a module.
-    pub async fn send_message(sender_id: &ModuleID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes) -> Result<(), FrameworkError> {
+    pub async fn send_message(sender_id: &SenderID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes) -> Result<(), FrameworkError> {
         
         // Read MMF data.
         //
@@ -286,6 +286,22 @@ impl MMF {
         let mmf_data_guard = MMF_DATA.read().unwrap();
 
         let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+
+        // Validate the sender.
+        //
+        // MMF modules must be initialized before they can
+        // send messages through MMF.
+        //
+        // External senders are not validated.
+        match sender_id {
+            SenderID::Module(module_id) => {
+                let module_state = mmf_data.registry.get_module_state(module_id)?;
+                if module_state != ModuleState::Initialized {
+                    return Err(FrameworkError::Module_NotInitialized);
+                }
+            }
+            SenderID::External(_) => {}
+        }
 
         // Validate the receiver module state.
         //
