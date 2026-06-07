@@ -3,9 +3,10 @@
 //! This module defines the channel types used to communicate
 //! with ModuleTasks.
 //!
-//! All lifecycle operations and business messages are serialized
-//! through a single FIFO queue using ModuleCommand.
-//!
+//! All lifecycle operations (like Init or Close) and business 
+//! messages are serialized through a single FIFO queue using 
+//! ModuleCommand.
+//! 
 //! This guarantees that commands are processed by a module in the
 //! same order they are accepted by MMF.
 

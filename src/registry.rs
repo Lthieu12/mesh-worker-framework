@@ -20,7 +20,7 @@ pub(crate) struct RegistryEntry {
     /// Current module state.
     module_state: ModuleState,
 
-    /// Channel used to send messages to the module.
+    /// Channel used to send commands to the module.
     module_channel: ModuleSenderChannel,
 
     /// Tokio task handle associated with the module runtime.

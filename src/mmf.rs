@@ -4,6 +4,8 @@
 //! initialize, shutdown and manage modules.
 
 use std::sync::{LazyLock, RwLock};
+use bytes::Bytes;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::error::FrameworkError;
 use crate::logging::LoggingData;
@@ -11,9 +13,13 @@ use crate::module::{Module, ModuleID, ModuleState};
 use crate::registry::Registry;
 use crate::module_task::spawn_module_task;
 use crate::channel::ModuleCommand;
+use crate::message::{FrameworkMessage, MessageID, MessagePriority, MessageInstanceID};
 
 /// Global MMF runtime storage.
 static MMF_DATA: LazyLock<RwLock<Option<MMFData>>> = LazyLock::new(|| RwLock::new(None));
+
+/// Global MMF message instance counter
+static MESSAGE_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 /// Internal MMF runtime data.
 struct MMFData {
@@ -71,6 +77,16 @@ impl MMF {
         }
 
         Ok(())
+    }
+
+    /// Generate a unique MessageInstanceID.
+    fn generate_message_instance_id() -> Result<MessageInstanceID, FrameworkError> {
+        let current_id = MESSAGE_INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed);
+        if current_id == u64::MAX {
+            return Err(FrameworkError::Framework_InternalError);
+        }
+
+        Ok(current_id)
     }
 
     /// Check whether the framework is initialized.
@@ -258,6 +274,60 @@ impl MMF {
         drop(mmf_data_guard);
 
         Ok(())
+    }
+
+    /// Send a message to a module.
+    pub async fn send_message(sender_id: &ModuleID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes) -> Result<(), FrameworkError> {
+        
+        // Read MMF data.
+        //
+        // send_message() only requires a read lock because it does
+        // not modify the Registry or ModuleState.
+        let mmf_data_guard = MMF_DATA.read().unwrap();
+
+        let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+
+        // Validate the receiver module state.
+        //
+        // Messages can only be sent to initialized modules.
+        let module_state = mmf_data.registry.get_module_state(receiver_id)?;
+        if module_state != ModuleState::Initialized {
+            return Err(FrameworkError::Module_NotInitialized);
+        }
+
+        // Retrieve the communication channel associated with
+        // the receiver module.
+        //
+        // State validation and channel retrieval are performed
+        // under the same lock to avoid race conditions with
+        // close_module().
+        let module_channel = mmf_data.registry.get_module_channel(receiver_id)?;
+
+        // Generate the unique id of the message
+        let message_instance_id = MMF::generate_message_instance_id()?;
+
+        // Create the FrameworkMessage.
+        //
+        // MMF is responsible for generating framework-managed
+        // fields such as MessageInstanceID.
+        let framework_message = FrameworkMessage {
+
+                sender_id: sender_id.clone(),
+                receiver_id: receiver_id.clone(),
+                message_id: message_id.clone(),
+                message_instance_id,
+                message_priority: MessagePriority::Normal,
+                message_data,
+            };
+
+        // Release MMF lock before awaiting.
+        drop(mmf_data_guard);
+
+        // Send the message to the target module.
+        module_channel.send(ModuleCommand::Message(framework_message)).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+
+        Ok(())
+
     }
 
 }

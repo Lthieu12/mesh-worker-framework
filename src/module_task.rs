@@ -11,6 +11,8 @@
 //! - Receive commands and messages sent by MMF.
 //! - Execute the module callbacks.
 //! - Terminate the module task when requested.
+//! - Process all module commands sequentially through a
+//!   single FIFO queue.
 //!
 //! MMF never directly calls on_init(), on_message() or on_close().
 //! These callbacks are executed inside the module task because
@@ -60,6 +62,14 @@ where T: Module + Send + 'static{
                     let _ = reply_sender.send(());
                 }
 
+                // Execute a business message.
+                //
+                // Messages are processed through the same FIFO queue
+                // as lifecycle commands (like Init or Close).
+                //
+                // This guarantees that a message accepted before a
+                // Close command is always processed before module
+                // shutdown begins.
                 ModuleCommand::Message(message) => {
                     module.on_message(message).await;
                 }
