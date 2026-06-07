@@ -48,13 +48,12 @@ impl MMF {
     /// Initialize the MMF framework.
     pub fn init() -> Result<(), FrameworkError> {
         {
-            let mut mmf_data = MMF_DATA.write().unwrap();
-
-            if mmf_data.is_some() {
+            let mut mmf_data_guard = MMF_DATA.write().unwrap();
+            if mmf_data_guard.is_some() {
                 return Err(FrameworkError::Framework_AlreadyInitialized);
             }
-
-            *mmf_data = Some(MMFData::new());
+            *mmf_data_guard = Some(MMFData::new());
+            drop(mmf_data_guard);
         }
 
         Ok(())
@@ -63,20 +62,19 @@ impl MMF {
     /// Shutdown the MMF framework and release all resources.
     pub fn close() -> Result<(), FrameworkError> {
         {
-            let mut mmf_data = MMF_DATA.write().unwrap();
-
-            if mmf_data.is_none() {
+            let mut mmf_data_guard = MMF_DATA.write().unwrap();
+            if mmf_data_guard.is_none() {
                 return Err(FrameworkError::Framework_NotInitialized);
             }
-
-            *mmf_data = None;
+            *mmf_data_guard = None;
+            drop(mmf_data_guard);
         }
 
         Ok(())
     }
 
     /// Check whether the framework is initialized.
-    pub(crate) fn is_initialized() -> bool {
+    pub fn is_initialized() -> bool {
         MMF_DATA.read().unwrap().is_some()
     }
 
