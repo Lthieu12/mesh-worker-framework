@@ -136,19 +136,17 @@ impl MMF {
     /// Initialize a module and wait until on_init() completes.
     pub async fn init_module(module_id: &ModuleID) -> Result<(), FrameworkError> {
 
-        // Get the current module state.
+        // Change Module state to Initializing
+        // and read MMF data to retrieve the Lifecycle channel
+        // associated with the target module.
         //
         // Only modules in the Created state can be initialized.
-        let module_state = MMF::get_module_state(module_id)?;
+        let mut mmf_data_guard = MMF_DATA.write().unwrap();
+        let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let module_state = mmf_data.registry.get_module_state(module_id)?;
         if module_state != ModuleState::Created {
             return Err(FrameworkError::Module_AlreadyInitialized);
         }
-
-        // Change Module state to Initializing.
-        // Read MMF data to retrieve the Lifecycle channel associated
-        // with the target module.
-        let mut mmf_data_guard = MMF_DATA.write().unwrap();
-        let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
         mmf_data.registry.set_module_state(module_id, ModuleState::Initializing)?;
         let lifecycle_channel = mmf_data.registry.get_lifecycle_channel(module_id)?;
         drop(mmf_data_guard);
@@ -189,19 +187,17 @@ impl MMF {
     /// Close a module and wait until on_close() completes.
     pub async fn close_module(module_id: &ModuleID) -> Result<(), FrameworkError> {
 
-        // Get the current module state.
+        // Change Module state to Closing
+        // and read MMF data to retrieve the Lifecycle channel
+        // associated with the target module.
         //
         // Only modules in the Initialized state can be closed.
-        let module_state = MMF::get_module_state(module_id)?;
-        if module_state != ModuleState::Initialized {
-            return Err(FrameworkError::Module_NotInitialized);
-        }
-
-        // Change Module state to Closing
-        // Read MMF data to retrieve the Lifecycle channel associated
-        // with the target module.
         let mut mmf_data_guard = MMF_DATA.write().unwrap();
         let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let module_state = mmf_data.registry.get_module_state(module_id)?;
+        if module_state != ModuleState::Initialized {
+            return Err(FrameworkError::Module_AlreadyInitialized);
+        }
         mmf_data.registry.set_module_state(module_id, ModuleState::Closing)?;
         let lifecycle_channel = mmf_data.registry.get_lifecycle_channel(module_id)?;
         drop(mmf_data_guard);
