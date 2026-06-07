@@ -1,23 +1,38 @@
+//! MMF communication channels and commands.
+//!
+//! This module defines the channel types used to communicate
+//! with ModuleTasks.
+//!
+//! All lifecycle operations and business messages are serialized
+//! through a single FIFO queue using ModuleCommand.
+//!
+//! This guarantees that commands are processed by a module in the
+//! same order they are accepted by MMF.
+
 use tokio::sync::mpsc::Sender;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot;
 
 use crate::message::FrameworkMessage;
 
+/// Command processed by a ModuleTask.
+///
+/// All module events are transported through the same channel:
+/// - Initialization requests
+/// - Business messages
+/// - Shutdown requests
+///
+/// Using a single command queue guarantees FIFO processing and
+/// prevents lifecycle commands (like Init or Close) from overtaking 
+/// previously accepted messages.
 #[derive(Debug)]
-pub(crate) enum LifecycleCommand {
+pub(crate) enum ModuleCommand {
     Init(oneshot::Sender<()>),
+    Message(FrameworkMessage),
     Close(oneshot::Sender<()>),
 }
 
-/// Channel used to send lifecycle commands to a module.
-pub(crate) type LifecycleSenderChannel = Sender<LifecycleCommand>;
+pub(crate) type ModuleSenderChannel = Sender<ModuleCommand>;
 
-/// Channel used to send business messages to a module.
-pub(crate) type MessageSenderChannel = Sender<FrameworkMessage>;
-
-/// Receiver used to receive lifecycle commands from MMF.
-pub(crate) type LifecycleReceiverChannel = Receiver<LifecycleCommand>;
-
-/// Receiver used to receive FrameworkMessages from MMF.
-pub(crate) type MessageReceiverChannel = Receiver<FrameworkMessage>;
+pub(crate) type ModuleReceiverChannel = Receiver<ModuleCommand>;
+ 

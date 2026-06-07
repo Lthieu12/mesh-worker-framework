@@ -10,7 +10,7 @@ use crate::logging::LoggingData;
 use crate::module::{Module, ModuleID, ModuleState};
 use crate::registry::Registry;
 use crate::module_task::spawn_module_task;
-use crate::channel::LifecycleCommand;
+use crate::channel::ModuleCommand;
 
 /// Global MMF runtime storage.
 static MMF_DATA: LazyLock<RwLock<Option<MMFData>>> = LazyLock::new(|| RwLock::new(None));
@@ -96,18 +96,15 @@ impl MMF {
         let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
         let module_id = mmf_data.registry.generate_module_id::<T>();
 
-        // Channel used to send Lifecycle commands (like Init and Close) to the module.
-        let (lifecycle_sender, lifecycle_receiver) = tokio::sync::mpsc::channel(mmf_data.module_channel_capacity);
-
-        // Channel used to send FrameworkMessages to the module.
-        let (message_sender, message_receiver) = tokio::sync::mpsc::channel(mmf_data.module_channel_capacity);
+        // Channel used to send Module commands (like Init and Close) and messages to the module.
+        let (module_sender, module_receiver) = tokio::sync::mpsc::channel(mmf_data.module_channel_capacity);
 
         // Spawn the Tokio task that will own the module instance.
         //
         // Once spawned, MMF no longer owns the module.
         // MMF communicates with the module through channels and
         // tracks its execution through the JoinHandle.
-        let join_handle = spawn_module_task(module, lifecycle_receiver, message_receiver);
+        let join_handle = spawn_module_task(module, module_receiver);
 
         // Store the module resources in the Registry.
         //
@@ -116,7 +113,7 @@ impl MMF {
         // - Module state.
         // - Communication channels.
         // - JoinHandle associated with the Tokio task.
-        mmf_data.registry.add_module(module_id.clone(), father_module_id, lifecycle_sender, message_sender, join_handle,)?;
+        mmf_data.registry.add_module(module_id.clone(), father_module_id, module_sender, join_handle,)?;
         drop(mmf_data_guard);
 
         Ok(module_id)
@@ -137,7 +134,7 @@ impl MMF {
     pub async fn init_module(module_id: &ModuleID) -> Result<(), FrameworkError> {
 
         // Change Module state to Initializing
-        // and read MMF data to retrieve the Lifecycle channel
+        // and read MMF data to retrieve the Module channel
         // associated with the target module.
         //
         // Only modules in the Created state can be initialized.
@@ -148,7 +145,7 @@ impl MMF {
             return Err(FrameworkError::Module_AlreadyInitialized);
         }
         mmf_data.registry.set_module_state(module_id, ModuleState::Initializing)?;
-        let lifecycle_channel = mmf_data.registry.get_lifecycle_channel(module_id)?;
+        let module_channel = mmf_data.registry.get_module_channel(module_id)?;
         drop(mmf_data_guard);
 
         // Create a temporary reply channel.
@@ -164,7 +161,7 @@ impl MMF {
         //
         // The reply_sender is attached to the command so that
         // ModuleTask can notify MMF when on_init() completes.
-        lifecycle_channel.send(LifecycleCommand::Init(reply_sender)).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        module_channel.send(ModuleCommand::Init(reply_sender)).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         // Wait for ModuleTask to acknowledge completion of on_init().
         //
@@ -188,7 +185,7 @@ impl MMF {
     pub async fn close_module(module_id: &ModuleID) -> Result<(), FrameworkError> {
 
         // Change Module state to Closing
-        // and read MMF data to retrieve the Lifecycle channel
+        // and read MMF data to retrieve the Module channel
         // associated with the target module.
         //
         // Only modules in the Initialized state can be closed.
@@ -196,10 +193,10 @@ impl MMF {
         let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
         let module_state = mmf_data.registry.get_module_state(module_id)?;
         if module_state != ModuleState::Initialized {
-            return Err(FrameworkError::Module_AlreadyInitialized);
+            return Err(FrameworkError::Module_NotInitialized);
         }
         mmf_data.registry.set_module_state(module_id, ModuleState::Closing)?;
-        let lifecycle_channel = mmf_data.registry.get_lifecycle_channel(module_id)?;
+        let module_channel = mmf_data.registry.get_module_channel(module_id)?;
         drop(mmf_data_guard);
 
         // Create a temporary reply channel.
@@ -215,7 +212,7 @@ impl MMF {
         //
         // The reply_sender is attached to the command so that
         // ModuleTask can notify MMF when on_close() completes.
-        lifecycle_channel.send(LifecycleCommand::Close(reply_sender)).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        module_channel.send(ModuleCommand::Close(reply_sender)).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         // Wait for ModuleTask to acknowledge completion of on_close().
         //

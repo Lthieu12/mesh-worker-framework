@@ -9,7 +9,7 @@
 //! Responsibilities:
 //! - Own the module instance.
 //! - Receive commands and messages sent by MMF.
-//! - Execute the module lifecycle callbacks.
+//! - Execute the module callbacks.
 //! - Terminate the module task when requested.
 //!
 //! MMF never directly calls on_init(), on_message() or on_close().
@@ -18,7 +18,7 @@
 
 use tokio::task::JoinHandle;
 
-use crate::channel::{LifecycleCommand, LifecycleReceiverChannel, MessageReceiverChannel};
+use crate::channel::{ModuleCommand, ModuleReceiverChannel};
 use crate::module::Module;
 
 /// Spawn a Tokio task that takes ownership of the module instance.
@@ -26,26 +26,25 @@ use crate::module::Module;
 /// After this point:
 /// - MMF owns the Senders and the JoinHandle.
 /// - ModuleTask owns the module instance and the Receivers.
-pub(crate) fn spawn_module_task<T>(module: T, lifecycle_receiver: LifecycleReceiverChannel, message_receiver: MessageReceiverChannel) -> JoinHandle<()>
+pub(crate) fn spawn_module_task<T>(module: T, module_receiver: ModuleReceiverChannel) -> JoinHandle<()>
 where T: Module + Send + 'static{
    
     tokio::spawn(async move {
         // ModuleTask owns the module instance.
         //
-        // All lifecycle callbacks and message callbacks are executed
+        // All module callbacks are executed
         // inside this Tokio task.
         let mut module = module;
 
-        let mut lifecycle_receiver = lifecycle_receiver;
-        let _message_receiver = message_receiver;
+        let mut module_receiver = module_receiver;
 
-        // Wait for lifecycle commands sent by MMF.
+        // Wait for module commands sent by MMF.
         //
         // The loop terminates when:
         // - A Close command is received.
-        // - All LifecycleSenderChannels are dropped.
+        // - All ModuleSenderChannels are dropped.
         while let Some(command) =
-        lifecycle_receiver.recv().await
+        module_receiver.recv().await
         {
             match command {
 
@@ -56,9 +55,13 @@ where T: Module + Send + 'static{
                 //
                 // The reply is sent only after on_init() completes,
                 // making init_module() behave like a synchronous operation.
-                LifecycleCommand::Init(reply_sender) => {
+                ModuleCommand::Init(reply_sender) => {
                     module.on_init().await;
                     let _ = reply_sender.send(());
+                }
+
+                ModuleCommand::Message(message) => {
+                    module.on_message(message).await;
                 }
 
                 // Execute module shutdown.
@@ -68,7 +71,7 @@ where T: Module + Send + 'static{
                 //
                 // After the reply is sent, the ModuleTask exits its event
                 // loop and the Tokio task terminates.
-                LifecycleCommand::Close(reply_sender) => {
+                ModuleCommand::Close(reply_sender) => {
                     module.on_close().await;
                     let _ = reply_sender.send(());
                     break;

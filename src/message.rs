@@ -26,6 +26,7 @@ pub enum MessagePriority {
     High,
 }
 
+#[derive(Debug)]
 /// Message exchanged between modules through MMF.
 pub struct FrameworkMessage {
 

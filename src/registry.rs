@@ -6,8 +6,7 @@
 use std::collections::HashMap;
 use tokio::task::JoinHandle;
 
-use crate::channel::LifecycleSenderChannel;
-use crate::channel::MessageSenderChannel;
+use crate::channel::ModuleSenderChannel;
 use crate::module::{Module, ModuleID, ModuleState};
 use crate::error::FrameworkError;
 
@@ -21,11 +20,8 @@ pub(crate) struct RegistryEntry {
     /// Current module state.
     module_state: ModuleState,
 
-    /// Channel used to initialize or close the module.
-    lifecycle_channel: LifecycleSenderChannel,
-
-    /// Channel used to send FrameworkMessages.
-    message_channel: MessageSenderChannel,
+    /// Channel used to send messages to the module.
+    module_channel: ModuleSenderChannel,
 
     /// Tokio task handle associated with the module runtime.
     join_handle: Option<JoinHandle<()>>,
@@ -37,16 +33,14 @@ impl RegistryEntry {
     /// Create a registry entry for a newly created module.
     fn new(
         father_module_id: Option<ModuleID>,
-        lifecycle_channel: LifecycleSenderChannel,
-        message_channel: MessageSenderChannel,
+        module_channel: ModuleSenderChannel,
         join_handle: JoinHandle<()>,
     ) -> Self {
 
         Self {
             father_module_id,
             module_state: ModuleState::Created,
-            lifecycle_channel,
-            message_channel,
+            module_channel: module_channel,
             join_handle: Some(join_handle),
         }
     }
@@ -76,12 +70,12 @@ impl Registry {
         }
     }
 
-    /// Get lifecycle channel from ModuleID.
-    pub(crate) fn get_lifecycle_channel(&self, module_id: &ModuleID) -> Result<LifecycleSenderChannel, FrameworkError> {
+    /// Get module channel from ModuleID.
+    pub(crate) fn get_module_channel(&self, module_id: &ModuleID) -> Result<ModuleSenderChannel, FrameworkError> {
 
         let registry_entry = self.module_map.get(module_id).ok_or(FrameworkError::Module_NotFound)?;
 
-        Ok(registry_entry.lifecycle_channel.clone())
+        Ok(registry_entry.module_channel.clone())
     }
 
     pub(crate) fn get_module_state(&self, module_id: &ModuleID) -> Result<ModuleState, FrameworkError> {
@@ -100,7 +94,7 @@ impl Registry {
     }
 
     /// Register a newly created module.
-    pub(crate) fn add_module(&mut self, module_id: ModuleID, father_module_id: Option<ModuleID>, lifecycle_channel: LifecycleSenderChannel, message_channel: MessageSenderChannel, join_handle: JoinHandle<()>,) -> Result<(), FrameworkError> {
+    pub(crate) fn add_module(&mut self, module_id: ModuleID, father_module_id: Option<ModuleID>, module_channel: ModuleSenderChannel, join_handle: JoinHandle<()>,) -> Result<(), FrameworkError> {
 
         if self.module_map.contains_key(&module_id) {
             return Err(FrameworkError::Module_AlreadyExists);
@@ -113,7 +107,7 @@ impl Registry {
             }
         }
 
-        let registry_entry = RegistryEntry::new(father_module_id.clone(), lifecycle_channel, message_channel, join_handle);
+        let registry_entry = RegistryEntry::new(father_module_id.clone(), module_channel, join_handle);
 
         self.module_map.insert(module_id.clone(), registry_entry);
 
