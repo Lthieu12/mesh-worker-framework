@@ -22,7 +22,8 @@ pub enum ModuleState {
     Initialized,
     /// Module Closing is in progress.
     Closing,
-
+    /// Module has been closed and is not usable anymore.
+    Closed,
 }
 
 

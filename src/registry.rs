@@ -28,7 +28,7 @@ pub(crate) struct RegistryEntry {
     message_channel: MessageSenderChannel,
 
     /// Tokio task handle associated with the module runtime.
-    join_handle: JoinHandle<()>,
+    join_handle: Option<JoinHandle<()>>,
 
 }
 
@@ -47,7 +47,7 @@ impl RegistryEntry {
             module_state: ModuleState::Created,
             lifecycle_channel,
             message_channel,
-            join_handle,
+            join_handle: Some(join_handle),
         }
     }
 }
@@ -157,6 +157,16 @@ impl Registry {
         registry_entry.module_state = module_state;
 
         Ok(())
+    }
+
+    /// Take ownership of the JoinHandle associated with a module.
+    pub(crate) fn take_join_handle(&mut self, module_id: &ModuleID) -> Result<JoinHandle<()>, FrameworkError> {
+
+        let registry_entry = self.module_map.get_mut(module_id).ok_or(FrameworkError::Module_NotFound)?;
+
+        let join_handle = registry_entry.join_handle.take().ok_or(FrameworkError::Framework_InternalError)?;
+
+        Ok(join_handle)
     }
     
 }

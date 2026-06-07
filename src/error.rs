@@ -17,6 +17,9 @@ use std::fmt;
 #[allow(non_camel_case_types)]
 pub enum FrameworkError {
 
+    /// An internal framework error occurred.
+    Framework_InternalError,
+
     /// The framework has not been initialized.
     Framework_NotInitialized,
 
@@ -36,7 +39,10 @@ pub enum FrameworkError {
     Module_AlreadyExists,
 
     /// The requested module is already initialized.
-    Module_AlreadyInitialized
+    Module_AlreadyInitialized,
+
+    /// The requested module has not been initialized.
+    Module_NotInitialized,
 }
 
 /// Human-readable representation of FrameworkError.
@@ -45,6 +51,9 @@ impl fmt::Display for FrameworkError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 
         match self {
+
+            FrameworkError::Framework_InternalError =>
+                write!(f, "An internal framework error occurred."),
 
             FrameworkError::Framework_NotInitialized =>
                 write!(f, "The framework has not been initialized."),
@@ -66,6 +75,9 @@ impl fmt::Display for FrameworkError {
             
             FrameworkError::Module_AlreadyInitialized =>
                 write!(f, "The requested module is already initialized."),
+
+            FrameworkError::Module_NotInitialized =>
+                write!(f, "The requested module has not been initialized."),
 
         }
     }

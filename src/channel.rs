@@ -1,12 +1,13 @@
 use tokio::sync::mpsc::Sender;
 use tokio::sync::mpsc::Receiver;
+use tokio::sync::oneshot;
 
 use crate::message::FrameworkMessage;
 
 #[derive(Debug)]
 pub(crate) enum LifecycleCommand {
-    Init,
-    Close,
+    Init(oneshot::Sender<()>),
+    Close(oneshot::Sender<()>),
 }
 
 /// Channel used to send lifecycle commands to a module.
