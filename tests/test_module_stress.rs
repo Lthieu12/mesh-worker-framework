@@ -128,3 +128,50 @@ async fn test_module_stress_multiple_modules() {
 
     MMF::close().unwrap();
 }
+
+// MMF uses a global runtime instance.
+// Integration tests must run serially.
+#[tokio::test]
+#[serial]
+async fn test_hierarchy_stress() {
+
+    MMF::init().unwrap();
+
+    let mut root_ids = Vec::new();
+
+    for root_index in 0..100 {
+
+        let root_id =
+            MMF::spawn_module(
+                TestModule,
+                EntityID::External(
+                    format!("ROOT_{root_index}")
+                ),
+            )
+            .unwrap();
+
+        root_ids.push(root_id.clone());
+
+        for _ in 0..10 {
+
+            let child_id =
+                MMF::spawn_module(
+                    TestModule,
+                    EntityID::Module(root_id.clone()),
+                )
+                .unwrap();
+
+            assert_eq!(
+                MMF::get_father_id(&child_id).unwrap(),
+                EntityID::Module(root_id.clone())
+            );
+        }
+
+        let children =
+            MMF::get_children_ids(&root_id).unwrap();
+
+        assert_eq!(children.len(), 10);
+    }
+
+    MMF::close().unwrap();
+}

@@ -76,6 +76,7 @@ impl Registry {
         Ok(registry_entry.module_channel.clone())
     }
 
+    /// Get module state from ModuleID
     pub(crate) fn get_module_state(&self, module_id: &ModuleID) -> Result<ModuleState, FrameworkError> {
         let registry_entry = self.module_map.get(module_id).ok_or(FrameworkError::Module_NotFound)?;
         Ok(registry_entry.module_state)
@@ -128,11 +129,28 @@ impl Registry {
         Ok(())
     }
 
-    /// Update the state of a registered module.
+    /// Update the module state of a registered module.
     pub(crate) fn set_module_state(&mut self, module_id: &ModuleID, module_state: ModuleState) -> Result<(), FrameworkError> {
         let registry_entry = self.module_map.get_mut(module_id).ok_or(FrameworkError::Module_NotFound)?;
         registry_entry.module_state = module_state;
         Ok(())
+    }
+
+    /// Get the module FatherID from ModuleID.
+    pub(crate) fn get_father_id(&self, module_id: &ModuleID) -> Result<EntityID, FrameworkError> {
+        let registry_entry = self.module_map.get(module_id).ok_or(FrameworkError::Module_NotFound)?;
+        Ok(registry_entry.father_id.clone())
+    }
+
+    /// Get the children ModuleIDs of a module.
+    pub(crate) fn get_children_ids(&self, module_id: &ModuleID) -> Result<Vec<ModuleID>, FrameworkError> {
+        if !self.module_map.contains_key(module_id) {
+            return Err(FrameworkError::Module_NotFound);
+        }
+        match self.child_module_map.get(module_id) {
+            Some(children_ids) => Ok(children_ids.clone()),
+            None => Ok(Vec::new()),
+        }
     }
 
     /// Take ownership of the JoinHandle associated with a module.
@@ -141,6 +159,8 @@ impl Registry {
         let join_handle = registry_entry.join_handle.take().ok_or(FrameworkError::Framework_InternalError)?;
         Ok(join_handle)
     }
+
+
     
 }
 

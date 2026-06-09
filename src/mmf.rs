@@ -276,6 +276,25 @@ impl MMF {
         Ok(())
     }
 
+    /// Get the module FatherID of a module
+    pub fn get_father_id(module_id: &ModuleID) -> Result<EntityID, FrameworkError>{
+        
+        let mmf_data_guard = MMF_DATA.read().unwrap();
+        let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let father_id = mmf_data.registry.get_father_id(module_id)?;
+        drop(mmf_data_guard);
+
+        Ok(father_id)
+    }
+
+    /// Get the children ModuleIDs of a module.
+    pub fn get_children_ids(module_id: &ModuleID) -> Result<Vec<ModuleID>, FrameworkError> {
+        let mmf_data_guard = MMF_DATA.read().unwrap();
+        let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+
+        mmf_data.registry.get_children_ids(module_id)
+    }
+
     /// Send a message to a module.
     pub async fn send_message(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes) -> Result<(), FrameworkError> {
         
