@@ -83,7 +83,7 @@ async fn test_module_stress_multiple_modules() {
 
         let mut module_ids = Vec::new();
 
-        for i in 0..10 {
+        for _i in 0..10 {
 
             let module_id =
                 MMF::spawn_module(
