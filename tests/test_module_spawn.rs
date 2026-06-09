@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use serial_test::serial;
 
 use mesh_module_framework::*;
 
@@ -26,7 +27,10 @@ impl Module for TestModule {
     }
 }
 
+// MMF uses a global runtime instance.
+// Integration tests must run serially.
 #[tokio::test]
+#[serial]
 async fn test_module_lifecycle() {
 
     MMF::init().unwrap();

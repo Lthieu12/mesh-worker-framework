@@ -147,3 +147,33 @@ The long-term objective is to validate:
 ## Project Status
 
 Early design phase.
+
+---
+
+## Running tests
+
+MMF currently uses a global runtime instance.
+
+Integration tests that call:
+
+- MMF::init()
+- MMF::close()
+
+must not execute concurrently.
+
+The project uses the `serial_test` crate and integration tests are annotated with:
+
+#[serial]
+
+to ensure exclusive access to the MMF runtime during execution.
+
+### Why are integration tests serialized?
+
+MMF uses a global runtime instance stored in a static variable.
+
+Running multiple integration tests concurrently could cause
+Framework_AlreadyInitialized errors because several tests would
+attempt to initialize the same MMF runtime simultaneously.
+
+For this reason, integration tests using MMF are marked with
+#[serial].

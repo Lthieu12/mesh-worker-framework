@@ -1,5 +1,5 @@
 use std::sync::{Arc, Mutex};
-
+use serial_test::serial;
 use async_trait::async_trait;
 use bytes::Bytes;
 
@@ -50,7 +50,10 @@ impl Module for TestModule {
     }
 }
 
+// MMF uses a global runtime instance.
+// Integration tests must run serially.
 #[tokio::test]
+#[serial]
 async fn test_module_message_fifo() {
 
     MMF::init().unwrap();
