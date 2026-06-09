@@ -10,13 +10,11 @@ use crate::message::FrameworkMessage;
 /// Unique identifier of a module instance.
 pub type ModuleID = String;
 
-/// Identifier of a message sender.
+/// Identifier of an entity interacting with MMF.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SenderID {
-
+pub enum EntityID {
     /// Message sent by a MMF module.
     Module(ModuleID),
-
     /// Message sent from outside MMF.
     External(String),
 }
@@ -24,7 +22,6 @@ pub enum SenderID {
 /// Current state of a module within the framework.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModuleState {
-
     /// Module has been created but not initialized.
     Created,
     /// Module initialization is in progress.
@@ -43,7 +40,7 @@ pub enum ModuleState {
 pub trait Module {
 
     /// Called once when the module is initialized.
-    async fn on_init(&mut self);
+    async fn on_init(&mut self, module_id: &ModuleID, father_id: &EntityID);
 
     /// Called when a message is received by the module.
     async fn on_message(&mut self, message: FrameworkMessage);

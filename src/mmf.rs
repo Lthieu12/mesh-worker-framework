@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::error::FrameworkError;
 use crate::logging::LoggingData;
-use crate::module::{Module, ModuleID, SenderID, ModuleState};
+use crate::module::{Module, ModuleID, EntityID, ModuleState};
 use crate::registry::Registry;
 use crate::module_task::spawn_module_task;
 use crate::channel::ModuleCommand;
@@ -105,7 +105,7 @@ impl MMF {
     /// After this function returns:
     /// - MMF owns the ModuleID, channels and JoinHandle.
     /// - The Tokio task owns the module instance itself.
-    pub fn spawn_module<T>(module: T, father_module_id: Option<ModuleID>) -> Result<ModuleID, FrameworkError>
+    pub fn spawn_module<T>(module: T, father_id: EntityID) -> Result<ModuleID, FrameworkError>
     where T: Module + Send + 'static {
 
         let mut mmf_data_guard = MMF_DATA.write().unwrap();
@@ -120,7 +120,7 @@ impl MMF {
         // Once spawned, MMF no longer owns the module.
         // MMF communicates with the module through channels and
         // tracks its execution through the JoinHandle.
-        let join_handle = spawn_module_task(module, module_receiver);
+        let join_handle = spawn_module_task(module, module_receiver, module_id.clone(), father_id.clone());
 
         // Store the module resources in the Registry.
         //
@@ -129,7 +129,7 @@ impl MMF {
         // - Module state.
         // - Communication channels.
         // - JoinHandle associated with the Tokio task.
-        mmf_data.registry.add_module(module_id.clone(), father_module_id, module_sender, join_handle,)?;
+        mmf_data.registry.add_module(module_id.clone(), father_id, module_sender, join_handle,)?;
         drop(mmf_data_guard);
 
         Ok(module_id)
@@ -277,7 +277,7 @@ impl MMF {
     }
 
     /// Send a message to a module.
-    pub async fn send_message(sender_id: &SenderID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes) -> Result<(), FrameworkError> {
+    pub async fn send_message(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes) -> Result<(), FrameworkError> {
         
         // Read MMF data.
         //
@@ -294,13 +294,13 @@ impl MMF {
         //
         // External senders are not validated.
         match sender_id {
-            SenderID::Module(module_id) => {
+            EntityID::Module(module_id) => {
                 let module_state = mmf_data.registry.get_module_state(module_id)?;
                 if module_state != ModuleState::Initialized {
                     return Err(FrameworkError::Module_NotInitialized);
                 }
             }
-            SenderID::External(_) => {}
+            EntityID::External(_) => {}
         }
 
         // Validate the receiver module state.

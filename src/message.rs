@@ -5,7 +5,7 @@
 //! FrameworkMessage instances.
 
 use bytes::Bytes;
-use crate::module::{ModuleID, SenderID};
+use crate::module::{ModuleID, EntityID};
 
 /// Identifies the functional purpose of a message
 /// (e.g. "Start", "Stop", "AcquisitionDone").
@@ -31,7 +31,7 @@ pub enum MessagePriority {
 pub struct FrameworkMessage {
 
     /// Identifier of the sender module.
-    pub sender_id: SenderID,
+    pub sender_id: EntityID,
 
     /// Identifier of the receiver module.
     pub receiver_id: ModuleID,

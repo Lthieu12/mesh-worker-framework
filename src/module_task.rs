@@ -21,14 +21,14 @@
 use tokio::task::JoinHandle;
 
 use crate::channel::{ModuleCommand, ModuleReceiverChannel};
-use crate::module::Module;
+use crate::module::{Module, ModuleID, EntityID};
 
 /// Spawn a Tokio task that takes ownership of the module instance.
 ///
 /// After this point:
 /// - MMF owns the Senders and the JoinHandle.
 /// - ModuleTask owns the module instance and the Receivers.
-pub(crate) fn spawn_module_task<T>(module: T, module_receiver: ModuleReceiverChannel) -> JoinHandle<()>
+pub(crate) fn spawn_module_task<T>(module: T, module_receiver: ModuleReceiverChannel, module_id:ModuleID, father_id:EntityID) -> JoinHandle<()>
 where T: Module + Send + 'static{
    
     tokio::spawn(async move {
@@ -37,8 +37,10 @@ where T: Module + Send + 'static{
         // All module callbacks are executed
         // inside this Tokio task.
         let mut module = module;
-
         let mut module_receiver = module_receiver;
+
+        let module_id = module_id;
+        let father_id = father_id;
 
         // Wait for module commands sent by MMF.
         //
@@ -58,7 +60,7 @@ where T: Module + Send + 'static{
                 // The reply is sent only after on_init() completes,
                 // making init_module() behave like a synchronous operation.
                 ModuleCommand::Init(reply_sender) => {
-                    module.on_init().await;
+                    module.on_init(&module_id, &father_id).await;
                     let _ = reply_sender.send(());
                 }
 

@@ -7,7 +7,11 @@ struct TestModule;
 #[async_trait]
 impl Module for TestModule {
 
-    async fn on_init(&mut self) {
+    async fn on_init(
+        &mut self,
+        _module_id: &ModuleID,
+        _father_id: &EntityID,
+    ) {
         println!("on_init");
     }
 
@@ -30,7 +34,7 @@ async fn test_module_lifecycle() {
     let module_id =
         MMF::spawn_module(
             TestModule,
-            None,
+            EntityID::External("TEST".to_string()),
         )
         .unwrap();
 

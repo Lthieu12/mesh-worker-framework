@@ -12,7 +12,11 @@ struct TestModule {
 #[async_trait]
 impl Module for TestModule {
 
-    async fn on_init(&mut self) {
+    async fn on_init(
+        &mut self,
+        _module_id: &ModuleID,
+        _father_id: &EntityID,
+    ) {
 
         let mut event_list = self.event_list.lock().unwrap();
 
@@ -63,7 +67,7 @@ async fn test_module_message_fifo() {
             TestModule {
                 event_list: event_list.clone(),
             },
-            None,
+            EntityID::External("TEST".to_string()),
         )
         .unwrap();
 
@@ -72,7 +76,7 @@ async fn test_module_message_fifo() {
         .unwrap();
 
     MMF::send_message(
-        &SenderID::Module(module_id.clone()),
+        &EntityID::Module(module_id.clone()),
         &module_id,
         &"Message1".to_string(),
         Bytes::new(),
@@ -81,7 +85,7 @@ async fn test_module_message_fifo() {
     .unwrap();
 
     MMF::send_message(
-        &SenderID::Module(module_id.clone()),
+        &EntityID::Module(module_id.clone()),
         &module_id,
         &"Message2".to_string(),
         Bytes::new(),

@@ -7,15 +7,15 @@ use std::collections::HashMap;
 use tokio::task::JoinHandle;
 
 use crate::channel::ModuleSenderChannel;
-use crate::module::{Module, ModuleID, ModuleState};
+use crate::module::{Module, ModuleID, EntityID, ModuleState};
 use crate::error::FrameworkError;
 
 /// Information associated with a registered module.
 #[derive(Debug)]
 pub(crate) struct RegistryEntry {
 
-    /// Parent module identifier. None indicates a root module.
-    father_module_id: Option<ModuleID>,
+    /// Identifier of the entity that spawned this module.
+    father_id: EntityID,
 
     /// Current module state.
     module_state: ModuleState,
@@ -32,13 +32,13 @@ impl RegistryEntry {
 
     /// Create a registry entry for a newly created module.
     fn new(
-        father_module_id: Option<ModuleID>,
+        father_id: EntityID,
         module_channel: ModuleSenderChannel,
         join_handle: JoinHandle<()>,
     ) -> Self {
 
         Self {
-            father_module_id,
+            father_id,
             module_state: ModuleState::Created,
             module_channel: module_channel,
             join_handle: Some(join_handle),
@@ -72,16 +72,12 @@ impl Registry {
 
     /// Get module channel from ModuleID.
     pub(crate) fn get_module_channel(&self, module_id: &ModuleID) -> Result<ModuleSenderChannel, FrameworkError> {
-
         let registry_entry = self.module_map.get(module_id).ok_or(FrameworkError::Module_NotFound)?;
-
         Ok(registry_entry.module_channel.clone())
     }
 
     pub(crate) fn get_module_state(&self, module_id: &ModuleID) -> Result<ModuleState, FrameworkError> {
-
         let registry_entry = self.module_map.get(module_id).ok_or(FrameworkError::Module_NotFound)?;
-
         Ok(registry_entry.module_state)
     }
 
@@ -94,72 +90,55 @@ impl Registry {
     }
 
     /// Register a newly created module.
-    pub(crate) fn add_module(&mut self, module_id: ModuleID, father_module_id: Option<ModuleID>, module_channel: ModuleSenderChannel, join_handle: JoinHandle<()>,) -> Result<(), FrameworkError> {
-
+    pub(crate) fn add_module(&mut self, module_id: ModuleID, father_id: EntityID, module_channel: ModuleSenderChannel, join_handle: JoinHandle<()>,) -> Result<(), FrameworkError> {
         if self.module_map.contains_key(&module_id) {
             return Err(FrameworkError::Module_AlreadyExists);
         }
-
-        if let Some(father_module_id_ref) = &father_module_id {
-
-            if !self.module_map.contains_key(father_module_id_ref) {
-                return Err(FrameworkError::Module_NotFound);
+        match &father_id {
+            EntityID::Module(father_id_ref) => {
+                if !self.module_map.contains_key(father_id_ref) {
+                    return Err(FrameworkError::Module_NotFound);
+                }
             }
+
+            EntityID::External(_) => {}
         }
-
-        let registry_entry = RegistryEntry::new(father_module_id.clone(), module_channel, join_handle);
-
+        let registry_entry = RegistryEntry::new(father_id.clone(), module_channel, join_handle);
         self.module_map.insert(module_id.clone(), registry_entry);
-
-        if let Some(father_module_id_ref) = father_module_id {
-            self.child_module_map.entry(father_module_id_ref).or_insert(Vec::new()).push(module_id);
+        if let EntityID::Module(father_id_ref) = father_id {
+            self.child_module_map.entry(father_id_ref).or_insert(Vec::new()).push(module_id);
         }
-
         Ok(())
     }
 
     /// Remove a module from the registry.
     pub(crate) fn remove_module(&mut self, module_id: &ModuleID) -> Result<(), FrameworkError> {
-
         let registry_entry = self.module_map.get(module_id).ok_or(FrameworkError::Module_NotFound)?;
-        let father_module_id = registry_entry.father_module_id.clone();
-
+        let father_id = registry_entry.father_id.clone();
         self.module_map.remove(module_id);
-
-        if let Some(father_module_id_ref) = father_module_id {
-
-            if let Some(child_module_list) = self.child_module_map.get_mut(&father_module_id_ref) {
-
+        if let EntityID::Module(father_id_ref) = father_id {
+            if let Some(child_module_list) = self.child_module_map.get_mut(&father_id_ref) {
                 child_module_list.retain(|child_id| child_id != module_id);
-
                 if child_module_list.is_empty() {
-                    self.child_module_map.remove(&father_module_id_ref);
+                    self.child_module_map.remove(&father_id_ref);
                 }
             }
         }
-
         self.child_module_map.remove(module_id);
-
         Ok(())
     }
 
     /// Update the state of a registered module.
     pub(crate) fn set_module_state(&mut self, module_id: &ModuleID, module_state: ModuleState) -> Result<(), FrameworkError> {
-
         let registry_entry = self.module_map.get_mut(module_id).ok_or(FrameworkError::Module_NotFound)?;
-
         registry_entry.module_state = module_state;
-
         Ok(())
     }
 
     /// Take ownership of the JoinHandle associated with a module.
     pub(crate) fn take_join_handle(&mut self, module_id: &ModuleID) -> Result<JoinHandle<()>, FrameworkError> {
-
         let registry_entry = self.module_map.get_mut(module_id).ok_or(FrameworkError::Module_NotFound)?;
-
         let join_handle = registry_entry.join_handle.take().ok_or(FrameworkError::Framework_InternalError)?;
-
         Ok(join_handle)
     }
     
