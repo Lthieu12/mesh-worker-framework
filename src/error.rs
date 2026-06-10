@@ -20,6 +20,9 @@ pub enum FrameworkError {
     /// An internal framework error occurred.
     Framework_InternalError,
 
+    /// The operation timed out.
+    Operation_Timeout,
+
     /// The framework has not been initialized.
     Framework_NotInitialized,
 
@@ -46,6 +49,7 @@ pub enum FrameworkError {
 
     /// The requested father module was not found.
     FatherModule_NotFound,
+
 }
 
 /// Human-readable representation of FrameworkError.
@@ -57,6 +61,9 @@ impl fmt::Display for FrameworkError {
 
             FrameworkError::Framework_InternalError =>
                 write!(f, "An internal framework error occurred."),
+
+            FrameworkError::Operation_Timeout =>
+                write!(f, "The operation timed out."),
 
             FrameworkError::Framework_NotInitialized =>
                 write!(f, "The framework has not been initialized."),

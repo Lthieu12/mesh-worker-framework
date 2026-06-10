@@ -6,6 +6,7 @@
 use std::sync::{LazyLock, RwLock};
 use bytes::Bytes;
 use std::sync::atomic::{AtomicU64, Ordering};
+use tokio::sync::Notify;
 
 use crate::error::FrameworkError;
 use crate::logging::LoggingData;
@@ -17,6 +18,9 @@ use crate::message::{FrameworkMessage, MessageID, MessagePriority, MessageInstan
 
 /// Global MMF runtime storage.
 static MMF_DATA: LazyLock<RwLock<Option<MMFData>>> = LazyLock::new(|| RwLock::new(None));
+
+/// Global MMF notifier used to signal child module closures.
+static MMF_CHILD_CLOSE_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Notify::new());
 
 /// Global MMF message instance counter
 static MESSAGE_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
@@ -285,6 +289,9 @@ impl MMF {
         mmf_data.registry.remove_module(module_id)?;
         drop(mmf_data_guard);
 
+        // Notify all waiters that a child module has closed.
+        MMF_CHILD_CLOSE_NOTIFY.notify_waiters();
+
         Ok(())
     }
 
@@ -319,6 +326,49 @@ impl MMF {
         let children_count = mmf_data.registry.get_children_count(entity_id)?;
         drop(mmf_data_guard);
         Ok(children_count)
+    }
+
+
+    /// Wait until all child modules of an entity are closed.
+    ///
+    /// timeout_ms:
+    /// - None => wait indefinitely.
+    /// - Some(value) => timeout in milliseconds.
+    pub async fn wait_children_close(entity_id: &EntityID, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
+
+        let wait_future = async {
+
+            loop {
+
+                // Check the current number of children.
+                //
+                // The count is re-evaluated after every notification
+                // because multiple child modules may close concurrently.
+                let child_count =
+                    MMF::get_children_count(entity_id)?;
+
+                if child_count == 0 {
+                    return Ok(());
+                }
+
+                // Wait until a child module closure notification
+                // is received.
+                MMF_CHILD_CLOSE_NOTIFY.notified().await;
+            }
+        };
+
+        match timeout_ms {
+
+            // Wait indefinitely.
+            None => {
+                wait_future.await
+            }
+
+            // Wait until timeout expires.
+            Some(timeout_ms) => {
+                tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), wait_future).await.map_err(|_| FrameworkError::Operation_Timeout)?
+            }
+        }
     }
 
 
