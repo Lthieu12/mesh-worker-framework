@@ -11,7 +11,7 @@ use crate::message::FrameworkMessage;
 pub type ModuleID = String;
 
 /// Identifier of an entity interacting with MMF.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum EntityID {
     /// Message sent by a MMF module.
     Module(ModuleID),

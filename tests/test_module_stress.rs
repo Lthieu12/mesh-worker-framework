@@ -168,7 +168,9 @@ async fn test_hierarchy_stress() {
         }
 
         let children =
-            MMF::get_children_ids(&root_id).unwrap();
+            MMF::get_children_ids(
+                &EntityID::Module(root_id.clone())
+            ).unwrap();
 
         assert_eq!(children.len(), 10);
     }

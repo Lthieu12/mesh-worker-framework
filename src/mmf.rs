@@ -38,12 +38,14 @@ impl MMFData {
 
     /// Create a new MMF runtime instance.
     fn new() -> Self {
+        
         Self {
             registry: Registry::new(),
             logging_data: LoggingData::new(),
             module_channel_capacity: 100,
         }
     }
+
 }
 
 /// Public MMF entry point.
@@ -53,6 +55,7 @@ impl MMF {
 
     /// Initialize the MMF framework.
     pub fn init() -> Result<(), FrameworkError> {
+        
         {
             let mut mmf_data_guard = MMF_DATA.write().unwrap();
             if mmf_data_guard.is_some() {
@@ -65,8 +68,10 @@ impl MMF {
         Ok(())
     }
 
+
     /// Shutdown the MMF framework and release all resources.
     pub fn close() -> Result<(), FrameworkError> {
+        
         {
             let mut mmf_data_guard = MMF_DATA.write().unwrap();
             if mmf_data_guard.is_none() {
@@ -79,8 +84,10 @@ impl MMF {
         Ok(())
     }
 
+
     /// Generate a unique MessageInstanceID.
     fn generate_message_instance_id() -> Result<MessageInstanceID, FrameworkError> {
+        
         let current_id = MESSAGE_INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed);
         if current_id == u64::MAX {
             return Err(FrameworkError::Framework_InternalError);
@@ -89,8 +96,10 @@ impl MMF {
         Ok(current_id)
     }
 
+
     /// Check whether the framework is initialized.
     pub fn is_initialized() -> bool {
+        
         MMF_DATA.read().unwrap().is_some()
     }
 
@@ -135,6 +144,7 @@ impl MMF {
         Ok(module_id)
     }
 
+
     /// Get the current state of a module.
     pub fn get_module_state(module_id: &ModuleID) -> Result<ModuleState, FrameworkError>{
 
@@ -145,6 +155,7 @@ impl MMF {
 
         Ok(module_state)
     }
+
 
     /// Initialize a module and wait until on_init() completes.
     pub async fn init_module(module_id: &ModuleID) -> Result<(), FrameworkError> {
@@ -196,6 +207,7 @@ impl MMF {
 
         Ok(())
     }
+
 
     /// Close a module and wait until on_close() completes.
     pub async fn close_module(module_id: &ModuleID) -> Result<(), FrameworkError> {
@@ -276,6 +288,7 @@ impl MMF {
         Ok(())
     }
 
+
     /// Get the module FatherID of a module
     pub fn get_father_id(module_id: &ModuleID) -> Result<EntityID, FrameworkError>{
         
@@ -287,13 +300,27 @@ impl MMF {
         Ok(father_id)
     }
 
-    /// Get the children ModuleIDs of a module.
-    pub fn get_children_ids(module_id: &ModuleID) -> Result<Vec<ModuleID>, FrameworkError> {
+
+    /// Get the child ModuleIDs of an entity.
+    pub fn get_children_ids(entity_id: &EntityID) -> Result<Vec<ModuleID>, FrameworkError> {
+        
         let mmf_data_guard = MMF_DATA.read().unwrap();
         let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
 
-        mmf_data.registry.get_children_ids(module_id)
+        mmf_data.registry.get_children_ids(entity_id)
     }
+
+
+    /// Get the number of child modules of an entity.
+    pub fn get_children_count(entity_id: &EntityID) -> Result<usize, FrameworkError> {
+
+        let mmf_data_guard = MMF_DATA.read().unwrap();
+        let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let children_count = mmf_data.registry.get_children_count(entity_id)?;
+        drop(mmf_data_guard);
+        Ok(children_count)
+    }
+
 
     /// Send a message to a module.
     pub async fn send_message(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes) -> Result<(), FrameworkError> {
@@ -364,6 +391,7 @@ impl MMF {
         Ok(())
 
     }
+
 
 }
 

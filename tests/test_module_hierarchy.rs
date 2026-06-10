@@ -76,21 +76,35 @@ async fn test_module_hierarchy() {
     // Verify children relationships.
 
     let children_ids =
-        MMF::get_children_ids(&module_a_id).unwrap();
+        MMF::get_children_ids(
+            &EntityID::Module(module_a_id.clone())
+        ).unwrap();
 
     assert_eq!(children_ids.len(), 2);
     assert!(children_ids.contains(&module_b_id));
     assert!(children_ids.contains(&module_c_id));
 
     let children_ids =
-        MMF::get_children_ids(&module_b_id).unwrap();
+        MMF::get_children_ids(
+            &EntityID::Module(module_b_id.clone())
+        ).unwrap();
 
     assert!(children_ids.is_empty());
 
     let children_ids =
-        MMF::get_children_ids(&module_c_id).unwrap();
+        MMF::get_children_ids(
+            &EntityID::Module(module_c_id.clone())
+        ).unwrap();
 
     assert!(children_ids.is_empty());
+
+    let children_ids =
+        MMF::get_children_ids(
+            &EntityID::External("MAIN".to_string())
+        ).unwrap();
+
+    assert_eq!(children_ids.len(), 1);
+    assert!(children_ids.contains(&module_a_id));
 
     MMF::close().unwrap();
 }

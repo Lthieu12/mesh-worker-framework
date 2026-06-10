@@ -43,6 +43,9 @@ pub enum FrameworkError {
 
     /// The requested module has not been initialized.
     Module_NotInitialized,
+
+    /// The requested father module was not found.
+    FatherModule_NotFound,
 }
 
 /// Human-readable representation of FrameworkError.
@@ -78,6 +81,9 @@ impl fmt::Display for FrameworkError {
 
             FrameworkError::Module_NotInitialized =>
                 write!(f, "The requested module has not been initialized."),
+
+            FrameworkError::FatherModule_NotFound =>
+                write!(f, "The requested father module was not found."),
 
         }
     }

@@ -38,4 +38,5 @@ impl LoggingData {
             logged_module_list: Vec::new(),
         }
     }
+    
 }
