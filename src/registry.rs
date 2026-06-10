@@ -50,9 +50,10 @@ impl RegistryEntry {
 pub(crate) struct Registry {
 
     /// Maps a ModuleID to its registry entry.
+    /// Source of truth for module existence.
     module_map: HashMap<ModuleID, RegistryEntry>,
 
-    /// Maps a parent ModuleID to its child ModuleIDs.
+    /// Maps an entity to its child ModuleIDs.
     child_module_map: HashMap<EntityID, Vec<ModuleID>>,
 
     /// Stores the instance counter for each module type.
@@ -160,6 +161,10 @@ impl Registry {
             child_module_list.retain(|child_id| child_id != module_id);
 
             // Remove the father entry if it no longer has children.
+            //
+            // child_module_map only stores existing parent/child
+            // relationships.
+            // An entity with no children does not have an entry in the map.
             if child_module_list.is_empty() {
                 self.child_module_map.remove(&father_id);
             }

@@ -13,9 +13,9 @@ pub type ModuleID = String;
 /// Identifier of an entity interacting with MMF.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum EntityID {
-    /// Message sent by a MMF module.
+    /// MMF module entity.
     Module(ModuleID),
-    /// Message sent from outside MMF.
+    /// External entity not managed by MMF.
     External(String),
 }
 

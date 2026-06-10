@@ -30,7 +30,7 @@ pub enum MessagePriority {
 /// Message exchanged between modules through MMF.
 pub struct FrameworkMessage {
 
-    /// Identifier of the sender module.
+    /// Identifier of the sender entity.
     pub sender_id: EntityID,
 
     /// Identifier of the receiver module.
