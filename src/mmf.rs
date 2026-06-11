@@ -438,9 +438,44 @@ impl MMF {
     /// - Some(value) => return Operation_Timeout if the delay expires.
     pub async fn send_message_and_wait_reply(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
 
-        // Retrieve the target module channel.
+        // Read MMF data.
+        //
+        // send_message() only requires a read lock because it does
+        // not modify the Registry or ModuleState.
         let mmf_data_guard = MMF_DATA.read().unwrap();
+
         let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+
+        // Validate the sender.
+        //
+        // MMF modules must be initialized before they can
+        // send messages through MMF.
+        //
+        // External senders are not validated.
+        match sender_id {
+            EntityID::Module(module_id) => {
+                let module_state = mmf_data.registry.get_module_state(module_id)?;
+                if module_state != ModuleState::Initialized {
+                    return Err(FrameworkError::Module_NotInitialized);
+                }
+            }
+            EntityID::External(_) => {}
+        }
+
+        // Validate the receiver module state.
+        //
+        // Messages can only be sent to initialized modules.
+        let module_state = mmf_data.registry.get_module_state(receiver_id)?;
+        if module_state != ModuleState::Initialized {
+            return Err(FrameworkError::Module_NotInitialized);
+        }
+
+        // Retrieve the communication channel associated with
+        // the receiver module.
+        //
+        // State validation and channel retrieval are performed
+        // under the same lock to avoid race conditions with
+        // close_module().
         let module_channel = mmf_data.registry.get_module_channel(receiver_id)?;
         drop(mmf_data_guard);
 
