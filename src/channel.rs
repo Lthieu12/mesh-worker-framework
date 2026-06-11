@@ -30,6 +30,7 @@ use crate::message::FrameworkMessage;
 pub(crate) enum ModuleCommand {
     Init(oneshot::Sender<()>),
     Message(FrameworkMessage),
+    MessageAndWaitReply(oneshot::Sender<()>, FrameworkMessage),
     Close(oneshot::Sender<()>),
 }
 

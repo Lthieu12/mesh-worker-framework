@@ -48,3 +48,22 @@ pub struct FrameworkMessage {
     /// Binary payload associated with the message.
     pub message_data: Bytes,
 }
+
+impl FrameworkMessage {
+
+    /// Create a new framework message.
+    pub(crate) fn new(sender_id: EntityID, receiver_id: ModuleID, message_id: MessageID, message_instance_id: MessageInstanceID, message_priority: MessagePriority, message_data: Bytes) -> Self {
+
+        Self {
+            sender_id,
+            receiver_id,
+            message_id,
+            message_instance_id,
+            message_priority,
+            message_data,
+        }
+    }
+}
+
+
+

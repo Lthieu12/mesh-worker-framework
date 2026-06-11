@@ -2,8 +2,10 @@ use std::sync::{Arc, Mutex};
 use serial_test::serial;
 use async_trait::async_trait;
 use bytes::Bytes;
+use std::time::{Duration, Instant};
 
 use mesh_module_framework::*;
+
 
 struct TestModule {
     event_list: Arc<Mutex<Vec<String>>>,
@@ -49,6 +51,38 @@ impl Module for TestModule {
         );
     }
 }
+
+
+struct SlowModule;
+
+#[async_trait]
+impl Module for SlowModule {
+
+    async fn on_init(
+        &mut self,
+        _module_id: &ModuleID,
+        _father_id: &EntityID,
+    ) {
+    }
+
+    async fn on_message(
+        &mut self,
+        _message: FrameworkMessage,
+    ) {
+
+        tokio::time::sleep(
+            Duration::from_millis(200)
+        )
+        .await;
+    }
+
+    async fn on_close(
+        &mut self,
+    ) {
+    }
+}
+
+
 
 // MMF uses a global runtime instance.
 // Integration tests must run serially.
@@ -114,6 +148,115 @@ async fn test_module_message_fifo() {
     );
 
     drop(event_list);
+
+    MMF::close().unwrap();
+}
+
+
+// MMF uses a global runtime instance.
+// Integration tests must run serially.
+#[tokio::test]
+#[serial]
+async fn test_send_message_and_wait_reply() {
+
+    MMF::init().unwrap();
+
+    let module_id =
+        MMF::spawn_module(
+            SlowModule,
+            EntityID::External(
+                "MAIN".to_string()
+            ),
+        )
+        .unwrap();
+
+    MMF::init_module(&module_id)
+        .await
+        .unwrap();
+
+    let start_time =
+        Instant::now();
+
+    MMF::send_message_and_wait_reply(
+        &EntityID::External(
+            "MAIN".to_string()
+        ),
+        &module_id,
+        &"Ping".to_string(),
+        Bytes::new(),
+        Some(1000),
+    )
+    .await
+    .unwrap();
+
+    let elapsed_time =
+        start_time.elapsed();
+
+    assert!(
+        elapsed_time >= Duration::from_millis(200)
+    );
+
+    MMF::close_module(&module_id)
+        .await
+        .unwrap();
+
+    MMF::close().unwrap();
+}
+
+
+// MMF uses a global runtime instance.
+// Integration tests must run serially.
+#[tokio::test]
+#[serial]
+async fn test_send_message_and_wait_reply_timeout() {
+
+    MMF::init().unwrap();
+
+    let module_id =
+        MMF::spawn_module(
+            SlowModule,
+            EntityID::External(
+                "MAIN".to_string()
+            ),
+        )
+        .unwrap();
+
+    MMF::init_module(&module_id)
+        .await
+        .unwrap();
+
+    let start_time =
+        Instant::now();
+
+    let result =
+        MMF::send_message_and_wait_reply(
+            &EntityID::External(
+                "MAIN".to_string()
+            ),
+            &module_id,
+            &"Ping".to_string(),
+            Bytes::new(),
+            Some(50),
+        )
+        .await;
+
+    let elapsed_time =
+        start_time.elapsed();
+
+    assert!(
+        matches!(
+            result,
+            Err(FrameworkError::Operation_Timeout)
+        )
+    );
+
+    assert!(
+        elapsed_time < Duration::from_millis(150)
+    );
+
+    MMF::close_module(&module_id)
+        .await
+        .unwrap();
 
     MMF::close().unwrap();
 }

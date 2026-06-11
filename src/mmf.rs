@@ -415,22 +415,9 @@ impl MMF {
         // close_module().
         let module_channel = mmf_data.registry.get_module_channel(receiver_id)?;
 
-        // Generate the unique id of the message
+        // Generate the unique id and build the message
         let message_instance_id = MMF::generate_message_instance_id()?;
-
-        // Create the FrameworkMessage.
-        //
-        // MMF is responsible for generating framework-managed
-        // fields such as MessageInstanceID.
-        let framework_message = FrameworkMessage {
-
-                sender_id: sender_id.clone(),
-                receiver_id: receiver_id.clone(),
-                message_id: message_id.clone(),
-                message_instance_id,
-                message_priority: MessagePriority::Normal,
-                message_data,
-            };
+        let framework_message = FrameworkMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, MessagePriority::Normal, message_data);
 
         // Release MMF lock before awaiting.
         drop(mmf_data_guard);
@@ -440,6 +427,45 @@ impl MMF {
 
         Ok(())
 
+    }
+
+
+    /// Send a message and wait until the receiver has finished
+    /// processing it.
+    ///
+    /// timeout_ms:
+    /// - None => wait indefinitely.
+    /// - Some(value) => return Operation_Timeout if the delay expires.
+    pub async fn send_message_and_wait_reply(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
+
+        // Retrieve the target module channel.
+        let mmf_data_guard = MMF_DATA.read().unwrap();
+        let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let module_channel = mmf_data.registry.get_module_channel(receiver_id)?;
+        drop(mmf_data_guard);
+
+        // Generate the unique id and build the message
+        let message_instance_id = MMF::generate_message_instance_id()?;
+        let framework_message = FrameworkMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, MessagePriority::Normal, message_data);
+
+        // Create a temporary reply channel used to signal
+        // completion of on_message().
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel();
+
+        // Send the message to the receiver module.
+        module_channel.send(ModuleCommand::MessageAndWaitReply(reply_sender, framework_message)).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+
+        // Wait for completion or timeout.
+        match timeout_ms {
+            Some(timeout_ms) => {
+                tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), reply_receiver).await.map_err(|_| FrameworkError::Operation_Timeout)?.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+            }
+            None => {
+                reply_receiver.await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+            }
+        }
+
+        Ok(())
     }
 
 

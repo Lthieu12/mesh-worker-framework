@@ -76,6 +76,22 @@ where T: Module + Send + 'static{
                     module.on_message(message).await;
                 }
 
+                // Execute a business message.
+                //
+                // MMF is blocked waiting for confirmation that on_message()
+                // has completed.
+                //
+                // Messages are processed through the same FIFO queue
+                // as lifecycle commands (like Init or Close).
+                //
+                // This guarantees that a message accepted before a
+                // Close command is always processed before module
+                // shutdown begins.
+                ModuleCommand::MessageAndWaitReply(reply_sender, message) => {
+                    module.on_message(message).await;
+                    let _ = reply_sender.send(());
+                }
+
                 // Execute module shutdown.
                 //
                 // MMF is blocked waiting for confirmation that on_close()
