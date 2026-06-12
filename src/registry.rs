@@ -99,6 +99,13 @@ impl Registry {
     }
 
 
+    /// Check if the registry is empty.
+    pub(crate) fn is_empty(&self) -> bool {
+
+        self.module_map.is_empty()
+    }
+
+
     /// Register a newly created module.
     pub(crate) fn add_module(&mut self, module_id: ModuleID, father_id: EntityID, module_channel: ModuleSenderChannel, join_handle: JoinHandle<()>) -> Result<(), FrameworkError> {
         
@@ -188,6 +195,12 @@ impl Registry {
         Ok(())
     }
 
+
+    /// Returns true if the module exists in the Registry.
+    pub(crate) fn contains_module(&self, module_id: &ModuleID) -> bool {
+
+        self.module_map.contains_key(module_id)
+    }
 
     /// Get the module FatherID from ModuleID.
     pub(crate) fn get_father_id(&self, module_id: &ModuleID) -> Result<EntityID, FrameworkError> {

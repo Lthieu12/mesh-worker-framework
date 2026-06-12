@@ -20,8 +20,9 @@
 
 use tokio::task::JoinHandle;
 
+use crate::mmf::{MMF_DATA, MMF_MODULE_INIT_NOTIFY, MMF_MODULE_CLOSE_NOTIFY};
 use crate::channel::{ModuleCommand, ModuleReceiverChannel};
-use crate::module::{Module, ModuleID, EntityID};
+use crate::module::{Module, ModuleID, EntityID, ModuleState};
 
 /// Spawn a Tokio task that takes ownership of the module instance.
 ///
@@ -54,14 +55,27 @@ where T: Module + Send + 'static{
 
                 // Execute module initialization.
                 //
-                // MMF is blocked waiting on the reply_receiver created
-                // in init_module().
+                // MMF has already changed the module state from
+                // Created to Initializing before sending this command.
                 //
-                // The reply is sent only after on_init() completes,
-                // making init_module() behave like a synchronous operation.
-                ModuleCommand::Init(reply_sender) => {
+                // ModuleTask is responsible for marking the module
+                // as Initialized only after on_init() completes.
+                ModuleCommand::Init => {
+
                     module.on_init(&module_id, &father_id).await;
-                    let _ = reply_sender.send(());
+
+                    // Publish successful initialization.
+                    //
+                    // The module is now fully initialized and can
+                    // receive business messages.
+                    let mut mmf_data_guard = MMF_DATA.write().unwrap();
+                    let mmf_data = mmf_data_guard.as_mut().unwrap();
+                    mmf_data.registry.set_module_state(&module_id, ModuleState::Initialized).unwrap();
+                    drop(mmf_data_guard);
+
+                    // Wake up all waiters interested in module
+                    // initialization events.
+                    MMF_MODULE_INIT_NOTIFY.notify_waiters();
                 }
 
                 // Execute a business message.
@@ -94,14 +108,36 @@ where T: Module + Send + 'static{
 
                 // Execute module shutdown.
                 //
-                // MMF is blocked waiting for confirmation that on_close()
-                // has completed.
+                // MMF has already changed the module state from
+                // Initialized to Closing before sending this command.
                 //
-                // After the reply is sent, the ModuleTask exits its event
-                // loop and the Tokio task terminates.
-                ModuleCommand::Close(reply_sender) => {
+                // ModuleTask is responsible for removing the module
+                // from the Registry only after on_close() completes.
+                ModuleCommand::Close => {
+
                     module.on_close().await;
-                    let _ = reply_sender.send(());
+
+                    // Mark the module as Closed.
+                    //
+                    // Closed indicates that the module lifecycle
+                    // completed successfully.
+                    let mut mmf_data_guard = MMF_DATA.write().unwrap();
+                    let mmf_data = mmf_data_guard.as_mut().unwrap();
+                    mmf_data.registry.set_module_state(&module_id, ModuleState::Closed).unwrap();
+
+                    // Remove the module from the Registry.
+                    //
+                    // Once removed, the module is no longer visible
+                    // to MMF and cannot receive new commands.
+                    mmf_data.registry.remove_module(&module_id).unwrap();
+                    drop(mmf_data_guard);
+
+                    // Wake up all waiters interested in module
+                    // shutdown events.
+                    MMF_MODULE_CLOSE_NOTIFY.notify_waiters();
+
+                    // Terminate the Tokio task associated with
+                    // this module.
                     break;
                 }
             }

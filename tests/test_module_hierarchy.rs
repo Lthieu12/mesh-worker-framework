@@ -1,31 +1,9 @@
-use async_trait::async_trait;
+mod common;
+
 use serial_test::serial;
 
 use mesh_module_framework::*;
-
-struct TestModule;
-
-#[async_trait]
-impl Module for TestModule {
-
-    async fn on_init(
-        &mut self,
-        _module_id: &ModuleID,
-        _father_id: &EntityID,
-    ) {
-    }
-
-    async fn on_message(
-        &mut self,
-        _message: FrameworkMessage,
-    ) {
-    }
-
-    async fn on_close(
-        &mut self,
-    ) {
-    }
-}
+use common::simulation_module::SimulationModule;
 
 // MMF uses a global runtime instance.
 // Integration tests must run serially.
@@ -35,26 +13,22 @@ async fn test_module_hierarchy() {
 
     MMF::init().unwrap();
 
-    let module_a_id =
-        MMF::spawn_module(
-            TestModule,
-            EntityID::External("MAIN".to_string()),
-        )
-        .unwrap();
+    let module_a_id = SimulationModule::spawn(EntityID::External("MAIN".to_string()), 100, 100, true, Some(500)).await.unwrap();
+    println!("module a state = {:?}", MMF::get_module_state(&module_a_id));
 
-    let module_b_id =
-        MMF::spawn_module(
-            TestModule,
-            EntityID::Module(module_a_id.clone()),
-        )
-        .unwrap();
+    MMF::init_module(&module_a_id).await.unwrap();
+    MMF::wait_module_init(&module_a_id, Some(500)).await.unwrap();
 
-    let module_c_id =
-        MMF::spawn_module(
-            TestModule,
-            EntityID::Module(module_a_id.clone()),
-        )
-        .unwrap();
+    let module_b_id = SimulationModule::spawn(EntityID::Module(module_a_id.clone()), 200, 200, false, None).await.unwrap();
+    println!("module b state = {:?}", MMF::get_module_state(&module_b_id));
+    let module_c_id = SimulationModule::spawn(EntityID::Module(module_a_id.clone()), 300, 300, false, None).await.unwrap();
+    println!("module c state = {:?}", MMF::get_module_state(&module_c_id));
+    
+    MMF::init_module(&module_b_id).await.unwrap();
+    MMF::init_module(&module_c_id).await.unwrap();
+
+    MMF::wait_module_list_init(&vec![module_b_id.clone(), module_c_id.clone()], Some(1000)).await.unwrap();
+
 
     // Verify father relationships.
 
@@ -105,6 +79,15 @@ async fn test_module_hierarchy() {
 
     assert_eq!(children_ids.len(), 1);
     assert!(children_ids.contains(&module_a_id));
+
+    println!("MAIN children(s) = {:?}", MMF::get_children_ids(&EntityID::External("MAIN".to_string())));
+    println!("module_a children(s) = {:?}", MMF::get_children_ids(&EntityID::Module(module_a_id.clone())));
+
+    MMF::close_module(&module_a_id).await.unwrap();
+    MMF::close_module(&module_b_id).await.unwrap();
+    MMF::close_module(&module_c_id).await.unwrap();
+
+    MMF::wait_children_close(&EntityID::External("MAIN".to_string()), Some(1000)).await.unwrap();
 
     MMF::close().unwrap();
 }

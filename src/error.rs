@@ -29,6 +29,9 @@ pub enum FrameworkError {
     /// The framework is already initialized.
     Framework_AlreadyInitialized,
 
+    /// The framework shutdown failed: one or more modules are still running.
+    Framework_CannotClose_ModulesStillRunning,
+
     /// A module failed during its initialization.
     Module_InitializationFailed,
 
@@ -70,6 +73,9 @@ impl fmt::Display for FrameworkError {
 
             FrameworkError::Framework_AlreadyInitialized =>
                 write!(f, "The framework is already initialized."),
+
+            FrameworkError::Framework_CannotClose_ModulesStillRunning =>
+                write!(f, "The framework shutdown failed: one or more modules are still running."),
 
             FrameworkError::Module_InitializationFailed =>
                 write!(f, "A module failed during its initialization."),

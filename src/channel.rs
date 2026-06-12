@@ -28,10 +28,10 @@ use crate::message::FrameworkMessage;
 /// previously accepted messages.
 #[derive(Debug)]
 pub(crate) enum ModuleCommand {
-    Init(oneshot::Sender<()>),
+    Init,
     Message(FrameworkMessage),
     MessageAndWaitReply(oneshot::Sender<()>, FrameworkMessage),
-    Close(oneshot::Sender<()>),
+    Close,
 }
 
 pub(crate) type ModuleSenderChannel = Sender<ModuleCommand>;
