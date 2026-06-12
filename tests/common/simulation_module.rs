@@ -38,13 +38,7 @@ impl SimulationModule {
     /// This helper is intended for integration tests and
     /// returns only when the module has reached the
     /// Initialized state.
-    pub async fn spawn(
-        father_id: EntityID,
-        init_delay_ms: u64,
-        close_delay_ms: u64,
-        wait_children_close: bool,
-        wait_children_close_timeout_ms: Option<u64>,
-    ) -> Result<ModuleID, FrameworkError> {
+    pub async fn spawn(father_id: EntityID, init_delay_ms: u64, close_delay_ms: u64, wait_children_close: bool, wait_children_close_timeout_ms: Option<u64>) -> Result<ModuleID, FrameworkError> {
 
         let module_id =
             MMF::spawn_module(
@@ -94,9 +88,6 @@ impl Module for SimulationModule {
         }
 
         // Simulate shutdown work.
-        tokio::time::sleep(
-            Duration::from_millis(self.close_delay_ms)
-        )
-        .await;
+        tokio::time::sleep(Duration::from_millis(self.close_delay_ms)).await;
     }
 }
