@@ -66,52 +66,31 @@ impl SimulationModule {
 #[async_trait]
 impl Module for SimulationModule {
 
-    async fn on_init(
-        &mut self,
-        module_id: &ModuleID,
-        father_id: &EntityID,
-    ) {
+    async fn on_init(&mut self, module_id: &ModuleID, father_id: &EntityID) {
 
         // Store runtime identifiers provided by MMF.
         self.module_id = Some(module_id.clone());
         self.father_id = Some(father_id.clone());
 
-        tokio::time::sleep(
-            Duration::from_millis(self.init_delay_ms)
-        )
-        .await;
+        tokio::time::sleep(Duration::from_millis(self.init_delay_ms)).await;
     }
 
-    async fn on_message(
-        &mut self,
-        _message: FrameworkMessage,
-    ) {
+    async fn on_message(&mut self, _message: FrameworkMessage) {
         // Intentionally empty.
         //
         // Future tests can extend this module with
         // message-specific behaviors.
     }
 
-    async fn on_close(
-        &mut self,
-    ) {
+    async fn on_close(&mut self) {
 
         // Optionally wait until all direct children
         // have been removed from the Registry.
-        if let Some(timeout_ms) =
-            self.children_close_timeout_ms {
+        if self.wait_children_close {
 
-            let module_id =
-                self.module_id
-                    .as_ref()
-                    .expect("module_id should be initialized");
+            let module_id = self.module_id.as_ref().expect("module_id should be initialized");
 
-            MMF::wait_children_close(
-                &EntityID::Module(module_id.clone()),
-                Some(timeout_ms),
-            )
-            .await
-            .unwrap();
+            MMF::wait_children_close(&EntityID::Module(module_id.clone()), self.children_close_timeout_ms).await.unwrap();
         }
 
         // Simulate shutdown work.
