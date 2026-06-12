@@ -26,7 +26,7 @@ async fn test_module_timeout_init() {
     MMF::init().unwrap();
 
     // Very long init
-    let module_id = SimulationModule::spawn(EntityID::External("MAIN".to_string()), 5_000, 0, false, None).await.unwrap();
+    let module_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 5_000, 0, false, None).await.unwrap();
 
     MMF::init_module(&module_id).await.unwrap();
 
@@ -48,7 +48,7 @@ async fn test_module_timeout_close() {
     MMF::init().unwrap();
 
     // Very long close
-    let module_id = SimulationModule::spawn(EntityID::External("MAIN".to_string()), 0, 5_000, false, None).await.unwrap();
+    let module_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 0, 5_000, false, None).await.unwrap();
 
     MMF::init_module(&module_id).await.unwrap();
 

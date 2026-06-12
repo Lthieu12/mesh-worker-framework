@@ -107,10 +107,10 @@ impl Registry {
 
 
     /// Register a newly created module.
-    pub(crate) fn add_module(&mut self, module_id: ModuleID, father_id: EntityID, module_channel: ModuleSenderChannel, join_handle: JoinHandle<()>) -> Result<(), FrameworkError> {
+    pub(crate) fn add_module(&mut self, module_id: &ModuleID, father_id: &EntityID, module_channel: ModuleSenderChannel, join_handle: JoinHandle<()>) -> Result<(), FrameworkError> {
         
         // Prevent duplicate ModuleIDs.
-        if self.module_map.contains_key(&module_id) {
+        if self.module_map.contains_key(module_id) {
             return Err(FrameworkError::Module_AlreadyExists);
         }
 
@@ -121,7 +121,7 @@ impl Registry {
         //
         // External entities are not managed by MMF and therefore
         // cannot be validated.
-        match &father_id {
+        match father_id {
             EntityID::Module(father_id_ref) => {
                 if !self.module_map.contains_key(father_id_ref) {
                     return Err(FrameworkError::FatherModule_NotFound);
@@ -140,7 +140,7 @@ impl Registry {
         // child_module_map only stores existing relationships.
         //
         // Modules without children do not have an entry in this map.
-        self.child_module_map.entry(father_id.clone()).or_insert(Vec::new()).push(module_id);
+        self.child_module_map.entry(father_id.clone()).or_insert(Vec::new()).push(module_id.clone());
 
         Ok(())
     }

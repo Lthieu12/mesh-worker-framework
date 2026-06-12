@@ -126,7 +126,7 @@ impl MMF {
     /// After this function returns:
     /// - MMF owns the ModuleID, channels and JoinHandle.
     /// - The Tokio task owns the module instance itself.
-    pub fn spawn_module<T>(module: T, father_id: EntityID) -> Result<ModuleID, FrameworkError>
+    pub fn spawn_module<T>(module: T, father_id: &EntityID) -> Result<ModuleID, FrameworkError>
     where T: Module + Send + 'static {
 
         let mut mmf_data_guard = MMF_DATA.write().unwrap();
@@ -170,7 +170,7 @@ impl MMF {
         // - Module state.
         // - Communication channels.
         // - JoinHandle associated with the Tokio task.
-        mmf_data.registry.add_module(module_id.clone(), father_id, module_sender, join_handle,)?;
+        mmf_data.registry.add_module(&module_id, &father_id, module_sender, join_handle,)?;
         drop(mmf_data_guard);
 
         Ok(module_id)
@@ -458,12 +458,12 @@ impl MMF {
     ///
     /// This function should only be used as a recovery mechanism
     /// when normal shutdown has failed.
-    pub fn kill_module_list(module_ids: Vec<ModuleID>) -> Result<(), FrameworkError> {
+    pub fn kill_module_list(module_ids: &Vec<ModuleID>) -> Result<(), FrameworkError> {
 
         let mut mmf_data_guard = MMF_DATA.write().unwrap();
         let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
 
-        for module_id in &module_ids {
+        for module_id in module_ids {
 
             let join_handle = mmf_data.registry.take_join_handle(module_id)?;
 
@@ -483,6 +483,7 @@ impl MMF {
         Ok(())
     }
 
+    
     /// Forcefully terminate a module.
     ///
     /// This operation aborts the Tokio tasks associated with the
@@ -493,7 +494,7 @@ impl MMF {
     /// when normal shutdown has failed.
     pub fn kill_module(module_id: &ModuleID) -> Result<(), FrameworkError> {
 
-        MMF::kill_module_list(vec![module_id.clone()])
+        MMF::kill_module_list(&vec![module_id.clone()])
     }
 
 
@@ -507,7 +508,7 @@ impl MMF {
     /// when normal shutdown has failed.
     pub fn kill_children(entity_id: &EntityID) -> Result<(), FrameworkError> {
 
-        MMF::kill_module_list(MMF::get_children_ids(entity_id)?)
+        MMF::kill_module_list(&MMF::get_children_ids(entity_id)?)
     }
  
 

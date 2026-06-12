@@ -27,15 +27,15 @@ async fn test_module_hierarchy() {
 
     MMF::init().unwrap();
 
-    let module_a_id = SimulationModule::spawn(EntityID::External("MAIN".to_string()), 100, 100, true, Some(500)).await.unwrap();
+    let module_a_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 100, 100, true, Some(500)).await.unwrap();
     println!("module a state = {:?}", MMF::get_module_state(&module_a_id));
 
     MMF::init_module(&module_a_id).await.unwrap();
     MMF::wait_module_init(&module_a_id, Some(500)).await.unwrap();
 
-    let module_b_id = SimulationModule::spawn(EntityID::Module(module_a_id.clone()), 200, 200, false, None).await.unwrap();
+    let module_b_id = SimulationModule::spawn(&EntityID::Module(module_a_id.clone()), 200, 200, false, None).await.unwrap();
     println!("module b state = {:?}", MMF::get_module_state(&module_b_id));
-    let module_c_id = SimulationModule::spawn(EntityID::Module(module_a_id.clone()), 300, 300, false, None).await.unwrap();
+    let module_c_id = SimulationModule::spawn(&EntityID::Module(module_a_id.clone()), 300, 300, false, None).await.unwrap();
     println!("module c state = {:?}", MMF::get_module_state(&module_c_id));
     
     MMF::init_module(&module_b_id).await.unwrap();

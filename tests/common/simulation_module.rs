@@ -29,7 +29,7 @@ pub struct SimulationModule {
     /// Optional timeout used by on_close() to wait for
     /// all direct children to terminate.
     pub wait_children_close: bool,
-    pub children_close_timeout_ms: Option<u64>,
+    pub wait_children_close_timeout_ms: Option<u64>,
 }
 
 impl SimulationModule {
@@ -39,7 +39,7 @@ impl SimulationModule {
     /// This helper is intended for integration tests and
     /// returns only when the module has reached the
     /// Initialized state.
-    pub async fn spawn(father_id: EntityID, init_delay_ms: u64, close_delay_ms: u64, wait_children_close: bool, wait_children_close_timeout_ms: Option<u64>) -> Result<ModuleID, FrameworkError> {
+    pub async fn spawn(father_id: &EntityID, init_delay_ms: u64, close_delay_ms: u64, wait_children_close: bool, wait_children_close_timeout_ms: Option<u64>) -> Result<ModuleID, FrameworkError> {
 
         let module_id =
             MMF::spawn_module(
@@ -49,7 +49,7 @@ impl SimulationModule {
                     init_delay_ms,
                     close_delay_ms,
                     wait_children_close,
-                    children_close_timeout_ms: wait_children_close_timeout_ms,
+                    wait_children_close_timeout_ms,
                 },
                 father_id,
             )?;
@@ -85,7 +85,7 @@ impl Module for SimulationModule {
 
             let module_id = self.module_id.as_ref().expect("module_id should be initialized");
 
-            MMF::wait_children_close(&EntityID::Module(module_id.clone()), self.children_close_timeout_ms).await.unwrap();
+            MMF::wait_children_close(&EntityID::Module(module_id.clone()), self.wait_children_close_timeout_ms).await.unwrap();
         }
 
         // Simulate shutdown work.
