@@ -404,15 +404,8 @@ impl MMF {
         match timeout_ms {
 
             Some(timeout_ms) => {
-
-                tokio::time::timeout(
-                    std::time::Duration::from_millis(timeout_ms),
-                    wait_future,
-                )
-                .await
-                .map_err(|_| FrameworkError::Operation_Timeout)?
+                tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), wait_future).await.map_err(|_| FrameworkError::Operation_Timeout)?
             }
-
             None => {
                 wait_future.await
             }
