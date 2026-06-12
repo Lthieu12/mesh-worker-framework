@@ -1,16 +1,17 @@
+//! Generic MMF module used by integration tests.
+//!
+//! This module can simulate:
+//! - Initialization delays.
+//! - Shutdown delays.
+//! - Parent waiting for child shutdown.
+//!
+//! Additional test behaviors can be added over time.
+
 use async_trait::async_trait;
 use std::time::Duration;
 
 use mesh_module_framework::*;
 
-/// Generic MMF module used by integration tests.
-///
-/// This module can simulate:
-/// - Initialization delays.
-/// - Shutdown delays.
-/// - Parent waiting for child shutdown.
-///
-/// Additional test behaviors can be added over time.
 pub struct SimulationModule {
 
     /// Runtime ModuleID assigned by MMF during on_init().

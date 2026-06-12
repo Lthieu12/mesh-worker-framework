@@ -1,3 +1,17 @@
+//! Validate the complete MMF module lifecycle on a small hierarchy.
+//!
+//! Scenario:
+//! - Create a parent module and two child modules.
+//! - Verify parent/child relationships.
+//! - Initialize all modules.
+//! - Shutdown all modules.
+//! - Wait for complete module removal.
+//! - Shutdown MMF.
+//!
+//! This test validates the normal lifecycle path of the framework,
+//! including hierarchy management, initialization, shutdown and
+//! synchronization helpers.
+
 mod common;
 
 use serial_test::serial;
