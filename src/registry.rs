@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use tokio::task::JoinHandle;
 
-use crate::channel::ModuleSenderChannel;
+use crate::channel::{ModuleNormalSenderChannel, ModulePrioritySenderChannel};
 use crate::module::{Module, ModuleID, EntityID, ModuleState};
 use crate::error::FrameworkError;
 
@@ -21,7 +21,10 @@ pub(crate) struct RegistryEntry {
     module_state: ModuleState,
 
     /// Channel used to send commands to the module.
-    module_channel: ModuleSenderChannel,
+    normal_sender_channel: ModuleNormalSenderChannel,
+
+    /// Channel used to send priority commands to the module.
+    priority_sender_channel: ModulePrioritySenderChannel,
 
     /// Tokio task handle associated with the module runtime.
     join_handle: Option<JoinHandle<()>>,
@@ -33,14 +36,16 @@ impl RegistryEntry {
     /// Create a registry entry for a newly created module.
     fn new(
         father_id: EntityID,
-        module_channel: ModuleSenderChannel,
+        normal_sender_channel: ModuleNormalSenderChannel,
+        priority_sender_channel: ModulePrioritySenderChannel,
         join_handle: JoinHandle<()>,
     ) -> Self {
 
         Self {
             father_id,
             module_state: ModuleState::Created,
-            module_channel: module_channel,
+            normal_sender_channel,
+            priority_sender_channel,
             join_handle: Some(join_handle),
         }
     }
@@ -74,10 +79,18 @@ impl Registry {
 
 
     /// Get module channel from ModuleID.
-    pub(crate) fn get_module_channel(&self, module_id: &ModuleID) -> Result<ModuleSenderChannel, FrameworkError> {
+    pub(crate) fn get_module_normal_channel(&self, module_id: &ModuleID) -> Result<ModuleNormalSenderChannel, FrameworkError> {
         
         let registry_entry = self.module_map.get(module_id).ok_or(FrameworkError::Module_NotFound)?;
-        Ok(registry_entry.module_channel.clone())
+        Ok(registry_entry.normal_sender_channel.clone())
+    }
+
+
+    /// Get module priority channel from ModuleID.
+    pub(crate) fn get_module_priority_channel(&self, module_id: &ModuleID) -> Result<ModuleNormalSenderChannel, FrameworkError> {
+        
+        let registry_entry = self.module_map.get(module_id).ok_or(FrameworkError::Module_NotFound)?;
+        Ok(registry_entry.priority_sender_channel.clone())
     }
 
 
@@ -107,7 +120,7 @@ impl Registry {
 
 
     /// Register a newly created module.
-    pub(crate) fn add_module(&mut self, module_id: &ModuleID, father_id: &EntityID, module_channel: ModuleSenderChannel, join_handle: JoinHandle<()>) -> Result<(), FrameworkError> {
+    pub(crate) fn add_module(&mut self, module_id: &ModuleID, father_id: &EntityID, normal_sender_channel: ModuleNormalSenderChannel, priority_sender_channel: ModuleNormalSenderChannel, join_handle: JoinHandle<()>) -> Result<(), FrameworkError> {
         
         // Prevent duplicate ModuleIDs.
         if self.module_map.contains_key(module_id) {
@@ -131,7 +144,7 @@ impl Registry {
         }
 
         // Create the Registry entry associated with the module.
-        let registry_entry = RegistryEntry::new(father_id.clone(), module_channel, join_handle);
+        let registry_entry = RegistryEntry::new(father_id.clone(), normal_sender_channel, priority_sender_channel, join_handle);
         // Register the module.
         self.module_map.insert(module_id.clone(), registry_entry);
 

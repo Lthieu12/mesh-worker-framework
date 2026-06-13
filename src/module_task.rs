@@ -21,7 +21,7 @@
 use tokio::task::JoinHandle;
 
 use crate::mmf::{MMF_DATA, MMF_MODULE_INIT_NOTIFY, MMF_MODULE_CLOSE_NOTIFY};
-use crate::channel::{ModuleCommand, ModuleReceiverChannel};
+use crate::channel::{ModuleCommand, ModuleNormalReceiverChannel, ModulePriorityReceiverChannel};
 use crate::module::{Module, ModuleID, EntityID, ModuleState};
 
 /// Spawn a Tokio task that takes ownership of the module instance.
@@ -29,7 +29,7 @@ use crate::module::{Module, ModuleID, EntityID, ModuleState};
 /// After this point:
 /// - MMF owns the Senders and the JoinHandle.
 /// - ModuleTask owns the module instance and the Receivers.
-pub(crate) fn spawn_module_task<T>(module: T, module_receiver: ModuleReceiverChannel, module_id:ModuleID, father_id:EntityID) -> JoinHandle<()>
+pub(crate) fn spawn_module_task<T>(module: T, normal_receiver_channel: ModuleNormalReceiverChannel, priority_receiver_channel: ModulePriorityReceiverChannel, module_id:ModuleID, father_id:EntityID) -> JoinHandle<()>
 where T: Module + Send + 'static{
    
     tokio::spawn(async move {
@@ -38,19 +38,81 @@ where T: Module + Send + 'static{
         // All module callbacks are executed
         // inside this Tokio task.
         let mut module = module;
-        let mut module_receiver = module_receiver;
+        let mut normal_receiver_channel = normal_receiver_channel;
+        let mut priority_receiver_channel = priority_receiver_channel;
 
         let module_id = module_id;
         let father_id = father_id;
 
-        // Wait for module commands sent by MMF.
+        // Local LIFO stack used to store priority commands.
         //
-        // The loop terminates when:
-        // - A Close command is received.
-        // - All ModuleSenderChannels are dropped.
-        while let Some(command) =
-        module_receiver.recv().await
-        {
+        // Priority commands are first received through a Tokio FIFO
+        // channel, then moved into this stack.
+        //
+        // This reproduces the behavior:
+        //
+        // send_priority_message(P1)
+        // send_priority_message(P2)
+        // send_priority_message(P3)
+        //
+        // Processing order:
+        // P3 -> P2 -> P1
+        let mut priority_stack: Vec<ModuleCommand> = Vec::new();
+
+        loop {
+
+            // Drain all currently pending priority commands.
+            //
+            // Tokio channels are FIFO. Moving all available priority
+            // commands into a local stack allows ModuleTask to process
+            // them in LIFO order.
+            while let Ok(command) = priority_receiver_channel.try_recv() {
+                priority_stack.push(command);
+            }
+
+            // Priority commands always take precedence over normal
+            // commands.
+            //
+            // If the stack is not empty, process the most recently
+            // received priority command immediately.
+            let command =
+                if let Some(command) = priority_stack.pop() {
+
+                    command
+                } 
+                else {
+
+                    // No priority command is currently pending.
+                    //
+                    // Wait for the next command from either channel.
+                    //
+                    // Tokio wakes this task automatically when a message
+                    // arrives on the normal or priority channel.
+                    let command_option = tokio::select! {
+
+                        command = priority_receiver_channel.recv() => {
+                            command
+                        }
+                        command = normal_receiver_channel.recv() => {
+                            command
+                        }
+                    };
+
+                    // Both channels have been closed.
+                    //
+                    // This should normally happen only when MMF is
+                    // shutting down and no sender remains.
+                    match command_option {
+
+                        Some(command) => {
+                            command
+                        },
+                        None => {
+                            break;
+                        }
+                    }
+                };          
+
             match command {
 
                 // Execute module initialization.
@@ -141,6 +203,7 @@ where T: Module + Send + 'static{
                     break;
                 }
             }
+            
         }
     })
     

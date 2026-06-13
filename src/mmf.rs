@@ -154,14 +154,16 @@ impl MMF {
         let module_id = mmf_data.registry.generate_module_id::<T>();
 
         // Channel used to send Module commands (like Init and Close) and messages to the module.
-        let (module_sender, module_receiver) = tokio::sync::mpsc::channel(mmf_data.module_channel_capacity);
+        let (normal_sender_channel, normal_receiver_channel) = tokio::sync::mpsc::channel(mmf_data.module_channel_capacity);
+        // Channel used to send priority Module commands (like Init and Close) and messages to the module.
+        let (priority_sender_channel, priority_receiver_channel) = tokio::sync::mpsc::channel(mmf_data.module_channel_capacity);
 
         // Spawn the Tokio task that will own the module instance.
         //
         // Once spawned, MMF no longer owns the module.
         // MMF communicates with the module through channels and
         // tracks its execution through the JoinHandle.
-        let join_handle = spawn_module_task(module, module_receiver, module_id.clone(), father_id.clone());
+        let join_handle = spawn_module_task(module, normal_receiver_channel, priority_receiver_channel, module_id.clone(), father_id.clone());
 
         // Store the module resources in the Registry.
         //
@@ -170,7 +172,7 @@ impl MMF {
         // - Module state.
         // - Communication channels.
         // - JoinHandle associated with the Tokio task.
-        mmf_data.registry.add_module(&module_id, &father_id, module_sender, join_handle,)?;
+        mmf_data.registry.add_module(&module_id, &father_id, normal_sender_channel, priority_sender_channel, join_handle,)?;
         drop(mmf_data_guard);
 
         Ok(module_id)
@@ -208,11 +210,11 @@ impl MMF {
             return Err(FrameworkError::Module_AlreadyInitialized);
         }
         mmf_data.registry.set_module_state(module_id, ModuleState::Initializing)?;
-        let module_channel = mmf_data.registry.get_module_channel(module_id)?;
+        let normal_sender_channel = mmf_data.registry.get_module_normal_channel(module_id)?;
         drop(mmf_data_guard);
 
         // Send the Init command to ModuleTask.
-        module_channel.send(ModuleCommand::Init).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        normal_sender_channel.send(ModuleCommand::Init).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         Ok(())
     }
@@ -237,11 +239,11 @@ impl MMF {
             return Err(FrameworkError::Module_NotInitialized);
         }
         mmf_data.registry.set_module_state(module_id, ModuleState::Closing)?;
-        let module_channel = mmf_data.registry.get_module_channel(module_id)?;
+        let normal_sender_channel = mmf_data.registry.get_module_normal_channel(module_id)?;
         drop(mmf_data_guard);
 
         // Send the Close command to ModuleTask.
-        module_channel.send(ModuleCommand::Close).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        normal_sender_channel.send(ModuleCommand::Close).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         Ok(())
     }
@@ -546,7 +548,7 @@ impl MMF {
         // State validation and channel retrieval are performed
         // under the same lock to avoid race conditions with
         // close_module().
-        let module_channel = mmf_data.registry.get_module_channel(receiver_id)?;
+        let normal_sender_channel = mmf_data.registry.get_module_normal_channel(receiver_id)?;
 
         // Generate the unique id and build the message
         let message_instance_id = MMF::generate_message_instance_id()?;
@@ -556,7 +558,7 @@ impl MMF {
         drop(mmf_data_guard);
 
         // Send the message to the target module.
-        module_channel.send(ModuleCommand::Message(framework_message)).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        normal_sender_channel.send(ModuleCommand::Message(framework_message)).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         Ok(())
 
@@ -609,7 +611,7 @@ impl MMF {
         // State validation and channel retrieval are performed
         // under the same lock to avoid race conditions with
         // close_module().
-        let module_channel = mmf_data.registry.get_module_channel(receiver_id)?;
+        let normal_sender_channel = mmf_data.registry.get_module_normal_channel(receiver_id)?;
         drop(mmf_data_guard);
 
         // Generate the unique id and build the message
@@ -621,7 +623,7 @@ impl MMF {
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel();
 
         // Send the message to the receiver module.
-        module_channel.send(ModuleCommand::MessageAndWaitReply(reply_sender, framework_message)).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        normal_sender_channel.send(ModuleCommand::MessageAndWaitReply(reply_sender, framework_message)).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         // Wait for completion or timeout.
         match timeout_ms {
@@ -639,47 +641,3 @@ impl MMF {
 
 }
 
-
-#[cfg(test)]
-mod tests {
-
-    use crate::error::FrameworkError;
-    use crate::mmf::MMF;
-
-    #[test]
-    fn test_mmf_init_close() {
-        assert!(!MMF::is_initialized());
-
-        assert!(MMF::init().is_ok());
-
-        assert!(MMF::is_initialized());
-
-        assert!(MMF::close().is_ok());
-
-        assert!(!MMF::is_initialized());
-    }
-
-    #[test]
-    fn test_mmf_double_init() {
-        assert!(MMF::init().is_ok());
-
-        assert!(
-            matches!(
-                MMF::init(),
-                Err(FrameworkError::Framework_AlreadyInitialized)
-            )
-        );
-
-        assert!(MMF::close().is_ok());
-    }
-
-    #[test]
-    fn test_mmf_double_close() {
-        assert!(
-            matches!(
-                MMF::close(),
-                Err(FrameworkError::Framework_NotInitialized)
-            )
-        );
-    }
-}

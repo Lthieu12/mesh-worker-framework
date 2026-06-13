@@ -34,7 +34,9 @@ pub(crate) enum ModuleCommand {
     Close,
 }
 
-pub(crate) type ModuleSenderChannel = Sender<ModuleCommand>;
+pub(crate) type ModuleNormalSenderChannel = Sender<ModuleCommand>;
+pub(crate) type ModuleNormalReceiverChannel = Receiver<ModuleCommand>;
 
-pub(crate) type ModuleReceiverChannel = Receiver<ModuleCommand>;
+pub(crate) type ModulePrioritySenderChannel = Sender<ModuleCommand>;
+pub(crate) type ModulePriorityReceiverChannel = Receiver<ModuleCommand>;
  
