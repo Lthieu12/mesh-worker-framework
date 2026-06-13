@@ -7,6 +7,7 @@
 //! - Message ordering guarantees.
 //! - Priority message handling.
 //! - Chained message processing across multiple modules.
+
 mod common;
 
 use serial_test::serial;

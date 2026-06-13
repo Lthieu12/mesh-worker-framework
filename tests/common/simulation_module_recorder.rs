@@ -1,5 +1,13 @@
 //! MMF module used by integration tests to record message
 //! execution order and measure wait durations.
+//!
+//! This module can:
+//! - Record the order in which messages are processed.
+//! - Measure send_message_and_wait_reply() durations.
+//! - Validate priority message behavior.
+//!
+//! Additional test behaviors can be added over time.
+
 #![allow(dead_code)]
 
 use async_trait::async_trait;
