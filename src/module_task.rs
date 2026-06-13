@@ -88,27 +88,19 @@ where T: Module + Send + 'static{
                     //
                     // Tokio wakes this task automatically when a message
                     // arrives on the normal or priority channel.
-                    let command_option = tokio::select! {
+                    //
+                    // Receiver channels are expected to remain valid
+                    // until the module task terminates.
+                    //
+                    // A closed channel indicates an internal framework error.
+                    tokio::select! {
 
                         command = priority_receiver_channel.recv() => {
-                            command
+                            command.unwrap()
                         }
+
                         command = normal_receiver_channel.recv() => {
-                            command
-                        }
-                    };
-
-                    // Both channels have been closed.
-                    //
-                    // This should normally happen only when MMF is
-                    // shutting down and no sender remains.
-                    match command_option {
-
-                        Some(command) => {
-                            command
-                        },
-                        None => {
-                            break;
+                            command.unwrap()
                         }
                     }
                 };          
