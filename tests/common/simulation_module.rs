@@ -15,6 +15,7 @@
 //! SimulationMessageBehavior.
 //!
 //! Additional test behaviors can be added over time.
+
 #![allow(dead_code)]
 
 use async_trait::async_trait;
