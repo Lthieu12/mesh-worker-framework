@@ -35,7 +35,7 @@ async fn test_module_timeout_init() {
             MMF::wait_module_init(&module_id, Some(100)).await,Err(FrameworkError::Operation_Timeout))
     );
 
-    MMF::kill_module(&module_id).unwrap();
+    MMF::abort_module(&module_id).unwrap();
     MMF::close().unwrap();
 }
 
@@ -62,7 +62,7 @@ async fn test_module_timeout_close() {
         )
     );
 
-    MMF::kill_module(&module_id).unwrap();
+    MMF::abort_module(&module_id).unwrap();
     MMF::close().unwrap();
 }
 

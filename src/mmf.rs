@@ -155,7 +155,7 @@ impl MMF {
 
         // Channel used to send Module commands (like Init and Close) and messages to the module.
         let (normal_sender_channel, normal_receiver_channel) = tokio::sync::mpsc::channel(mmf_data.module_channel_capacity);
-        // Channel used to send priority Module commands (like Init and Close) and messages to the module.
+        // Channel used to send priority Module commands messages to the module.
         let (priority_sender_channel, priority_receiver_channel) = tokio::sync::mpsc::channel(mmf_data.module_channel_capacity);
 
         // Spawn the Tokio task that will own the module instance.
@@ -249,7 +249,7 @@ impl MMF {
     }
 
 
-    /// Get the module FatherID of a module
+    /// Get the FatherID of a module.
     pub fn get_father_id(module_id: &ModuleID) -> Result<EntityID, FrameworkError>{
         
         let mmf_data_guard = MMF_DATA.read().unwrap();
@@ -453,7 +453,7 @@ impl MMF {
     ///
     /// This function should only be used as a recovery mechanism
     /// when normal shutdown has failed.
-    pub fn kill_module_list(module_ids: &Vec<ModuleID>) -> Result<(), FrameworkError> {
+    pub fn abort_module_list(module_ids: &Vec<ModuleID>) -> Result<(), FrameworkError> {
 
         let mut mmf_data_guard = MMF_DATA.write().unwrap();
         let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
@@ -487,9 +487,9 @@ impl MMF {
     ///
     /// This function should only be used as a recovery mechanism
     /// when normal shutdown has failed.
-    pub fn kill_module(module_id: &ModuleID) -> Result<(), FrameworkError> {
+    pub fn abort_module(module_id: &ModuleID) -> Result<(), FrameworkError> {
 
-        MMF::kill_module_list(&vec![module_id.clone()])
+        MMF::abort_module_list(&vec![module_id.clone()])
     }
 
 
@@ -501,9 +501,9 @@ impl MMF {
     ///
     /// This function should only be used as a recovery mechanism
     /// when normal shutdown has failed.
-    pub fn kill_children(entity_id: &EntityID) -> Result<(), FrameworkError> {
+    pub fn abort_children(entity_id: &EntityID) -> Result<(), FrameworkError> {
 
-        MMF::kill_module_list(&MMF::get_children_ids(entity_id)?)
+        MMF::abort_module_list(&MMF::get_children_ids(entity_id)?)
     }
  
 
@@ -693,6 +693,81 @@ impl MMF {
 
         Ok(())
 
+    }
+
+
+    /// Send a priority message and wait until the receiver has finished
+    /// processing it.
+    ///
+    /// timeout_ms:
+    /// - None => wait indefinitely.
+    /// - Some(value) => return Operation_Timeout if the delay expires.
+    pub async fn send_priority_message_and_wait_reply(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
+
+        let priority_sender_channel: ModulePrioritySenderChannel = {
+            // Read MMF data.
+            //
+            // send_message() only requires a read lock because it does
+            // not modify the Registry or ModuleState.
+            let mmf_data_guard = MMF_DATA.read().unwrap();
+
+            let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+
+            // Validate the sender.
+            //
+            // MMF modules must be initialized before they can
+            // send messages through MMF.
+            //
+            // External senders are not validated.
+            match sender_id {
+                EntityID::Module(module_id) => {
+                    let module_state = mmf_data.registry.get_module_state(module_id)?;
+                    if module_state != ModuleState::Initialized {
+                        return Err(FrameworkError::Module_NotInitialized);
+                    }
+                }
+                EntityID::External(_) => {}
+            }
+
+            // Validate the receiver module state.
+            //
+            // Messages can only be sent to initialized modules.
+            let module_state = mmf_data.registry.get_module_state(receiver_id)?;
+            if module_state != ModuleState::Initialized {
+                return Err(FrameworkError::Module_NotInitialized);
+            }
+
+            // Retrieve the communication channel associated with
+            // the receiver module.
+            //
+            // State validation and channel retrieval are performed
+            // under the same lock to avoid race conditions with
+            // close_module().
+            mmf_data.registry.get_module_priority_channel(receiver_id)?
+        };
+
+        // Generate the unique id and build the message
+        let message_instance_id = MMF::generate_message_instance_id()?;
+        let framework_message = FrameworkMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
+
+        // Create a temporary reply channel used to signal
+        // completion of on_message().
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel();
+
+        // Send the message to the receiver module.
+        priority_sender_channel.send(ModuleCommand::MessageAndWaitReply(reply_sender, framework_message)).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+
+        // Wait for completion or timeout.
+        match timeout_ms {
+            Some(timeout_ms) => {
+                tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), reply_receiver).await.map_err(|_| FrameworkError::Operation_Timeout)?.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+            }
+            None => {
+                reply_receiver.await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+            }
+        }
+
+        Ok(())
     }
 
 }

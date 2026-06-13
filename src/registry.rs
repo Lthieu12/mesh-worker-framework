@@ -87,7 +87,7 @@ impl Registry {
 
 
     /// Get module priority channel from ModuleID.
-    pub(crate) fn get_module_priority_channel(&self, module_id: &ModuleID) -> Result<ModuleNormalSenderChannel, FrameworkError> {
+    pub(crate) fn get_module_priority_channel(&self, module_id: &ModuleID) -> Result<ModulePrioritySenderChannel, FrameworkError> {
         
         let registry_entry = self.module_map.get(module_id).ok_or(FrameworkError::Module_NotFound)?;
         Ok(registry_entry.priority_sender_channel.clone())
@@ -120,7 +120,7 @@ impl Registry {
 
 
     /// Register a newly created module.
-    pub(crate) fn add_module(&mut self, module_id: &ModuleID, father_id: &EntityID, normal_sender_channel: ModuleNormalSenderChannel, priority_sender_channel: ModuleNormalSenderChannel, join_handle: JoinHandle<()>) -> Result<(), FrameworkError> {
+    pub(crate) fn add_module(&mut self, module_id: &ModuleID, father_id: &EntityID, normal_sender_channel: ModuleNormalSenderChannel, priority_sender_channel: ModulePrioritySenderChannel, join_handle: JoinHandle<()>) -> Result<(), FrameworkError> {
         
         // Prevent duplicate ModuleIDs.
         if self.module_map.contains_key(module_id) {

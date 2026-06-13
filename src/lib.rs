@@ -33,7 +33,7 @@ pub use module::ModuleState;
 
 pub use message::FrameworkMessage;
 pub use message::MessageID;
-pub use message::MessagePriority;
+
 
 
 

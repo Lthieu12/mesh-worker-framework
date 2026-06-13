@@ -15,17 +15,6 @@ pub type MessageID = String;
 /// tracing and request/reply correlation.
 pub type MessageInstanceID = u64;
 
-/// Defines the priority of a message.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MessagePriority {
-
-    /// Standard message processing.
-    Normal,
-
-    /// High priority message processing.
-    High,
-}
-
 #[derive(Debug)]
 /// Message exchanged between modules through MMF.
 pub struct FrameworkMessage {

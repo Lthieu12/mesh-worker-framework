@@ -11,8 +11,11 @@
 //! - Receive commands and messages sent by MMF.
 //! - Execute the module callbacks.
 //! - Terminate the module task when requested.
-//! - Process all module commands sequentially through a
-//!   single FIFO queue.
+//! - Process all module commands sequentially.
+//!
+//! Normal commands are processed FIFO.
+//! Priority commands are processed before normal commands
+//! using a LIFO policy.
 //!
 //! MMF never directly calls on_init(), on_message() or on_close().
 //! These callbacks are executed inside the module task because
@@ -154,6 +157,7 @@ where T: Module + Send + 'static{
                 // Close command is always processed before module
                 // shutdown begins.
                 ModuleCommand::MessageAndWaitReply(reply_sender, message) => {
+ 
                     module.on_message(message).await;
                     let _ = reply_sender.send(());
                 }
