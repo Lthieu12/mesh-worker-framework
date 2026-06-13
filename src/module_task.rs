@@ -94,11 +94,9 @@ where T: Module + Send + 'static{
                     //
                     // A closed channel indicates an internal framework error.
                     tokio::select! {
-
                         command = priority_receiver_channel.recv() => {
                             command.unwrap()
                         }
-
                         command = normal_receiver_channel.recv() => {
                             command.unwrap()
                         }
