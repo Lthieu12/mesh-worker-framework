@@ -136,7 +136,7 @@ impl Registry {
         // cannot be validated.
         match father_id {
             EntityID::Module(father_id_ref) => {
-                if !self.module_map.contains_key(father_id_ref) {
+                if !Registry::contains_module(&self, father_id_ref) {
                     return Err(FrameworkError::FatherModule_NotFound);
                 }
             }
@@ -231,7 +231,7 @@ impl Registry {
         // External entities are not managed by MMF and therefore
         // cannot be validated.
         if let EntityID::Module(module_id) = entity_id {
-            if !self.module_map.contains_key(module_id) {
+            if !Registry::contains_module(&self, module_id) {
                 return Err(FrameworkError::Module_NotFound);
             }
         }
@@ -255,7 +255,7 @@ impl Registry {
         // External entities are not managed by MMF and therefore
         // cannot be validated.
         if let EntityID::Module(module_id) = entity_id {
-            if !self.module_map.contains_key(module_id) {
+            if !Registry::contains_module(&self, module_id) {
                 return Err(FrameworkError::Module_NotFound);
             }
         }
