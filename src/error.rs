@@ -38,6 +38,9 @@ pub enum FrameworkError {
     /// The requested module was not found.
     Module_NotFound,
 
+    /// A module failed during its closing.
+    Module_CloseFailed,
+
     /// A module communication channel is closed.
     Module_ChannelClosed,
 
@@ -50,9 +53,14 @@ pub enum FrameworkError {
     /// The requested module has not been initialized.
     Module_NotInitialized,
 
+    /// Error returned by a module while processing
+    /// a message sent through send_message_and_wait_reply().
+    Module_MessageError(
+        Box<dyn std::error::Error + Send + Sync>
+    ),
+
     /// The requested father module was not found.
     FatherModule_NotFound,
-
 }
 
 /// Human-readable representation of FrameworkError.
@@ -83,8 +91,11 @@ impl fmt::Display for FrameworkError {
             FrameworkError::Module_NotFound =>
                 write!(f, "The requested module was not found."),
 
+            FrameworkError::Module_CloseFailed =>
+                write!(f, "The requested module was not found."),
+
             FrameworkError::Module_ChannelClosed =>
-                write!(f, "A module communication channel is closed."),
+                write!(f, "A module failed during its closing."),
 
             FrameworkError::Module_AlreadyExists =>
                 write!(f, "The requested module already exists."),
@@ -94,6 +105,9 @@ impl fmt::Display for FrameworkError {
 
             FrameworkError::Module_NotInitialized =>
                 write!(f, "The requested module has not been initialized."),
+
+            FrameworkError::Module_MessageError(error) =>
+                write!(f, "Module message processing failed: {}", error),
 
             FrameworkError::FatherModule_NotFound =>
                 write!(f, "The requested father module was not found."),

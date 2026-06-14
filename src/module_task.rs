@@ -117,7 +117,7 @@ where T: Module + Send + 'static{
                 // as Initialized only after on_init() completes.
                 ModuleCommand::Init => {
 
-                    module.on_init(&module_id, &father_id).await;
+                    let error_init = module.on_init(&module_id, &father_id).await;
 
                     // Publish successful initialization.
                     //
@@ -125,7 +125,17 @@ where T: Module + Send + 'static{
                     // receive business messages.
                     let mut mmf_data_guard = MMF_DATA.write().unwrap();
                     let mmf_data = mmf_data_guard.as_mut().unwrap();
-                    mmf_data.registry.set_module_state(&module_id, ModuleState::Initialized).unwrap();
+                    match error_init {
+                        Ok(()) => {
+
+                            mmf_data.registry.set_module_state(&module_id, ModuleState::Initialized).unwrap();
+                        }
+                        Err(_) => {
+
+                            mmf_data.registry.set_module_state(&module_id, ModuleState::InitFailed).unwrap();
+                        }
+
+                    }
                     drop(mmf_data_guard);
 
                     // Wake up all waiters interested in module
@@ -171,7 +181,7 @@ where T: Module + Send + 'static{
                 // from the Registry only after on_close() completes.
                 ModuleCommand::Close => {
 
-                    module.on_close().await;
+                    let error_close = module.on_close().await;
 
                     // Mark the module as Closed.
                     //
@@ -179,13 +189,23 @@ where T: Module + Send + 'static{
                     // completed successfully.
                     let mut mmf_data_guard = MMF_DATA.write().unwrap();
                     let mmf_data = mmf_data_guard.as_mut().unwrap();
-                    mmf_data.registry.set_module_state(&module_id, ModuleState::Closed).unwrap();
+                    match error_close {
+                        Ok(()) => {
 
-                    // Remove the module from the Registry.
-                    //
-                    // Once removed, the module is no longer visible
-                    // to MMF and cannot receive new commands.
-                    mmf_data.registry.remove_module(&module_id).unwrap();
+                            mmf_data.registry.set_module_state(&module_id, ModuleState::Closed).unwrap();
+                            // Remove the module from the Registry.
+                            //
+                            // Once removed, the module is no longer visible
+                            // to MMF and cannot receive new commands.
+                            mmf_data.registry.remove_module(&module_id).unwrap();
+                        }
+                        Err(_) => {
+
+                            mmf_data.registry.set_module_state(&module_id, ModuleState::CloseFailed).unwrap();
+                        }
+
+                    }
+
                     drop(mmf_data_guard);
 
                     // Wake up all waiters interested in module

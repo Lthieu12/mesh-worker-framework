@@ -24,21 +24,27 @@ use bytes::Bytes;
 
 use mesh_module_framework::*;
 
-
-pub enum SimulationMessageBehavior {
+#[allow(non_camel_case_types)]
+pub enum SimulationBehavior {
 
     DoNothing,
 
-    Wait{
+    Message_Wait{
         message_delay_ms: u64,
     },
 
-    SendAndWaitReply {
+    Message_SendAndWaitReply {
         target_module_id: ModuleID,
         message_id: MessageID,
         timeout_ms: Option<u64>,
         message_delay_ms: u64,
     },
+
+    Init_Fail,
+
+    Close_Fail,
+
+    Message_Fail,
 
 }
 
@@ -56,8 +62,8 @@ pub struct SimulationModule {
     /// Artificial delay applied during on_close().
     pub close_delay_ms: u64,
 
-    /// Artificial action applied during on_message().
-    pub message_behavior: SimulationMessageBehavior,
+    /// Artificial action applied.
+    pub simulation_behavior: SimulationBehavior,
 
     /// Optional timeout used by on_close() to wait for
     /// all direct children to terminate.
@@ -72,7 +78,7 @@ impl SimulationModule {
     /// This helper is intended for integration tests and
     /// returns only when the module has reached the
     /// Initialized state.
-    pub async fn spawn(father_id: &EntityID, init_delay_ms: u64, close_delay_ms: u64, message_behavior: SimulationMessageBehavior, wait_children_close: bool, wait_children_close_timeout_ms: Option<u64>) -> Result<ModuleID, FrameworkError> {
+    pub async fn spawn(father_id: &EntityID, init_delay_ms: u64, close_delay_ms: u64, message_behavior: SimulationBehavior, wait_children_close: bool, wait_children_close_timeout_ms: Option<u64>) -> Result<ModuleID, FrameworkError> {
 
         let module_id =
             MMFMod::spawn_module(
@@ -81,7 +87,7 @@ impl SimulationModule {
                     father_id: None,
                     init_delay_ms,
                     close_delay_ms,
-                    message_behavior,
+                    simulation_behavior: message_behavior,
                     wait_children_close,
                     wait_children_close_timeout_ms,
 
@@ -96,7 +102,7 @@ impl SimulationModule {
 #[async_trait]
 impl Module for SimulationModule {
 
-    async fn on_init(&mut self, module_id: &ModuleID, father_id: &EntityID) {
+    async fn on_init(&mut self, module_id: &ModuleID, father_id: &EntityID) -> Result<(), ModuleError> {
 
         // Store runtime identifiers provided by MMF.
         self.module_id = Some(module_id.clone());
@@ -104,38 +110,52 @@ impl Module for SimulationModule {
 
         // Simulate init work.
         tokio::time::sleep(Duration::from_millis(self.init_delay_ms)).await;
+
+        match &self.simulation_behavior {
+            SimulationBehavior::Init_Fail => {
+
+                return Err(anyhow::anyhow!("Simulation init failure"));
+            }
+
+            _ => {} 
+        }
+        Ok(())
     }
 
-    async fn on_message(&mut self, _message: FrameworkMessage) {
+    async fn on_message(&mut self, _message: FrameworkMessage) -> Result<(), ModuleError> {
         
-        match &self.message_behavior {
+        match &self.simulation_behavior {
 
-            SimulationMessageBehavior::DoNothing => {}
+            SimulationBehavior::Message_SendAndWaitReply {
+                target_module_id,
+                message_id,
+                timeout_ms,
+                message_delay_ms,
+            } => {
+                tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
+                let module_id = self.module_id.as_ref().expect("module_id should be initialized");
+                MMFMod::send_message_and_wait_reply(&EntityID::Module(module_id.clone()), target_module_id, message_id, Bytes::new(), *timeout_ms).await.unwrap();
+            }
 
-                SimulationMessageBehavior::SendAndWaitReply {
-                    target_module_id,
-                    message_id,
-                    timeout_ms,
-                    message_delay_ms,
-                } => {
-                    tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
-                    let module_id = self.module_id.as_ref().expect("module_id should be initialized");
-                    MMFMod::send_message_and_wait_reply(&EntityID::Module(module_id.clone()), target_module_id, message_id, Bytes::new(), *timeout_ms).await.unwrap();
-                }
-
-            SimulationMessageBehavior::Wait {
+            SimulationBehavior::Message_Wait {
                 message_delay_ms,
             } => {
                 // Simulate message work.
                 tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
             }
 
+            SimulationBehavior::Message_Fail => {
+                
+                return Err(anyhow::anyhow!("Simulation message failure"));
+            }
 
+            _ => {} 
         }
-        
+
+        Ok(())
     }
 
-    async fn on_close(&mut self) {
+    async fn on_close(&mut self) -> Result<(), ModuleError> {
 
         // Optionally wait until all direct children
         // have been removed from the Registry.
@@ -148,5 +168,16 @@ impl Module for SimulationModule {
 
         // Simulate shutdown work.
         tokio::time::sleep(Duration::from_millis(self.close_delay_ms)).await;
+
+        match &self.simulation_behavior {
+            SimulationBehavior::Close_Fail => {
+
+                return Err(anyhow::anyhow!("Simulation close failure"));
+            }
+
+            _ => {} 
+        }
+
+        Ok(())
     }
 }

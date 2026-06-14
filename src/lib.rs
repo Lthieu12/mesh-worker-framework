@@ -31,6 +31,8 @@ pub use mmf_log::MMFLog;
 
 pub use error::FrameworkError;
 
+pub use mmf_mod::ModuleError;
+
 pub use module::{
     Module,
     ModuleID,

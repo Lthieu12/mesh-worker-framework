@@ -6,6 +6,7 @@
 use async_trait::async_trait;
 
 use crate::message::FrameworkMessage;
+use crate::ModuleError;
 
 /// Unique identifier of a module instance.
 pub type ModuleID = String;
@@ -26,10 +27,14 @@ pub enum ModuleState {
     Created,
     /// Module initialization is in progress.
     Initializing,
+    /// Module initialization has failed.
+    InitFailed,
     /// Module initialization has completed successfully.
     Initialized,
     /// Module Closing is in progress.
     Closing,
+    /// Module close has failed.
+    CloseFailed,
     /// Module has been closed and is not usable anymore.
     Closed,
 }
@@ -40,11 +45,11 @@ pub enum ModuleState {
 pub trait Module {
 
     /// Called once when the module is initialized.
-    async fn on_init(&mut self, module_id: &ModuleID, father_id: &EntityID);
+    async fn on_init(&mut self, module_id: &ModuleID, father_id: &EntityID) -> Result<(), ModuleError>;
 
     /// Called when a message is received by the module.
-    async fn on_message(&mut self, message: FrameworkMessage);
+    async fn on_message(&mut self, message: FrameworkMessage) -> Result<(), ModuleError>;
 
     /// Called once before the module is closed.
-    async fn on_close(&mut self);
+    async fn on_close(&mut self) -> Result<(), ModuleError>;
 }

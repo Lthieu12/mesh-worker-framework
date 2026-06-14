@@ -13,6 +13,7 @@ use crate::module_task::spawn_module_task;
 use crate::channel::{ModuleCommand, ModuleNormalSenderChannel, ModulePrioritySenderChannel};
 use crate::message::{FrameworkMessage, MessageID, MessageInstanceID};
 
+pub type ModuleError = anyhow::Error;
 
 pub struct MMFMod;
 
@@ -216,20 +217,41 @@ impl MMFMod {
                 //
                 // The lock must be released before awaiting the
                 // next notification.
-                let all_initialized = {
+                let (all_init_finished, one_init_failed) = {
 
                     let mmf_data_guard = MMF_DATA.read().unwrap();
                     let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
 
-                    // Initialization is complete only when all modules
-                    // have reached the Initialized state.
-                    module_ids.iter().all(|module_id| { 
+                    let mut all_init_finished = true;
+                    let mut one_init_failed = false;
 
-                        matches!(mmf_data.registry.get_module_state(module_id), Ok(ModuleState::Initialized))
-                    })
+                    // Initialization is complete only when all modules
+                    // have reached the Initialized or InitFailed state.
+                    for module_id in module_ids {
+
+                        match mmf_data.registry.get_module_state(module_id)? {
+
+                            ModuleState::Initialized => {}
+
+                            ModuleState::InitFailed => {
+                                one_init_failed = true;
+                            }
+
+                            _ => {
+                                all_init_finished = false;
+                            }
+                        }
+                    }
+
+                    (all_init_finished, one_init_failed)
                 };
 
-                if all_initialized {
+                if all_init_finished {
+
+                    if one_init_failed {
+                        return Err(FrameworkError::Module_InitializationFailed);
+                    }
+
                     return Ok(());
                 }
 
@@ -289,7 +311,7 @@ impl MMFMod {
 
             loop {
 
-                // Register interest in the next close event
+                // Register interest in the next closing event
                 // before checking module states to avoid lost notifications.
                 let close_notify = MMF_MODULE_CLOSE_NOTIFY.notified();
 
@@ -297,23 +319,46 @@ impl MMFMod {
                 //
                 // The lock must be released before awaiting the
                 // next notification.
-                let all_closed = {
+                let (all_close_finished, one_close_failed) = {
 
                     let mmf_data_guard = MMF_DATA.read().unwrap();
                     let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
 
-                    // Shutdown is complete only when all modules
-                    // have been removed from the Registry.
-                    module_ids.iter().all(|module_id| {
-                        !mmf_data.registry.contains_module(module_id)
-                    })
+                    let mut all_close_finished = true;
+                    let mut one_close_failed = false;
+
+                    // Closing is complete only when all modules
+                    // have either been removed from the Registry
+                    // or reached the CloseFailed state.
+                    for module_id in module_ids {
+
+                        match mmf_data.registry.get_module_state(module_id) {
+
+                            // A module not found has been properly closed.
+                            Err(FrameworkError::Module_NotFound) => {}
+
+                            Ok(ModuleState::CloseFailed) => {
+                                one_close_failed = true;
+                            }
+
+                            _ => {
+                                all_close_finished = false;
+                            }
+                        }
+                    }
+
+                    (all_close_finished, one_close_failed)
                 };
 
-                if all_closed {
+                if all_close_finished {
+
+                    if one_close_failed {
+                        return Err(FrameworkError::Module_CloseFailed);
+                    }
+
                     return Ok(());
                 }
 
-                // Wait for the next module shutdown event.
                 close_notify.await;
             }
         };

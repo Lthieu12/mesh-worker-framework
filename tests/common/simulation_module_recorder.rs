@@ -70,20 +70,15 @@ impl MessageRecorderModule {
 #[async_trait]
 impl Module for MessageRecorderModule {
 
-    async fn on_init(
-        &mut self,
-        module_id: &ModuleID,
-        father_id: &EntityID,
-    ) {
+    async fn on_init(&mut self, module_id: &ModuleID, father_id: &EntityID) -> Result<(), ModuleError> {
 
         self.module_id = Some(module_id.clone());
         self.father_id = Some(father_id.clone());
+
+        Ok(())
     }
 
-    async fn on_message(
-        &mut self,
-        message: FrameworkMessage,
-    ) {
+    async fn on_message(&mut self, message: FrameworkMessage) -> Result<(), ModuleError> {
 
         match message.message_id.as_str() {
 
@@ -166,10 +161,12 @@ impl Module for MessageRecorderModule {
 
             _ => {}
         }
+
+        Ok(())
     }
 
-    async fn on_close(
-        &mut self,
-    ) {
+    async fn on_close(&mut self) -> Result<(), ModuleError> {
+
+        Ok(())
     }
 }

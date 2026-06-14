@@ -16,7 +16,7 @@ use bytes::Bytes;
 use std::time::Duration;
 
 use mesh_module_framework::*;
-use common::simulation_module::{SimulationModule, SimulationMessageBehavior};
+use common::simulation_module::{SimulationModule, SimulationBehavior};
 use common::simulation_module_recorder::{MessageRecorderModule, MESSAGE_CHAIN, MESSAGE_NORMAL_1, MESSAGE_NORMAL_2, MESSAGE_PRIORITY_1, MESSAGE_PRIORITY_2};
 
 // MMF uses a global runtime instance.
@@ -38,8 +38,8 @@ async fn test_module_message_chain() {
     let module_c_id: ModuleID;
     let message_id_temp: MessageID = Default::default();
 
-    module_c_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 300, 300, SimulationMessageBehavior::Wait { message_delay_ms: (300) }, false, None).await.unwrap();
-    module_b_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 200, 200, SimulationMessageBehavior::SendAndWaitReply { target_module_id: module_c_id.clone(), message_id: message_id_temp, timeout_ms: (Some(500)), message_delay_ms: (200) }, false, None).await.unwrap();
+    module_c_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 300, 300, SimulationBehavior::Message_Wait { message_delay_ms: (300) }, false, None).await.unwrap();
+    module_b_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 200, 200, SimulationBehavior::Message_SendAndWaitReply { target_module_id: module_c_id.clone(), message_id: message_id_temp, timeout_ms: (Some(500)), message_delay_ms: (200) }, false, None).await.unwrap();
     module_a_id = MessageRecorderModule::spawn(&EntityID::External("MAIN".to_string()), module_b_id.clone(), execution_log.clone(), wait_duration_ms.clone()).await.unwrap();
 
     MMFMod::init_module(&module_a_id).await.unwrap();
@@ -105,8 +105,8 @@ async fn test_module_message_chain_and_priority() {
     let module_c_id: ModuleID;
     let message_id_temp: MessageID = Default::default();
 
-    module_c_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 300, 300, SimulationMessageBehavior::Wait { message_delay_ms: (300) }, false, None).await.unwrap();
-    module_b_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 200, 200, SimulationMessageBehavior::SendAndWaitReply { target_module_id: module_c_id.clone(), message_id: message_id_temp, timeout_ms: (Some(500)), message_delay_ms: (200) }, false, None).await.unwrap();
+    module_c_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 300, 300, SimulationBehavior::Message_Wait { message_delay_ms: (300) }, false, None).await.unwrap();
+    module_b_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 200, 200, SimulationBehavior::Message_SendAndWaitReply { target_module_id: module_c_id.clone(), message_id: message_id_temp, timeout_ms: (Some(500)), message_delay_ms: (200) }, false, None).await.unwrap();
     module_a_id = MessageRecorderModule::spawn(&EntityID::External("MAIN".to_string()), module_b_id.clone(), execution_log.clone(), wait_duration_ms.clone()).await.unwrap();
 
     MMFMod::init_module(&module_a_id).await.unwrap();

@@ -16,7 +16,7 @@ mod common;
 use serial_test::serial;
 
 use mesh_module_framework::*;
-use common::simulation_module::{SimulationModule, SimulationMessageBehavior};
+use common::simulation_module::{SimulationModule, SimulationBehavior};
 
 // MMF uses a global runtime instance.
 // Integration tests must run serially.
@@ -26,7 +26,7 @@ async fn test_module_timeout_init() {
     MMF::init().unwrap();
 
     // Very long init
-    let module_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 5_000, 0, SimulationMessageBehavior::DoNothing, false, None).await.unwrap();
+    let module_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 5_000, 0, SimulationBehavior::DoNothing, false, None).await.unwrap();
 
     MMFMod::init_module(&module_id).await.unwrap();
 
@@ -48,7 +48,7 @@ async fn test_module_timeout_close() {
     MMF::init().unwrap();
 
     // Very long close
-    let module_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 0, 5_000, SimulationMessageBehavior::DoNothing, false, None).await.unwrap();
+    let module_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 0, 5_000, SimulationBehavior::DoNothing, false, None).await.unwrap();
 
     MMFMod::init_module(&module_id).await.unwrap();
 
