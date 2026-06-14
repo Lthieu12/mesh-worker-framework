@@ -74,6 +74,15 @@ impl MMF {
 
 
     /// Shutdown the MMF framework and release all resources.
+    ///
+    /// All modules must be closed before calling this function.
+    ///
+    /// If one or more modules are still running,
+    /// FrameworkError::Module_StillRunning is returned.
+    ///
+    /// Use MMFMod::close_module() to terminate modules
+    /// gracefully, or MMFMod::abort_module() as a last
+    /// resort if a module becomes unresponsive.
     pub fn close() -> Result<(), FrameworkError> {
 
         let mut mmf_data_guard = MMF_DATA.write().unwrap();
