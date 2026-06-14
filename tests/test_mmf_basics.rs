@@ -1,13 +1,10 @@
-use mesh_module_framework::*;
-
 use serial_test::serial;
 
 #[cfg(test)]
 #[serial]
 mod tests {
 
-    use crate::error::FrameworkError;
-    use crate::mmf::MMF;
+    use mesh_module_framework::*;
 
     #[test]
     fn test_mmf_init_close() {
