@@ -1,4 +1,4 @@
-//! Public MMFLog API.
+//! Public MMFLog (logging) API.
 //!
 //! This API exposes the framework logging and observability
 //! features.

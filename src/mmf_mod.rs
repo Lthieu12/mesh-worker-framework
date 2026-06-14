@@ -1,4 +1,4 @@
-//! Public MMFMod API.
+//! Public MMFMod (module) API.
 //!
 //! This API exposes the framework entry points used to
 //! manage modules and send messages.
