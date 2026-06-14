@@ -215,6 +215,7 @@ impl Registry {
         self.module_map.contains_key(module_id)
     }
 
+    
     /// Get the module FatherID from ModuleID.
     pub(crate) fn get_father_id(&self, module_id: &ModuleID) -> Result<EntityID, FrameworkError> {
         
