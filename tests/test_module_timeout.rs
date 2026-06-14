@@ -28,14 +28,14 @@ async fn test_module_timeout_init() {
     // Very long init
     let module_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 5_000, 0, SimulationMessageBehavior::DoNothing, false, None).await.unwrap();
 
-    MMF::init_module(&module_id).await.unwrap();
+    MMFMod::init_module(&module_id).await.unwrap();
 
     assert!(
         matches!(
-            MMF::wait_module_init(&module_id, Some(100)).await,Err(FrameworkError::Operation_Timeout))
+            MMFMod::wait_module_init(&module_id, Some(100)).await,Err(FrameworkError::Operation_Timeout))
     );
 
-    MMF::abort_module(&module_id).unwrap();
+    MMFMod::abort_module(&module_id).unwrap();
     MMF::close().unwrap();
 }
 
@@ -50,19 +50,19 @@ async fn test_module_timeout_close() {
     // Very long close
     let module_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 0, 5_000, SimulationMessageBehavior::DoNothing, false, None).await.unwrap();
 
-    MMF::init_module(&module_id).await.unwrap();
+    MMFMod::init_module(&module_id).await.unwrap();
 
-    MMF::wait_module_init(&module_id, Some(1000)).await.unwrap();
+    MMFMod::wait_module_init(&module_id, Some(1000)).await.unwrap();
 
-    MMF::close_module(&module_id).await.unwrap();
+    MMFMod::close_module(&module_id).await.unwrap();
 
     assert!(
         matches!(
-            MMF::wait_module_close(&module_id, Some(100)).await, Err(FrameworkError::Operation_Timeout)
+            MMFMod::wait_module_close(&module_id, Some(100)).await, Err(FrameworkError::Operation_Timeout)
         )
     );
 
-    MMF::abort_module(&module_id).unwrap();
+    MMFMod::abort_module(&module_id).unwrap();
     MMF::close().unwrap();
 }
 

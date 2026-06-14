@@ -75,7 +75,7 @@ impl SimulationModule {
     pub async fn spawn(father_id: &EntityID, init_delay_ms: u64, close_delay_ms: u64, message_behavior: SimulationMessageBehavior, wait_children_close: bool, wait_children_close_timeout_ms: Option<u64>) -> Result<ModuleID, FrameworkError> {
 
         let module_id =
-            MMF::spawn_module(
+            MMFMod::spawn_module(
                 SimulationModule {
                     module_id: None,
                     father_id: None,
@@ -120,7 +120,7 @@ impl Module for SimulationModule {
                 } => {
                     tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
                     let module_id = self.module_id.as_ref().expect("module_id should be initialized");
-                    MMF::send_message_and_wait_reply(&EntityID::Module(module_id.clone()), target_module_id, message_id, Bytes::new(), *timeout_ms).await.unwrap();
+                    MMFMod::send_message_and_wait_reply(&EntityID::Module(module_id.clone()), target_module_id, message_id, Bytes::new(), *timeout_ms).await.unwrap();
                 }
 
             SimulationMessageBehavior::Wait {
@@ -143,7 +143,7 @@ impl Module for SimulationModule {
 
             let module_id = self.module_id.as_ref().expect("module_id should be initialized");
 
-            MMF::wait_children_close(&EntityID::Module(module_id.clone()), self.wait_children_close_timeout_ms).await.unwrap();
+            MMFMod::wait_children_close(&EntityID::Module(module_id.clone()), self.wait_children_close_timeout_ms).await.unwrap();
         }
 
         // Simulate shutdown work.

@@ -52,7 +52,7 @@ impl MessageRecorderModule {
     ) -> Result<ModuleID, FrameworkError> {
 
         let module_id =
-            MMF::spawn_module(
+            MMFMod::spawn_module(
                 MessageRecorderModule {
                     module_id: None,
                     father_id: None,
@@ -96,7 +96,7 @@ impl Module for MessageRecorderModule {
 
                 let start_time = Instant::now();
 
-                MMF::send_message_and_wait_reply(
+                MMFMod::send_message_and_wait_reply(
                     &EntityID::Module(module_id.clone()),
                     &self.target_module_id,
                     &message.message_id,

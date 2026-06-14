@@ -42,19 +42,19 @@ async fn test_module_message_chain() {
     module_b_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 200, 200, SimulationMessageBehavior::SendAndWaitReply { target_module_id: module_c_id.clone(), message_id: message_id_temp, timeout_ms: (Some(500)), message_delay_ms: (200) }, false, None).await.unwrap();
     module_a_id = MessageRecorderModule::spawn(&EntityID::External("MAIN".to_string()), module_b_id.clone(), execution_log.clone(), wait_duration_ms.clone()).await.unwrap();
 
-    MMF::init_module(&module_a_id).await.unwrap();
-    MMF::init_module(&module_b_id).await.unwrap();
-    MMF::init_module(&module_c_id).await.unwrap();
-    MMF::wait_module_list_init(&vec![module_a_id.clone(), module_b_id.clone(), module_c_id.clone()], Some(1000)).await.unwrap();
+    MMFMod::init_module(&module_a_id).await.unwrap();
+    MMFMod::init_module(&module_b_id).await.unwrap();
+    MMFMod::init_module(&module_c_id).await.unwrap();
+    MMFMod::wait_module_list_init(&vec![module_a_id.clone(), module_b_id.clone(), module_c_id.clone()], Some(1000)).await.unwrap();
 
-    MMF::send_message(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_CHAIN.to_string(), Bytes::new()).await.unwrap();
+    MMFMod::send_message(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_CHAIN.to_string(), Bytes::new()).await.unwrap();
 
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    MMF::send_message(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_NORMAL_1.to_string(), Bytes::new()).await.unwrap();
-    MMF::send_message(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_NORMAL_2.to_string(), Bytes::new()).await.unwrap();
-    MMF::send_priority_message(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_PRIORITY_1.to_string(), Bytes::new()).await.unwrap();
-    MMF::send_priority_message(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_PRIORITY_2.to_string(), Bytes::new()).await.unwrap();
+    MMFMod::send_message(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_NORMAL_1.to_string(), Bytes::new()).await.unwrap();
+    MMFMod::send_message(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_NORMAL_2.to_string(), Bytes::new()).await.unwrap();
+    MMFMod::send_priority_message(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_PRIORITY_1.to_string(), Bytes::new()).await.unwrap();
+    MMFMod::send_priority_message(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_PRIORITY_2.to_string(), Bytes::new()).await.unwrap();
 
     tokio::time::sleep(Duration::from_millis(1000)).await;
 
@@ -75,11 +75,11 @@ async fn test_module_message_chain() {
     assert_eq!(log_guard[3], MESSAGE_NORMAL_1);
     assert_eq!(log_guard[4], MESSAGE_NORMAL_2);
 
-    MMF::close_module(&module_a_id).await.unwrap();
-    MMF::close_module(&module_b_id).await.unwrap();
-    MMF::close_module(&module_c_id).await.unwrap();
+    MMFMod::close_module(&module_a_id).await.unwrap();
+    MMFMod::close_module(&module_b_id).await.unwrap();
+    MMFMod::close_module(&module_c_id).await.unwrap();
 
-    MMF::wait_children_close(&EntityID::External("MAIN".to_string()), Some(1000)).await.unwrap();
+    MMFMod::wait_children_close(&EntityID::External("MAIN".to_string()), Some(1000)).await.unwrap();
 
     MMF::close().unwrap();
 
@@ -109,19 +109,19 @@ async fn test_module_message_chain_and_priority() {
     module_b_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 200, 200, SimulationMessageBehavior::SendAndWaitReply { target_module_id: module_c_id.clone(), message_id: message_id_temp, timeout_ms: (Some(500)), message_delay_ms: (200) }, false, None).await.unwrap();
     module_a_id = MessageRecorderModule::spawn(&EntityID::External("MAIN".to_string()), module_b_id.clone(), execution_log.clone(), wait_duration_ms.clone()).await.unwrap();
 
-    MMF::init_module(&module_a_id).await.unwrap();
-    MMF::init_module(&module_b_id).await.unwrap();
-    MMF::init_module(&module_c_id).await.unwrap();
-    MMF::wait_module_list_init(&vec![module_a_id.clone(), module_b_id.clone(), module_c_id.clone()], Some(1000)).await.unwrap();
+    MMFMod::init_module(&module_a_id).await.unwrap();
+    MMFMod::init_module(&module_b_id).await.unwrap();
+    MMFMod::init_module(&module_c_id).await.unwrap();
+    MMFMod::wait_module_list_init(&vec![module_a_id.clone(), module_b_id.clone(), module_c_id.clone()], Some(1000)).await.unwrap();
 
-    MMF::send_message(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_CHAIN.to_string(), Bytes::new()).await.unwrap();
+    MMFMod::send_message(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_CHAIN.to_string(), Bytes::new()).await.unwrap();
 
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    MMF::send_message(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_NORMAL_1.to_string(), Bytes::new()).await.unwrap();
-    MMF::send_message(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_NORMAL_2.to_string(), Bytes::new()).await.unwrap();
-    MMF::send_priority_message(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_PRIORITY_1.to_string(), Bytes::new()).await.unwrap();
-    MMF::send_priority_message_and_wait_reply(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_PRIORITY_2.to_string(), Bytes::new(), Some(1000)).await.unwrap();
+    MMFMod::send_message(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_NORMAL_1.to_string(), Bytes::new()).await.unwrap();
+    MMFMod::send_message(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_NORMAL_2.to_string(), Bytes::new()).await.unwrap();
+    MMFMod::send_priority_message(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_PRIORITY_1.to_string(), Bytes::new()).await.unwrap();
+    MMFMod::send_priority_message_and_wait_reply(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_PRIORITY_2.to_string(), Bytes::new(), Some(1000)).await.unwrap();
 
     tokio::time::sleep(Duration::from_millis(1000)).await;
 
@@ -142,11 +142,11 @@ async fn test_module_message_chain_and_priority() {
     assert_eq!(log_guard[3], MESSAGE_NORMAL_1);
     assert_eq!(log_guard[4], MESSAGE_NORMAL_2);
 
-    MMF::close_module(&module_a_id).await.unwrap();
-    MMF::close_module(&module_b_id).await.unwrap();
-    MMF::close_module(&module_c_id).await.unwrap();
+    MMFMod::close_module(&module_a_id).await.unwrap();
+    MMFMod::close_module(&module_b_id).await.unwrap();
+    MMFMod::close_module(&module_c_id).await.unwrap();
 
-    MMF::wait_children_close(&EntityID::External("MAIN".to_string()), Some(1000)).await.unwrap();
+    MMFMod::wait_children_close(&EntityID::External("MAIN".to_string()), Some(1000)).await.unwrap();
 
     MMF::close().unwrap();
 

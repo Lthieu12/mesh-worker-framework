@@ -28,43 +28,43 @@ async fn test_module_hierarchy() {
     MMF::init().unwrap();
 
     let module_a_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 100, 100, SimulationMessageBehavior::DoNothing, true, Some(500)).await.unwrap();
-    println!("module a state = {:?}", MMF::get_module_state(&module_a_id));
+    println!("module a state = {:?}", MMFMod::get_module_state(&module_a_id));
 
-    MMF::init_module(&module_a_id).await.unwrap();
-    MMF::wait_module_init(&module_a_id, Some(500)).await.unwrap();
+    MMFMod::init_module(&module_a_id).await.unwrap();
+    MMFMod::wait_module_init(&module_a_id, Some(500)).await.unwrap();
 
     let module_b_id = SimulationModule::spawn(&EntityID::Module(module_a_id.clone()), 200, 200, SimulationMessageBehavior::DoNothing, false, None).await.unwrap();
-    println!("module b state = {:?}", MMF::get_module_state(&module_b_id));
+    println!("module b state = {:?}", MMFMod::get_module_state(&module_b_id));
     let module_c_id = SimulationModule::spawn(&EntityID::Module(module_a_id.clone()), 300, 300, SimulationMessageBehavior::DoNothing, false, None).await.unwrap();
-    println!("module c state = {:?}", MMF::get_module_state(&module_c_id));
+    println!("module c state = {:?}", MMFMod::get_module_state(&module_c_id));
     
-    MMF::init_module(&module_b_id).await.unwrap();
-    MMF::init_module(&module_c_id).await.unwrap();
+    MMFMod::init_module(&module_b_id).await.unwrap();
+    MMFMod::init_module(&module_c_id).await.unwrap();
 
-    MMF::wait_module_list_init(&vec![module_b_id.clone(), module_c_id.clone()], Some(1000)).await.unwrap();
+    MMFMod::wait_module_list_init(&vec![module_b_id.clone(), module_c_id.clone()], Some(1000)).await.unwrap();
 
 
     // Verify father relationships.
 
     assert_eq!(
-        MMF::get_father_id(&module_a_id).unwrap(),
+        MMFMod::get_father_id(&module_a_id).unwrap(),
         EntityID::External("MAIN".to_string())
     );
 
     assert_eq!(
-        MMF::get_father_id(&module_b_id).unwrap(),
+        MMFMod::get_father_id(&module_b_id).unwrap(),
         EntityID::Module(module_a_id.clone())
     );
 
     assert_eq!(
-        MMF::get_father_id(&module_c_id).unwrap(),
+        MMFMod::get_father_id(&module_c_id).unwrap(),
         EntityID::Module(module_a_id.clone())
     );
 
     // Verify children relationships.
 
     let children_ids =
-        MMF::get_children_ids(
+        MMFMod::get_children_ids(
             &EntityID::Module(module_a_id.clone())
         ).unwrap();
 
@@ -73,35 +73,35 @@ async fn test_module_hierarchy() {
     assert!(children_ids.contains(&module_c_id));
 
     let children_ids =
-        MMF::get_children_ids(
+        MMFMod::get_children_ids(
             &EntityID::Module(module_b_id.clone())
         ).unwrap();
 
     assert!(children_ids.is_empty());
 
     let children_ids =
-        MMF::get_children_ids(
+        MMFMod::get_children_ids(
             &EntityID::Module(module_c_id.clone())
         ).unwrap();
 
     assert!(children_ids.is_empty());
 
     let children_ids =
-        MMF::get_children_ids(
+        MMFMod::get_children_ids(
             &EntityID::External("MAIN".to_string())
         ).unwrap();
 
     assert_eq!(children_ids.len(), 1);
     assert!(children_ids.contains(&module_a_id));
 
-    println!("MAIN children(s) = {:?}", MMF::get_children_ids(&EntityID::External("MAIN".to_string())));
-    println!("module_a children(s) = {:?}", MMF::get_children_ids(&EntityID::Module(module_a_id.clone())));
+    println!("MAIN children(s) = {:?}", MMFMod::get_children_ids(&EntityID::External("MAIN".to_string())));
+    println!("module_a children(s) = {:?}", MMFMod::get_children_ids(&EntityID::Module(module_a_id.clone())));
 
-    MMF::close_module(&module_a_id).await.unwrap();
-    MMF::close_module(&module_b_id).await.unwrap();
-    MMF::close_module(&module_c_id).await.unwrap();
+    MMFMod::close_module(&module_a_id).await.unwrap();
+    MMFMod::close_module(&module_b_id).await.unwrap();
+    MMFMod::close_module(&module_c_id).await.unwrap();
 
-    MMF::wait_children_close(&EntityID::External("MAIN".to_string()), Some(1000)).await.unwrap();
+    MMFMod::wait_children_close(&EntityID::External("MAIN".to_string()), Some(1000)).await.unwrap();
 
     MMF::close().unwrap();
 }
