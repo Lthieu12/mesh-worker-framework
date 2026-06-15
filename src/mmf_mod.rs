@@ -580,18 +580,83 @@ impl MMFMod {
 
         // Create a temporary reply channel used to signal
         // completion of on_message().
-        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel();
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<Result<(), ModuleError>>();
 
         // Send the message to the receiver module.
         normal_sender_channel.send(ModuleCommand::MessageAndWaitReply(reply_sender, framework_message)).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         // Wait for completion or timeout.
-        match timeout_ms {
-            Some(timeout_ms) => {
-                tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), reply_receiver).await.map_err(|_| FrameworkError::Operation_Timeout)?.map_err(|_| FrameworkError::Module_ChannelClosed)?;
-            }
-            None => {
-                reply_receiver.await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        //
+        // The reply channel transports the Result returned
+        // by the receiver on_message() callback.
+        let module_result: Result<(), ModuleError> =
+            match timeout_ms {
+
+                Some(timeout_ms) => {
+
+                    // Wait until the receiver module finishes
+                    // processing the message.
+                    //
+                    // timeout() returns:
+                    // - Ok(channel_result) if the receiver replied.
+                    // - Err(Elapsed) if the timeout expires.
+                    let timeout_result = tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), reply_receiver).await;
+
+                    // Convert timeout errors into MMF errors.
+                    let channel_result = match timeout_result {
+
+                        Ok(channel_result) => {
+                            channel_result
+                        }
+                        Err(_) => {
+                            return Err(FrameworkError::Operation_Timeout);
+                        }
+                    };
+
+                    // The receiver module task has disappeared
+                    // before sending its completion status.
+                    //
+                    // channel_result contains:
+                    // - Ok(module_result)
+                    // - Err(RecvError)
+                    match channel_result {
+
+                        Ok(module_result) => {
+                            module_result
+                        }
+                        Err(_) => {
+                            return Err(FrameworkError::Module_ChannelClosed);
+                        }
+                    }
+                }
+
+                None => {
+
+                    // Wait indefinitely until the receiver module
+                    // finishes processing the message.
+                    let channel_result = reply_receiver.await;
+
+                    // The receiver module task has disappeared
+                    // before sending its completion status.
+                    match channel_result {
+
+                        Ok(module_result) => {
+                            module_result
+                        }
+                        Err(_) => {
+                            return Err(FrameworkError::Module_ChannelClosed);
+                        }
+                    }
+                }
+            };
+
+        // The receiver module returned an error while
+        // processing the message.
+        match module_result {
+
+            Ok(()) => {}
+            Err(module_error) => {
+                return Err(FrameworkError::Module_MessageError(module_error));
             }
         }
 
@@ -718,12 +783,77 @@ impl MMFMod {
         priority_sender_channel.send(ModuleCommand::MessageAndWaitReply(reply_sender, framework_message)).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         // Wait for completion or timeout.
-        match timeout_ms {
-            Some(timeout_ms) => {
-                tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), reply_receiver).await.map_err(|_| FrameworkError::Operation_Timeout)?.map_err(|_| FrameworkError::Module_ChannelClosed)?;
-            }
-            None => {
-                reply_receiver.await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        //
+        // The reply channel transports the Result returned
+        // by the receiver on_message() callback.
+        let module_result: Result<(), ModuleError> =
+            match timeout_ms {
+
+                Some(timeout_ms) => {
+
+                    // Wait until the receiver module finishes
+                    // processing the message.
+                    //
+                    // timeout() returns:
+                    // - Ok(channel_result) if the receiver replied.
+                    // - Err(Elapsed) if the timeout expires.
+                    let timeout_result = tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), reply_receiver).await;
+
+                    // Convert timeout errors into MMF errors.
+                    let channel_result = match timeout_result {
+
+                        Ok(channel_result) => {
+                            channel_result
+                        }
+                        Err(_) => {
+                            return Err(FrameworkError::Operation_Timeout);
+                        }
+                    };
+
+                    // The receiver module task has disappeared
+                    // before sending its completion status.
+                    //
+                    // channel_result contains:
+                    // - Ok(module_result)
+                    // - Err(RecvError)
+                    match channel_result {
+
+                        Ok(module_result) => {
+                            module_result
+                        }
+                        Err(_) => {
+                            return Err(FrameworkError::Module_ChannelClosed);
+                        }
+                    }
+                }
+
+                None => {
+
+                    // Wait indefinitely until the receiver module
+                    // finishes processing the message.
+                    let channel_result = reply_receiver.await;
+
+                    // The receiver module task has disappeared
+                    // before sending its completion status.
+                    match channel_result {
+
+                        Ok(module_result) => {
+                            module_result
+                        }
+                        Err(_) => {
+                            return Err(FrameworkError::Module_ChannelClosed);
+                        }
+                    }
+                }
+            };
+
+        // The receiver module returned an error while
+        // processing the message.
+        match module_result {
+
+            Ok(()) => {}
+            Err(module_error) => {
+                return Err(FrameworkError::Module_MessageError(module_error));
             }
         }
 

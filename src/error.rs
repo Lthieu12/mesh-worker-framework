@@ -5,6 +5,8 @@
 use std::error::Error;
 use std::fmt;
 
+pub type ModuleError = anyhow::Error;
+
 /// Errors returned by MMF functions.
 ///
 /// Naming convention:
@@ -55,9 +57,7 @@ pub enum FrameworkError {
 
     /// Error returned by a module while processing
     /// a message sent through send_message_and_wait_reply().
-    Module_MessageError(
-        Box<dyn std::error::Error + Send + Sync>
-    ),
+    Module_MessageError(anyhow::Error),
 
     /// The requested father module was not found.
     FatherModule_NotFound,

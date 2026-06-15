@@ -18,13 +18,14 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot;
 
 use crate::message::FrameworkMessage;
+use crate::error::ModuleError;
 
 /// Command processed by a ModuleTask.
 #[derive(Debug)]
 pub(crate) enum ModuleCommand {
     Init,
     Message(FrameworkMessage),
-    MessageAndWaitReply(oneshot::Sender<()>, FrameworkMessage),
+    MessageAndWaitReply(oneshot::Sender<Result<(), ModuleError>>, FrameworkMessage),
     Close,
 }
 

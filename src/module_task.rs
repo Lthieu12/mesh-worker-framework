@@ -152,7 +152,7 @@ where T: Module + Send + 'static{
                 // Close command is always processed before module
                 // shutdown begins.
                 ModuleCommand::Message(message) => {
-                    module.on_message(message).await;
+                    let _ = module.on_message(message).await;
                 }
 
                 // Execute a business message.
@@ -168,9 +168,9 @@ where T: Module + Send + 'static{
                 // shutdown begins.
                 ModuleCommand::MessageAndWaitReply(reply_sender, message) => {
  
-                    module.on_message(message).await;
-                    let _ = reply_sender.send(());
-                }
+                        let result = module.on_message(message).await;
+                        let _ = reply_sender.send(result);
+                    }
 
                 // Execute module shutdown.
                 //
