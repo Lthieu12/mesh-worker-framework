@@ -8,7 +8,7 @@ use tokio::task::JoinHandle;
 
 use crate::channel::{ModuleNormalSenderChannel, ModulePrioritySenderChannel};
 use crate::module::{Module, ModuleID, EntityID, ModuleState};
-use crate::error::FrameworkError;
+use crate::error::{FrameworkError, MMFPanic};
 
 /// Information associated with a registered module.
 #[derive(Debug)]
@@ -276,7 +276,7 @@ impl Registry {
     pub(crate) fn take_join_handle(&mut self, module_id: &ModuleID) -> Result<JoinHandle<()>, FrameworkError> {
         
         let registry_entry = self.module_map.get_mut(module_id).ok_or(FrameworkError::Module_NotFound)?;
-        let join_handle = registry_entry.join_handle.take().ok_or(FrameworkError::Framework_InternalError)?;
+        let join_handle = registry_entry.join_handle.take().expect(MMFPanic::Module_JoinHandleMissing.message());
         Ok(join_handle)
     }
 

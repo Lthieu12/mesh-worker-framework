@@ -7,7 +7,7 @@ use std::sync::{LazyLock, RwLock};
 use std::sync::atomic::AtomicU64;
 use tokio::sync::Notify;
 
-use crate::error::FrameworkError;
+use crate::error::{FrameworkError, MMFPanic};
 use crate::logging::LoggingData;
 use crate::registry::Registry;
 
@@ -61,7 +61,7 @@ impl MMF {
     pub fn init() -> Result<(), FrameworkError> {
         
         {
-            let mut mmf_data_guard = MMF_DATA.write().unwrap();
+            let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
             if mmf_data_guard.is_some() {
                 return Err(FrameworkError::Framework_AlreadyInitialized);
             }
@@ -85,7 +85,7 @@ impl MMF {
     /// resort if a module becomes unresponsive.
     pub fn close() -> Result<(), FrameworkError> {
 
-        let mut mmf_data_guard = MMF_DATA.write().unwrap();
+        let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
 
         let mmf_data = match mmf_data_guard.as_ref() {
             Some(mmf_data) => mmf_data,
@@ -106,7 +106,7 @@ impl MMF {
     /// Check whether the framework is initialized.
     pub fn is_initialized() -> bool {
         
-        MMF_DATA.read().unwrap().is_some()
+        MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message()).is_some()
     }
 
 

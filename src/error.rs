@@ -5,7 +5,9 @@
 use std::error::Error;
 use std::fmt;
 
+
 pub type ModuleError = anyhow::Error;
+
 
 /// Errors returned by MMF functions.
 ///
@@ -18,9 +20,6 @@ pub type ModuleError = anyhow::Error;
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
 pub enum FrameworkError {
-
-    /// An internal framework error occurred.
-    Framework_InternalError,
 
     /// The operation timed out.
     Operation_Timeout,
@@ -61,6 +60,10 @@ pub enum FrameworkError {
 
     /// The requested father module was not found.
     FatherModule_NotFound,
+
+    /// The MessageInstanceID counter has reached its maximum value
+    /// and can no longer generate unique identifiers.
+    Message_InstanceIDExhausted,
 }
 
 /// Human-readable representation of FrameworkError.
@@ -69,9 +72,6 @@ impl fmt::Display for FrameworkError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 
         match self {
-
-            FrameworkError::Framework_InternalError =>
-                write!(f, "An internal framework error occurred."),
 
             FrameworkError::Operation_Timeout =>
                 write!(f, "The operation timed out."),
@@ -92,10 +92,10 @@ impl fmt::Display for FrameworkError {
                 write!(f, "The requested module was not found."),
 
             FrameworkError::Module_CloseFailed =>
-                write!(f, "The requested module was not found."),
+                write!(f, "A module failed during its closing."),
 
             FrameworkError::Module_ChannelClosed =>
-                write!(f, "A module failed during its closing."),
+                write!(f, "A module communication channel is closed."),
 
             FrameworkError::Module_AlreadyExists =>
                 write!(f, "The requested module already exists."),
@@ -112,9 +112,77 @@ impl fmt::Display for FrameworkError {
             FrameworkError::FatherModule_NotFound =>
                 write!(f, "The requested father module was not found."),
 
+            FrameworkError::Message_InstanceIDExhausted =>
+                write!(f, "MessageInstanceID counter exhausted."),
+
         }
     }
 }
 
 /// Standard Rust error implementation for FrameworkError.
 impl Error for FrameworkError {}
+
+
+/// Panic errors of MMF. 
+#[derive(Debug)]
+#[allow(non_camel_case_types)]
+pub(crate) enum MMFPanic {
+
+    Module_PriorityChannelClosed,
+    Module_NormalChannelClosed,
+
+    MMFData_ReadLockPoisoned,
+    MMFData_WriteLockPoisoned,
+    MMFData_Missing,
+
+    Registry_ReadLockPoisoned,
+    Registry_WriteLockPoisoned,
+    Registry_ModuleMissing,
+
+    Module_JoinHandleMissing,
+}
+
+impl MMFPanic {
+
+    pub(crate) fn message(&self) -> &'static str {
+
+        match self {
+
+            MMFPanic::Module_PriorityChannelClosed => {
+                "Internal MMF error: module priority command channel unexpectedly closed."
+            }
+
+            MMFPanic::Module_NormalChannelClosed => {
+                "Internal MMF error: module normal command channel unexpectedly closed."
+            }
+
+            MMFPanic::MMFData_ReadLockPoisoned => {
+                "Internal MMF error: MMF_DATA read lock poisoned."
+            }
+
+            MMFPanic::MMFData_WriteLockPoisoned => {
+                "Internal MMF error: MMF_DATA write lock poisoned."
+            }
+
+            MMFPanic::MMFData_Missing => {
+                "Internal MMF error: MMF_DATA is unexpectedly missing"
+            }
+
+            MMFPanic::Registry_ReadLockPoisoned => {
+                "Internal MMF error: Registry read lock poisoned."
+            }
+
+            MMFPanic::Registry_WriteLockPoisoned => {
+                "Internal MMF error: Registry write lock poisoned."
+            }
+
+            MMFPanic::Registry_ModuleMissing => {
+                "Internal MMF error: Registry module unexpectedly missing."
+            }
+
+            MMFPanic::Module_JoinHandleMissing => {
+                "Internal MMF error: JoinHandle unexpectedly missing."
+            }
+        }
+    }
+}

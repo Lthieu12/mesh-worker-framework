@@ -26,6 +26,7 @@ use tokio::task::JoinHandle;
 use crate::mmf::{MMF_DATA, MMF_MODULE_INIT_NOTIFY, MMF_MODULE_CLOSE_NOTIFY};
 use crate::channel::{ModuleCommand, ModuleNormalReceiverChannel, ModulePriorityReceiverChannel};
 use crate::module::{Module, ModuleID, EntityID, ModuleState};
+use crate::error::MMFPanic;
 
 /// Spawn a Tokio task that takes ownership of the module instance.
 ///
@@ -98,10 +99,10 @@ where T: Module + Send + 'static{
                     // A closed channel indicates an internal framework error.
                     tokio::select! {
                         command = priority_receiver_channel.recv() => {
-                            command.unwrap()
+                            command.expect(MMFPanic::Module_PriorityChannelClosed.message())
                         }
                         command = normal_receiver_channel.recv() => {
-                            command.unwrap()
+                            command.expect(MMFPanic::Module_NormalChannelClosed.message())
                         }
                     }
                 };          
@@ -123,16 +124,16 @@ where T: Module + Send + 'static{
                     //
                     // The module is now fully initialized and can
                     // receive business messages.
-                    let mut mmf_data_guard = MMF_DATA.write().unwrap();
-                    let mmf_data = mmf_data_guard.as_mut().unwrap();
+                    let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
+                    let mmf_data = mmf_data_guard.as_mut().expect(MMFPanic::MMFData_Missing.message());
                     match error_init {
                         Ok(()) => {
 
-                            mmf_data.registry.set_module_state(&module_id, ModuleState::Initialized).unwrap();
+                            mmf_data.registry.set_module_state(&module_id, ModuleState::Initialized).expect(MMFPanic::Registry_ModuleMissing.message());
                         }
                         Err(_) => {
 
-                            mmf_data.registry.set_module_state(&module_id, ModuleState::InitFailed).unwrap();
+                            mmf_data.registry.set_module_state(&module_id, ModuleState::InitFailed).expect(MMFPanic::Registry_ModuleMissing.message());
                         }
 
                     }
@@ -187,21 +188,21 @@ where T: Module + Send + 'static{
                     //
                     // Closed indicates that the module lifecycle
                     // completed successfully.
-                    let mut mmf_data_guard = MMF_DATA.write().unwrap();
-                    let mmf_data = mmf_data_guard.as_mut().unwrap();
+                    let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
+                    let mmf_data = mmf_data_guard.as_mut().expect(MMFPanic::MMFData_Missing.message());
                     match error_close {
                         Ok(()) => {
 
-                            mmf_data.registry.set_module_state(&module_id, ModuleState::Closed).unwrap();
+                            mmf_data.registry.set_module_state(&module_id, ModuleState::Closed).expect(MMFPanic::Registry_ModuleMissing.message());
                             // Remove the module from the Registry.
                             //
                             // Once removed, the module is no longer visible
                             // to MMF and cannot receive new commands.
-                            mmf_data.registry.remove_module(&module_id).unwrap();
+                            mmf_data.registry.remove_module(&module_id).expect(MMFPanic::Registry_ModuleMissing.message());
                         }
                         Err(_) => {
 
-                            mmf_data.registry.set_module_state(&module_id, ModuleState::CloseFailed).unwrap();
+                            mmf_data.registry.set_module_state(&module_id, ModuleState::CloseFailed).expect(MMFPanic::Registry_ModuleMissing.message());
                         }
 
                     }
