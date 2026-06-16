@@ -135,8 +135,6 @@ pub(crate) enum MMFPanic {
     MMFData_WriteLockPoisoned,
     MMFData_Missing,
 
-    Registry_ReadLockPoisoned,
-    Registry_WriteLockPoisoned,
     Registry_ModuleMissing,
 
     Module_JoinHandleMissing,
@@ -166,14 +164,6 @@ impl MMFPanic {
 
             MMFPanic::MMFData_Missing => {
                 "Internal MMF error: MMF_DATA is unexpectedly missing"
-            }
-
-            MMFPanic::Registry_ReadLockPoisoned => {
-                "Internal MMF error: Registry read lock poisoned."
-            }
-
-            MMFPanic::Registry_WriteLockPoisoned => {
-                "Internal MMF error: Registry write lock poisoned."
             }
 
             MMFPanic::Registry_ModuleMissing => {
