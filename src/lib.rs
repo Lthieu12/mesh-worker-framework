@@ -38,6 +38,7 @@ pub use module::{
     ModuleID,
     EntityID,
     ModuleState,
+    ModuleStatus,
 };
 pub use message::{
     FrameworkMessage,

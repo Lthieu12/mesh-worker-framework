@@ -8,7 +8,7 @@ use std::sync::atomic::Ordering;
 
 use crate::mmf::{MMF_DATA, MESSAGE_INSTANCE_COUNTER, MMF_MODULE_INIT_NOTIFY, MMF_MODULE_CLOSE_NOTIFY};
 use crate::error::{FrameworkError, MMFPanic};
-use crate::module::{Module, ModuleID, EntityID, ModuleState};
+use crate::module::{Module, ModuleID, EntityID, ModuleState, ModuleStatus};
 use crate::module_task::spawn_module_task;
 use crate::channel::{ModuleCommand, ModuleNormalSenderChannel, ModulePrioritySenderChannel};
 use crate::message::{FrameworkMessage, MessageID, MessageInstanceID};
@@ -70,9 +70,9 @@ impl MMFMod {
         let module_id = mmf_data.registry.generate_module_id::<T>();
 
         // Channel used to send Module commands (like Init and Close) and messages to the module.
-        let (normal_sender_channel, normal_receiver_channel) = tokio::sync::mpsc::channel(mmf_data.module_channel_capacity);
+        let (normal_sender_channel, normal_receiver_channel) = tokio::sync::mpsc::channel(mmf_data.module_normal_channel_capacity);
         // Channel used to send priority commands and messages to the module.
-        let (priority_sender_channel, priority_receiver_channel) = tokio::sync::mpsc::channel(mmf_data.module_channel_capacity);
+        let (priority_sender_channel, priority_receiver_channel) = tokio::sync::mpsc::channel(mmf_data.module_priority_channel_capacity);
 
         // Spawn the Tokio task that will own the module instance.
         //
@@ -95,16 +95,27 @@ impl MMFMod {
     }
 
 
-    /// Get the current state of a module.
-    pub fn get_module_state(module_id: &ModuleID) -> Result<ModuleState, FrameworkError>{
+    /// Get the current status of a module.
+    pub fn get_module_status(module_id: &ModuleID) -> Result<ModuleStatus, FrameworkError> {
 
         let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
-        let module_state = mmf_data.registry.get_module_state(module_id)?;
-        drop(mmf_data_guard);
+        let registry_entry = mmf_data.registry.get_registry_entry(module_id)?;
+        let normal_channel_capacity = mmf_data.module_normal_channel_capacity;
+        let priority_channel_capacity = mmf_data.module_priority_channel_capacity;
+        let normal_channel_size = normal_channel_capacity - registry_entry.normal_sender_channel.capacity();
+        let priority_channel_size = priority_channel_capacity - registry_entry.priority_sender_channel.capacity();
+        
+        let module_status = ModuleStatus {
+            module_state: registry_entry.module_state,
+            normal_channel_size,
+            normal_channel_capacity,
+            priority_channel_size,
+            priority_channel_capacity,
+        };
 
-        Ok(module_state)
-    }
+        Ok(module_status)
+    }   
 
 
     /// Request module initialization.

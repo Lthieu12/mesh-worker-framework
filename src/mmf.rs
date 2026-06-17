@@ -33,8 +33,11 @@ pub(crate) struct MMFData {
     /// Logging configuration.
     pub(crate) logging_data: LoggingData,
 
-    /// Capacity of module event queues.
-    pub(crate) module_channel_capacity: usize,
+    /// Capacity of normal module event queues.
+    pub(crate) module_normal_channel_capacity: usize,
+
+    /// Capacity of priority module event queues.
+    pub(crate) module_priority_channel_capacity: usize,
 }
 
 impl MMFData {
@@ -45,7 +48,8 @@ impl MMFData {
         Self {
             registry: Registry::new(),
             logging_data: LoggingData::new(),
-            module_channel_capacity: 500,
+            module_normal_channel_capacity: 50,
+            module_priority_channel_capacity: 10,
         }
     }
 

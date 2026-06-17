@@ -40,6 +40,20 @@ pub enum ModuleState {
 }
 
 
+/// Current status of a module within the framework.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ModuleStatus {
+
+    pub module_state: ModuleState,
+
+    pub normal_channel_size: usize,
+    pub normal_channel_capacity: usize,
+
+    pub priority_channel_size: usize,
+    pub priority_channel_capacity: usize,
+}
+
+
 /// Interface that must be implemented by all MMF modules.
 #[async_trait]
 pub trait Module {

@@ -28,15 +28,15 @@ async fn test_module_hierarchy() {
     MMF::init().unwrap();
 
     let module_a_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 100, 100, SimulationBehavior::DoNothing, true, Some(500)).await.unwrap();
-    println!("module a state = {:?}", MMFMod::get_module_state(&module_a_id));
+    println!("module a state = {:?}", MMFMod::get_module_status(&module_a_id).unwrap().module_state);
 
     MMFMod::init_module(&module_a_id).await.unwrap();
     MMFMod::wait_module_init(&module_a_id, Some(500)).await.unwrap();
 
     let module_b_id = SimulationModule::spawn(&EntityID::Module(module_a_id.clone()), 200, 200, SimulationBehavior::DoNothing, false, None).await.unwrap();
-    println!("module b state = {:?}", MMFMod::get_module_state(&module_b_id));
+    println!("module b state = {:?}", MMFMod::get_module_status(&module_b_id).unwrap().module_state);
     let module_c_id = SimulationModule::spawn(&EntityID::Module(module_a_id.clone()), 300, 300, SimulationBehavior::DoNothing, false, None).await.unwrap();
-    println!("module c state = {:?}", MMFMod::get_module_state(&module_c_id));
+    println!("module c state = {:?}", MMFMod::get_module_status(&module_c_id).unwrap().module_state);
     
     MMFMod::init_module(&module_b_id).await.unwrap();
     MMFMod::init_module(&module_c_id).await.unwrap();
