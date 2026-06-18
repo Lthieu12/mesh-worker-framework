@@ -5,6 +5,7 @@
 
 pub struct MMFLog;
 
+/// Public MMFLog entry point.
 impl MMFLog {
 
 

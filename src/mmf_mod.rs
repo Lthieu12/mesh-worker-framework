@@ -17,6 +17,7 @@ pub type ModuleError = anyhow::Error;
 
 pub struct MMFMod;
 
+/// Public MMFMod entry point.
 impl MMFMod {
 
     /// Generate a unique MessageInstanceID.

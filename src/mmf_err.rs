@@ -73,6 +73,7 @@ pub struct ErrorList {
 
 pub struct MMFErr;
 
+/// Public MMFErr entry point.
 impl MMFErr {
 
     /// Generate a unique ErrorInstanceID.
