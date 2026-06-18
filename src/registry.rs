@@ -8,7 +8,7 @@ use tokio::task::JoinHandle;
 
 use crate::channel::{ModuleNormalSenderChannel, ModulePrioritySenderChannel};
 use crate::module::{Module, ModuleID, EntityID, ModuleState};
-use crate::error::{FrameworkError, MMFPanic};
+use crate::framework_error::{FrameworkError, MMFPanic};
 
 /// Information associated with a registered module.
 #[derive(Debug)]

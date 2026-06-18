@@ -18,7 +18,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot;
 
 use crate::message::FrameworkMessage;
-use crate::error::ModuleError;
+use crate::framework_error::ModuleError;
 
 /// Command processed by a ModuleTask.
 #[derive(Debug)]

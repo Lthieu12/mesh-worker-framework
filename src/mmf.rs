@@ -5,9 +5,11 @@
 
 use std::sync::{LazyLock, RwLock};
 use std::sync::atomic::AtomicU64;
+use std::collections::VecDeque;
 use tokio::sync::Notify;
 
-use crate::error::{FrameworkError, MMFPanic};
+use crate::framework_error::{FrameworkError, MMFPanic};
+use crate::mmf_err::{ErrorData};
 use crate::logging::LoggingData;
 use crate::registry::Registry;
 
@@ -15,13 +17,23 @@ use crate::registry::Registry;
 pub(crate) static MMF_DATA: LazyLock<RwLock<Option<MMFData>>> = LazyLock::new(|| RwLock::new(None));
 
 /// Global MMF notifier used to signal child module initialized.
-pub(crate) static MMF_MODULE_INIT_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Notify::new());
+pub(crate) static MMF_MOD_INIT_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Notify::new());
 
 /// Global MMF notifier used to signal child module closures.
-pub(crate) static MMF_MODULE_CLOSE_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Notify::new());
+pub(crate) static MMF_MOD_CLOSE_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Notify::new());
 
-/// Global MMF message instance counter
-pub(crate) static MESSAGE_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
+/// Global MMF message instance counter used to identify messages sent to modules.
+pub(crate) static MMF_MOD_MESSAGE_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
+
+/// Global MMF error event storage.
+pub(crate) static MMF_ERR_DATA: LazyLock<RwLock<Option<ErrorData>>> = LazyLock::new(|| RwLock::new(None));
+
+/// MMF error notification emitted whenever a new error event
+/// is added to MMFErr.
+pub(crate) static MMF_ERR_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Notify::new());
+
+/// Global MMF error instance counter.
+pub(crate) static MMF_ERR_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 
 /// Internal MMF runtime data.
@@ -38,6 +50,9 @@ pub(crate) struct MMFData {
 
     /// Capacity of priority module event queues.
     pub(crate) module_priority_channel_capacity: usize,
+
+    /// Capacity of error event buffer.
+    pub(crate) error_event_buffer_capacity: usize,
 }
 
 impl MMFData {
@@ -50,6 +65,7 @@ impl MMFData {
             logging_data: LoggingData::new(),
             module_normal_channel_capacity: 50,
             module_priority_channel_capacity: 10,
+            error_event_buffer_capacity: 100,
         }
     }
 
@@ -71,6 +87,12 @@ impl MMF {
             }
             *mmf_data_guard = Some(MMFData::new());
             drop(mmf_data_guard);
+
+            let mut mmf_err_data_guard = MMF_ERR_DATA.write().expect(MMFPanic::MMFErrData_WriteLockPoisoned.message());
+            *mmf_err_data_guard = Some(ErrorData {
+                error_event_list: VecDeque::new()
+            });
+            drop(mmf_err_data_guard);
         }
 
         Ok(())
@@ -102,6 +124,10 @@ impl MMF {
 
         *mmf_data_guard = None;
         drop(mmf_data_guard);
+
+        let mut mmf_err_data_guard = MMF_ERR_DATA.write().expect(MMFPanic::MMFErrData_WriteLockPoisoned.message());
+        *mmf_err_data_guard = None;
+        drop(mmf_err_data_guard);
 
         Ok(())
     }

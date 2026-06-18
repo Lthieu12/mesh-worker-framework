@@ -64,6 +64,10 @@ pub enum FrameworkError {
     /// The MessageInstanceID counter has reached its maximum value
     /// and can no longer generate unique identifiers.
     Message_InstanceIDExhausted,
+
+    /// The ErrorInstanceID counter has reached its maximum value
+    /// and can no longer generate unique identifiers.
+    Error_InstanceIDExhausted,
 }
 
 /// Human-readable representation of FrameworkError.
@@ -115,6 +119,10 @@ impl fmt::Display for FrameworkError {
             FrameworkError::Message_InstanceIDExhausted =>
                 write!(f, "MessageInstanceID counter exhausted."),
 
+            
+            FrameworkError::Error_InstanceIDExhausted =>
+                write!(f, "ErrorInstanceID counter exhausted."),
+
         }
     }
 }
@@ -138,6 +146,11 @@ pub(crate) enum MMFPanic {
     Registry_ModuleMissing,
 
     Module_JoinHandleMissing,
+
+    MMFErrData_ReadLockPoisoned,
+    MMFErrData_WriteLockPoisoned,
+
+    ErrorBuffer_Inconsistency,
 }
 
 impl MMFPanic {
@@ -172,6 +185,19 @@ impl MMFPanic {
 
             MMFPanic::Module_JoinHandleMissing => {
                 "Internal MMF error: JoinHandle unexpectedly missing."
+            }
+
+            MMFPanic::MMFErrData_ReadLockPoisoned => {
+                "Internal MMF error: MMFErr_DATA read lock poisoned."
+            }
+
+            MMFPanic::MMFErrData_WriteLockPoisoned => {
+                "Internal MMF error: MMFErr_DATA write lock poisoned."
+            }
+
+            MMFPanic::ErrorBuffer_Inconsistency => {
+                "Internal MMF error: error buffer is inconsistent."
+
             }
         }
     }

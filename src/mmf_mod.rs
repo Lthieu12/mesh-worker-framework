@@ -6,8 +6,8 @@
 use bytes::Bytes;
 use std::sync::atomic::Ordering;
 
-use crate::mmf::{MMF_DATA, MESSAGE_INSTANCE_COUNTER, MMF_MODULE_INIT_NOTIFY, MMF_MODULE_CLOSE_NOTIFY};
-use crate::error::{FrameworkError, MMFPanic};
+use crate::mmf::{MMF_DATA, MMF_MOD_MESSAGE_INSTANCE_COUNTER, MMF_MOD_INIT_NOTIFY, MMF_MOD_CLOSE_NOTIFY};
+use crate::framework_error::{FrameworkError, MMFPanic};
 use crate::module::{Module, ModuleID, EntityID, ModuleState, ModuleStatus};
 use crate::module_task::spawn_module_task;
 use crate::channel::{ModuleCommand, ModuleNormalSenderChannel, ModulePrioritySenderChannel};
@@ -22,7 +22,7 @@ impl MMFMod {
     /// Generate a unique MessageInstanceID.
     fn generate_message_instance_id() -> Result<MessageInstanceID, FrameworkError> {
         
-        let current_id = MESSAGE_INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let current_id = MMF_MOD_MESSAGE_INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed);
         if current_id == u64::MAX {
             return Err(FrameworkError::Message_InstanceIDExhausted);
         }
@@ -222,7 +222,7 @@ impl MMFMod {
 
                 // Register interest in the next initialization event
                 // before checking module states to avoid lost notifications.
-                let init_notify = MMF_MODULE_INIT_NOTIFY.notified();
+                let init_notify = MMF_MOD_INIT_NOTIFY.notified();
 
                 // Read Registry state under a short-lived lock.
                 //
@@ -324,7 +324,7 @@ impl MMFMod {
 
                 // Register interest in the next closing event
                 // before checking module states to avoid lost notifications.
-                let close_notify = MMF_MODULE_CLOSE_NOTIFY.notified();
+                let close_notify = MMF_MOD_CLOSE_NOTIFY.notified();
 
                 // Read Registry state under a short-lived lock.
                 //
@@ -444,7 +444,7 @@ impl MMFMod {
 
         // Wake up all waiters interested in module
         // shutdown events.
-        MMF_MODULE_CLOSE_NOTIFY.notify_waiters();
+        MMF_MOD_CLOSE_NOTIFY.notify_waiters();
 
         Ok(())
     }

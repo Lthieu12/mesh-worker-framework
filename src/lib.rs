@@ -15,7 +15,7 @@ mod registry;
 mod channel;
 mod module_task;
 mod logging;
-mod error;
+mod framework_error;
 mod module;
 mod message;
 
@@ -31,7 +31,7 @@ pub use mmf_mod::MMFMod;
 pub use mmf_log::MMFLog;
 pub use mmf_err::MMFErr;
 
-pub use error::FrameworkError;
+pub use framework_error::FrameworkError;
 
 pub use mmf_mod::ModuleError;
 

@@ -23,10 +23,10 @@
 
 use tokio::task::JoinHandle;
 
-use crate::mmf::{MMF_DATA, MMF_MODULE_INIT_NOTIFY, MMF_MODULE_CLOSE_NOTIFY};
+use crate::mmf::{MMF_DATA, MMF_MOD_INIT_NOTIFY, MMF_MOD_CLOSE_NOTIFY};
 use crate::channel::{ModuleCommand, ModuleNormalReceiverChannel, ModulePriorityReceiverChannel};
 use crate::module::{Module, ModuleID, EntityID, ModuleState};
-use crate::error::MMFPanic;
+use crate::framework_error::MMFPanic;
 
 /// Spawn a Tokio task that takes ownership of the module instance.
 ///
@@ -141,7 +141,7 @@ where T: Module + Send + 'static{
 
                     // Wake up all waiters interested in module
                     // initialization events.
-                    MMF_MODULE_INIT_NOTIFY.notify_waiters();
+                    MMF_MOD_INIT_NOTIFY.notify_waiters();
                 }
 
                 // Execute a business message.
@@ -211,7 +211,7 @@ where T: Module + Send + 'static{
 
                     // Wake up all waiters interested in module
                     // shutdown events.
-                    MMF_MODULE_CLOSE_NOTIFY.notify_waiters();
+                    MMF_MOD_CLOSE_NOTIFY.notify_waiters();
 
                     // Terminate the Tokio task associated with
                     // this module.
