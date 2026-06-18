@@ -30,7 +30,7 @@ pub(crate) static MMF_ERR_DATA: LazyLock<RwLock<Option<ErrorData>>> = LazyLock::
 
 /// MMF error notification emitted whenever a new error event
 /// is added to MMFErr.
-pub(crate) static MMF_ERR_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Notify::new());
+pub static MMF_ERR_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Notify::new());
 
 /// Global MMF error instance counter.
 pub(crate) static MMF_ERR_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);

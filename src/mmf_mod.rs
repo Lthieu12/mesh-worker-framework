@@ -465,7 +465,7 @@ impl MMFMod {
     }
 
 
-    /// Forcefully terminate  all direct children modules of an entity.
+    /// Forcefully terminate all direct children modules of an entity.
     ///
     /// This operation aborts the Tokio tasks associated with the
     /// modules and removes them from the Registry without executing
