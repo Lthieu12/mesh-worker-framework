@@ -22,7 +22,6 @@ pub type ErrorInstanceID = u64;
 /// 
 /// Error events are stored in a circular buffer and can
 /// later be retrieved for diagnostics, logging or monitoring.
-
 #[derive(Clone)]
 pub struct ErrorEvent {
 
