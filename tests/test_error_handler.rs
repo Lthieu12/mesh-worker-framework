@@ -1,3 +1,16 @@
+/// Verify that MMFErr captures and reports message
+/// processing failures.
+///
+/// A SimulationModule configured with Message_Fail is
+/// initialized and receives several messages.
+///
+/// Each failure should:
+/// - Generate an ErrorEvent.
+/// - Wake MMFErr waiters.
+/// - Be retrievable through MMFErr::get_error_list().
+///
+/// The test also verifies that ErrorInstanceID values
+/// are strictly increasing.
 mod common;
 
 use serial_test::serial;
@@ -32,9 +45,7 @@ async fn test_mmf_err_message_failure() {
         .unwrap();
 
     MMFMod::init_module(&module_id).await.unwrap();
-    println!("state = {:?}", MMFMod::get_module_status(&module_id).unwrap());
     MMFMod::wait_module_init(&module_id, Some(1000)).await.unwrap();
-    println!("state = {:?}", MMFMod::get_module_status(&module_id).unwrap());
 
     // Generate multiple message failures.
     for _ in 0..3 {
