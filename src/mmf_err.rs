@@ -152,28 +152,37 @@ impl MMFErr {
     ///
     /// Returns Framework_NotInitialized if MMFErr
     /// has not been initialized through MMF::init().
-    pub async fn wait_error() -> Result<(), FrameworkError> {
+    pub async fn wait_error(last_error_instance_id: Option<ErrorInstanceID>) -> Result<ErrorList, FrameworkError> {
 
-        {
-            let mmf_err_data_guard = MMF_ERR_DATA.read().expect(MMFPanic::MMFErrData_ReadLockPoisoned.message());
-            if mmf_err_data_guard.is_none() {
-                return Err(FrameworkError::Framework_NotInitialized);
+        loop {
+
+            let error_list = MMFErr::get_error_list(last_error_instance_id)?;
+
+            // New error events are already available.
+            //
+            // Return immediately without waiting for a
+            // notification.
+            if !error_list.error_event_list.is_empty() {
+
+                return Ok(error_list);
             }
+
+            // No new error event is currently available.
+            //
+            // Wait until MMFErr is notified that a new
+            // error event has been added.
+            MMF_ERR_NOTIFY.notified().await;
         }
-
-        MMF_ERR_NOTIFY.notified().await;
-
-        Ok(())
     }
 
 
     /// Retrieve error events stored in MMFErr.
     ///
-    /// If last_received_error_instance_id is None,
+    /// If last_error_instance_id is None,
     /// all events currently present in the circular
     /// buffer are returned.
     ///
-    /// If last_received_error_instance_id is provided,
+    /// If last_error_instance_id is provided,
     /// only events with a greater ErrorInstanceID are
     /// returned.
     ///
@@ -183,12 +192,7 @@ impl MMFErr {
     ///
     /// Returns Framework_NotInitialized if MMFErr has
     /// not been initialized through MMF::init().
-    /// 
-    /// Example:
-    /// let error_list = MMFErr::get_error_list(None)?;
-    /// let last_error_instance_id = error_list.last_error_instance_id;
-    /// let new_error_list = MMFErr::get_error_list(last_error_instance_id)?;
-    pub fn get_error_list(last_received_error_instance_id: Option<ErrorInstanceID>) -> Result<ErrorList, FrameworkError> {
+    fn get_error_list(last_error_instance_id: Option<ErrorInstanceID>) -> Result<ErrorList, FrameworkError> {
 
         let mmf_err_data_guard = MMF_ERR_DATA.read().expect(MMFPanic::MMFErrData_ReadLockPoisoned.message());
         let mmf_err_data = mmf_err_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
@@ -223,7 +227,7 @@ impl MMFErr {
         // Missing events occur when the caller requests events
         // older than the first ErrorInstanceID currently present
         // in the circular buffer.
-        let missing_error_count = match last_received_error_instance_id {
+        let missing_error_count = match last_error_instance_id {
 
             None => 0,
 
@@ -241,7 +245,7 @@ impl MMFErr {
 
         // Return only the events that have not yet been
         // received by the caller.
-        let error_event_list = match last_received_error_instance_id {
+        let error_event_list = match last_error_instance_id {
 
             None => {
 
