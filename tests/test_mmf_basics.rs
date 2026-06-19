@@ -1,3 +1,4 @@
+//! Validate basic MMF init and close functions.
 use serial_test::serial;
 
 #[cfg(test)]

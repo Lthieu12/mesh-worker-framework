@@ -25,7 +25,7 @@ use crate::framework_error::ModuleError;
 pub(crate) enum ModuleCommand {
     Init,
     Message(FrameworkMessage),
-    MessageAndWaitReply(oneshot::Sender<Result<(), ModuleError>>, FrameworkMessage),
+    MessageAndWaitCompletion(oneshot::Sender<Result<(), ModuleError>>, FrameworkMessage),
     Close,
 }
 

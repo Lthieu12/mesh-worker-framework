@@ -27,6 +27,7 @@ use crate::mmf::{MMF_DATA, MMF_MOD_INIT_NOTIFY, MMF_MOD_CLOSE_NOTIFY};
 use crate::channel::{ModuleCommand, ModuleNormalReceiverChannel, ModulePriorityReceiverChannel};
 use crate::module::{Module, ModuleID, EntityID, ModuleState};
 use crate::framework_error::MMFPanic;
+use crate::MMFErr;
 
 /// Spawn a Tokio task that takes ownership of the module instance.
 ///
@@ -118,7 +119,7 @@ where T: Module + Send + 'static{
                 // as Initialized only after on_init() completes.
                 ModuleCommand::Init => {
 
-                    let error_init = module.on_init(&module_id, &father_id).await;
+                    let result_init = module.on_init(&module_id, &father_id).await;
 
                     // Publish successful initialization.
                     //
@@ -126,13 +127,14 @@ where T: Module + Send + 'static{
                     // receive business messages.
                     let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
                     let mmf_data = mmf_data_guard.as_mut().expect(MMFPanic::MMFData_Missing.message());
-                    match error_init {
+                    match result_init {
                         Ok(()) => {
 
                             mmf_data.registry.set_module_state(&module_id, ModuleState::Initialized).expect(MMFPanic::Registry_ModuleMissing.message());
                         }
-                        Err(_) => {
+                        Err(error) => {
 
+                            MMFErr::add_error(EntityID::Module(module_id.clone()), &error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
                             mmf_data.registry.set_module_state(&module_id, ModuleState::InitFailed).expect(MMFPanic::Registry_ModuleMissing.message());
                         }
 
@@ -153,7 +155,17 @@ where T: Module + Send + 'static{
                 // Close command is always processed before module
                 // shutdown begins.
                 ModuleCommand::Message(message) => {
-                    let _ = module.on_message(message).await;
+                    let result_message = module.on_message(message).await;
+                    
+                    match result_message {
+
+                        Ok(()) => {}
+
+                        Err(error) => {
+
+                            MMFErr::add_error(EntityID::Module(module_id.clone()), &error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
+                        }
+                    }
                 }
 
                 // Execute a business message.
@@ -167,11 +179,17 @@ where T: Module + Send + 'static{
                 // This guarantees that a message accepted before a
                 // Close command is always processed before module
                 // shutdown begins.
-                ModuleCommand::MessageAndWaitReply(reply_sender, message) => {
+                ModuleCommand::MessageAndWaitCompletion(reply_sender, message) => {
  
-                        let result = module.on_message(message).await;
-                        let _ = reply_sender.send(result);
+                    let result_message = module.on_message(message).await;
+
+                    if let Err(error) = &result_message {
+
+                        MMFErr::add_error(EntityID::Module(module_id.clone()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
                     }
+
+                    let _ = reply_sender.send(result_message);
+                }
 
                 // Execute module shutdown.
                 //
@@ -182,7 +200,7 @@ where T: Module + Send + 'static{
                 // from the Registry only after on_close() completes.
                 ModuleCommand::Close => {
 
-                    let error_close = module.on_close().await;
+                    let result_close = module.on_close().await;
 
                     // Mark the module as Closed.
                     //
@@ -190,7 +208,7 @@ where T: Module + Send + 'static{
                     // completed successfully.
                     let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
                     let mmf_data = mmf_data_guard.as_mut().expect(MMFPanic::MMFData_Missing.message());
-                    match error_close {
+                    match result_close {
                         Ok(()) => {
 
                             mmf_data.registry.set_module_state(&module_id, ModuleState::Closed).expect(MMFPanic::Registry_ModuleMissing.message());
@@ -200,8 +218,9 @@ where T: Module + Send + 'static{
                             // to MMF and cannot receive new commands.
                             mmf_data.registry.remove_module(&module_id).expect(MMFPanic::Registry_ModuleMissing.message());
                         }
-                        Err(_) => {
+                        Err(error) => {
 
+                            MMFErr::add_error(EntityID::Module(module_id.clone()), &error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
                             mmf_data.registry.set_module_state(&module_id, ModuleState::CloseFailed).expect(MMFPanic::Registry_ModuleMissing.message());
                         }
 

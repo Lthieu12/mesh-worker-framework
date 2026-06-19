@@ -121,7 +121,7 @@ async fn test_module_message_chain_and_priority() {
     MMFMod::send_message(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_NORMAL_1.to_string(), Bytes::new()).await.unwrap();
     MMFMod::send_message(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_NORMAL_2.to_string(), Bytes::new()).await.unwrap();
     MMFMod::send_priority_message(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_PRIORITY_1.to_string(), Bytes::new()).await.unwrap();
-    MMFMod::send_priority_message_and_wait_reply(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_PRIORITY_2.to_string(), Bytes::new(), Some(1000)).await.unwrap();
+    MMFMod::send_priority_message_and_wait(&EntityID::External("MAIN".to_string()), &module_a_id, &MESSAGE_PRIORITY_2.to_string(), Bytes::new(), Some(1000)).await.unwrap();
 
     tokio::time::sleep(Duration::from_millis(1000)).await;
 

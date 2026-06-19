@@ -134,7 +134,7 @@ impl Module for SimulationModule {
             } => {
                 tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
                 let module_id = self.module_id.as_ref().expect("module_id should be initialized");
-                MMFMod::send_message_and_wait_reply(&EntityID::Module(module_id.clone()), target_module_id, message_id, Bytes::new(), *timeout_ms).await.unwrap();
+                MMFMod::send_message_and_wait(&EntityID::Module(module_id.clone()), target_module_id, message_id, Bytes::new(), *timeout_ms).await.unwrap();
             }
 
             SimulationBehavior::Message_Wait {

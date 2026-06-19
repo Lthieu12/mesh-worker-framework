@@ -151,6 +151,7 @@ pub(crate) enum MMFPanic {
     MMFErrData_WriteLockPoisoned,
 
     ErrorBuffer_Inconsistency,
+    ErrorBuffer_AddErrorFailed,
 }
 
 impl MMFPanic {
@@ -180,7 +181,7 @@ impl MMFPanic {
             }
 
             MMFPanic::Registry_ModuleMissing => {
-                "Internal MMF error: Registry module unexpectedly missing."
+                "Internal MMF error: module unexpectedly missing in registry."
             }
 
             MMFPanic::Module_JoinHandleMissing => {
@@ -197,7 +198,10 @@ impl MMFPanic {
 
             MMFPanic::ErrorBuffer_Inconsistency => {
                 "Internal MMF error: error buffer is inconsistent."
+            }
 
+            MMFPanic::ErrorBuffer_AddErrorFailed => {
+                "Internal MMF error: add error to buffer unexpectedly failed."
             }
         }
     }

@@ -91,7 +91,7 @@ impl Module for MessageRecorderModule {
 
                 let start_time = Instant::now();
 
-                MMFMod::send_message_and_wait_reply(
+                MMFMod::send_message_and_wait(
                     &EntityID::Module(module_id.clone()),
                     &self.target_module_id,
                     &message.message_id,

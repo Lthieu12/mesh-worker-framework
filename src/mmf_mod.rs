@@ -539,10 +539,11 @@ impl MMFMod {
     /// Send a message and wait until the receiver has finished
     /// processing it.
     ///
-    /// timeout_ms:
-    /// - None => wait indefinitely.
-    /// - Some(value) => return Operation_Timeout if the delay expires.
-    pub async fn send_message_and_wait_reply(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
+    /// Returns:
+    /// - Ok(()) if on_message() completed successfully.
+    /// - ModuleError if on_message() returned an error.
+    /// - Operation_Timeout if the timeout expires.
+    pub async fn send_message_and_wait(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
 
         let normal_sender_channel: ModuleNormalSenderChannel = {
             // Read MMF data.
@@ -595,7 +596,7 @@ impl MMFMod {
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<Result<(), ModuleError>>();
 
         // Send the message to the receiver module.
-        normal_sender_channel.send(ModuleCommand::MessageAndWaitReply(reply_sender, framework_message)).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        normal_sender_channel.send(ModuleCommand::MessageAndWaitCompletion(reply_sender, framework_message)).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         // Wait for completion or timeout.
         //
@@ -736,10 +737,11 @@ impl MMFMod {
     /// Send a priority message and wait until the receiver has finished
     /// processing it.
     ///
-    /// timeout_ms:
-    /// - None => wait indefinitely.
-    /// - Some(value) => return Operation_Timeout if the delay expires.
-    pub async fn send_priority_message_and_wait_reply(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
+    /// Returns:
+    /// - Ok(()) if on_message() completed successfully.
+    /// - ModuleError if on_message() returned an error.
+    /// - Operation_Timeout if the timeout expires.
+    pub async fn send_priority_message_and_wait(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
 
         let priority_sender_channel: ModulePrioritySenderChannel = {
             // Read MMF data.
@@ -792,7 +794,7 @@ impl MMFMod {
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel();
 
         // Send the message to the receiver module.
-        priority_sender_channel.send(ModuleCommand::MessageAndWaitReply(reply_sender, framework_message)).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        priority_sender_channel.send(ModuleCommand::MessageAndWaitCompletion(reply_sender, framework_message)).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         // Wait for completion or timeout.
         //

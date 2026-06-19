@@ -30,11 +30,37 @@ pub(crate) static MMF_ERR_DATA: LazyLock<RwLock<Option<ErrorData>>> = LazyLock::
 
 /// MMF error notification emitted whenever a new error event
 /// is added to MMFErr.
-pub static MMF_ERR_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Notify::new());
+pub(crate) static MMF_ERR_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Notify::new());
 
 /// Global MMF error instance counter.
 pub(crate) static MMF_ERR_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
 
+
+/// MMF startup configuration.
+pub struct MMFConfiguration {
+
+    /// Capacity of normal module event queues.
+    pub module_normal_channel_capacity: usize,
+
+    /// Capacity of priority module event queues.
+    pub module_priority_channel_capacity: usize,
+
+    /// Capacity of the MMFErr circular buffer.
+    pub error_event_buffer_capacity: usize,
+}
+
+impl Default for MMFConfiguration {
+
+    fn default() -> Self {
+
+        Self {
+
+            module_normal_channel_capacity: 50,
+            module_priority_channel_capacity: 10,
+            error_event_buffer_capacity: 100,
+        }
+    }
+}
 
 /// Internal MMF runtime data.
 pub(crate) struct MMFData {
@@ -50,22 +76,18 @@ pub(crate) struct MMFData {
 
     /// Capacity of priority module event queues.
     pub(crate) module_priority_channel_capacity: usize,
-
-    /// Capacity of error event buffer.
-    pub(crate) error_event_buffer_capacity: usize,
 }
 
 impl MMFData {
 
     /// Create a new MMF runtime instance.
-    fn new() -> Self {
+    fn new(mmf_configuration: &MMFConfiguration) -> Self {
         
         Self {
             registry: Registry::new(),
             logging_data: LoggingData::new(),
-            module_normal_channel_capacity: 50,
-            module_priority_channel_capacity: 10,
-            error_event_buffer_capacity: 100,
+            module_normal_channel_capacity: mmf_configuration.module_normal_channel_capacity,
+            module_priority_channel_capacity: mmf_configuration.module_priority_channel_capacity,
         }
     }
 
@@ -77,23 +99,29 @@ pub struct MMF;
 
 impl MMF {
 
-    /// Initialize the MMF framework.
+    /// Initialize MMF using the default configuration.
     pub fn init() -> Result<(), FrameworkError> {
-        
-        {
-            let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
-            if mmf_data_guard.is_some() {
-                return Err(FrameworkError::Framework_AlreadyInitialized);
-            }
-            *mmf_data_guard = Some(MMFData::new());
-            drop(mmf_data_guard);
 
-            let mut mmf_err_data_guard = MMF_ERR_DATA.write().expect(MMFPanic::MMFErrData_WriteLockPoisoned.message());
-            *mmf_err_data_guard = Some(ErrorData {
-                error_event_list: VecDeque::new()
-            });
-            drop(mmf_err_data_guard);
+        Self::init_with_configuration(MMFConfiguration::default())
+    }
+
+    /// Initialize the MMF framework with custom configuration.
+    pub fn init_with_configuration(mmf_configuration: MMFConfiguration) -> Result<(), FrameworkError> {
+        
+        let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
+        if mmf_data_guard.is_some() {
+            return Err(FrameworkError::Framework_AlreadyInitialized);
         }
+        *mmf_data_guard = Some(MMFData::new(&mmf_configuration));
+        drop(mmf_data_guard);
+
+        let mut mmf_err_data_guard = MMF_ERR_DATA.write().expect(MMFPanic::MMFErrData_WriteLockPoisoned.message());
+        *mmf_err_data_guard = Some(ErrorData {
+            
+            error_event_buffer_capacity:mmf_configuration.error_event_buffer_capacity,
+            error_event_list: VecDeque::new(),
+        });
+        drop(mmf_err_data_guard);
 
         Ok(())
     }
