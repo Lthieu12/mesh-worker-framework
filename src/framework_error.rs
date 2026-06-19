@@ -119,7 +119,6 @@ impl fmt::Display for FrameworkError {
             FrameworkError::Message_InstanceIDExhausted =>
                 write!(f, "MessageInstanceID counter exhausted."),
 
-            
             FrameworkError::Error_InstanceIDExhausted =>
                 write!(f, "ErrorInstanceID counter exhausted."),
 
