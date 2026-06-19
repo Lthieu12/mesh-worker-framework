@@ -1,4 +1,8 @@
-//! Validate basic MMF init and close functions.
+//! Validate MMF framework lifecycle operations.
+//!
+//! These tests verify framework initialization,
+//! shutdown and protection against invalid
+//! lifecycle transitions.
 use serial_test::serial;
 
 #[cfg(test)]

@@ -1,3 +1,8 @@
+//! Validate module lifecycle failure handling.
+//!
+//! These tests verify that initialization and
+//! shutdown failures are correctly propagated
+//! through MMF lifecycle APIs and module states.
 mod common;
 
 use serial_test::serial;
