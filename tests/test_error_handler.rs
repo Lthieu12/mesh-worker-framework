@@ -122,7 +122,8 @@ async fn test_mmf_err_buffer_overflow() {
             module_priority_channel_capacity: 10,
             error_event_buffer_capacity: 10,
         }
-    ).unwrap();
+    )
+    .unwrap();
 
     let module_id = SimulationModule::spawn(&EntityID::External("Test".to_string()), 0, 0, SimulationBehavior::Message_Fail, false, None).await.unwrap();
 

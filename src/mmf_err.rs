@@ -1,4 +1,4 @@
-//! Public MMFErr (ErrorHandler) API.
+//! Public MMFErr (error handling) API.
 //!
 //! This API exposes the framework error handling
 //! features.

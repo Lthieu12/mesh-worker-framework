@@ -2,11 +2,19 @@
 
 ## Purpose
 
-Mesh Module Framework (MMF) is a messaging and runtime framework.
+Mesh Module Framework (MMF) is a Tokio-based modular runtime for applications composed of independent communicating modules.
 
-MMF is not a workflow engine.
+MMF provides runtime services such as:
 
-Workflow orchestration is expected to be implemented by application-specific modules built on top of MMF.
+* Module lifecycle management
+* Message routing
+* Parent/child hierarchy management
+* Centralized error collection
+* Runtime observability
+
+MMF is intentionally application-agnostic.
+
+Application-specific concepts such as workflows, measurements, calculations or business logic are expected to be implemented by modules built on top of MMF.
 
 Example:
 
@@ -15,10 +23,49 @@ MMF
  ├── CameraModule
  ├── FFTModule
  ├── LoggerModule
- └── WeftHandler
+ └── WorkflowModule
 ```
 
-In this example, `WeftHandler` is a normal MMF module and not part of the framework core.
+All modules are considered application code. MMF itself remains unaware of their responsibilities.
+
+---
+
+# Runtime Model
+
+MMF uses one Tokio task per module.
+
+After a module is spawned:
+
+```text
+MMF
+ ├── Registry
+ ├── MMFErr
+ └── ModuleTask
+```
+
+MMF owns:
+
+* Communication channels
+* JoinHandles
+* Runtime metadata
+
+ModuleTask owns:
+
+* The module instance
+* Message processing
+* Lifecycle callback execution
+
+MMF never directly calls:
+
+```rust
+on_init()
+
+on_message()
+
+on_close()
+```
+
+These callbacks are always executed inside the Tokio task that owns the module instance.
 
 ---
 
@@ -49,7 +96,7 @@ These lifecycle methods are mandatory.
 
 # Execution Model
 
-One module processes one message at a time.
+A module processes one event at a time.
 
 ```text
 on_init()
@@ -71,15 +118,53 @@ Message C
 on_close()
 ```
 
-No two messages can be processed simultaneously by the same module.
+No two callbacks can execute simultaneously on the same module instance.
 
-Parallelism is achieved through multiple modules running concurrently.
+Parallelism is achieved by running multiple modules concurrently.
+
+This guarantees deterministic module behavior and eliminates the need for internal synchronization inside most modules.
 
 ---
 
-# Messages
+# Module Lifecycle
 
-Messages are transported using a generic framework message.
+Modules transition through explicit lifecycle states.
+
+```text
+Created
+
+↓
+
+Initializing
+
+↓
+
+Initialized
+
+↓
+
+Closing
+
+↓
+
+Closed
+```
+
+Failure states:
+
+```text
+InitFailed
+
+CloseFailed
+```
+
+Lifecycle transitions are controlled by MMF and not by application code.
+
+---
+
+# Messaging
+
+Messages are transported through a framework-defined structure.
 
 Conceptually:
 
@@ -91,26 +176,76 @@ MessageInstanceID
 MessageData
 ```
 
-MessageDatas are transported as `Bytes`.
+MessageData is transported as:
+
+```rust
+Bytes
+```
 
 MMF never interprets application data.
 
+Serialization and deserialization remain the responsibility of the application.
+
 ---
 
-# Message Routing
+# Communication Patterns
 
-MMF supports:
+## Send
 
-* Private messages
-* Broadcast messages
+Fire-and-forget message.
 
-Broadcast messages are delivered to all subscribed modules.
+The sender does not wait for message processing.
+
+---
+
+## SendPriority
+
+Fire-and-forget message processed before normal messages.
+
+Priority messages use a Last-In First-Out (LIFO) policy.
+
+---
+
+## SendAndWait
+
+The sender waits until the target module completes message processing or a timeout occurs.
+
+The processing result is returned to the caller.
+
+---
+
+# Message Priorities
+
+MMF maintains two independent channels per module:
+
+```text
+Normal Channel
+Priority Channel
+```
+
+Priority messages are always processed before normal messages.
+
+Priority messages are internally stored in a stack and executed using a LIFO policy.
+
+Example:
+
+```text
+SendPriority(A)
+SendPriority(B)
+SendPriority(C)
+
+↓
+
+C
+B
+A
+```
 
 ---
 
 # Parent / Child Hierarchy
 
-Modules may declare a parent module.
+Modules may declare a parent entity.
 
 Example:
 
@@ -120,91 +255,11 @@ Parent
  └── Child B
 ```
 
-During shutdown, a parent waits for its children to terminate before terminating itself.
+MMF maintains this hierarchy through the Registry.
 
-A timeout mechanism prevents deadlocks.
+The hierarchy is primarily used for coordinated shutdown operations.
 
----
-
-# Reply Modes
-
-MMF distinguishes three communication patterns.
-
-## Send
-
-No reply expected.
-
----
-
-## SendAndAskReply
-
-A reply is expected.
-
-The sender continues processing normally.
-
-The reply is later processed as a standard message.
-
----
-
-## SendAndWaitReply
-
-A reply is expected.
-
-The sender suspends the current processing sequence until the expected reply is received or a timeout occurs.
-
-The reply is considered part of the current logical sequence and must be available immediately to continue processing.
-
-This behavior is functionally different from `SendAndAskReply`.
-
----
-
-# Message Priorities
-
-MMF supports prioritized messages.
-
-Priorities are intended for execution ordering requirements.
-
-Example:
-
-```text
-Measurement A
-
-↓
-
-Step1
-
-↓
-
-Step2
-
-↓
-
-Step3
-```
-
-A module may use priority messages to ensure that Measurement A is fully processed before Measurement B begins.
-
-The exact implementation of priority handling is intentionally left open at this stage.
-
----
-
-# Logging
-
-MMF includes centralized logging.
-
-The framework must be capable of tracing message traffic at runtime.
-
-Typical log information:
-
-```text
-Timestamp
-SenderID
-ReceiverID
-MessageID
-MessageInstanceID
-```
-
-Logging must remain available in production executables and not only during development.
+MMF provides APIs allowing a parent to wait until all direct children have terminated.
 
 ---
 
@@ -212,22 +267,66 @@ Logging must remain available in production executables and not only during deve
 
 MMF maintains a runtime registry containing information about active modules.
 
-Typical information:
+Typical information includes:
 
 * ModuleID
-* ParentModuleID
-* State
-* Startup status
+* Parent EntityID
+* Lifecycle state
+* Communication channels
+* JoinHandle ownership information
 
-This registry is used for routing, lifecycle management and shutdown coordination.
+The Registry is used for:
+
+* Message routing
+* Lifecycle management
+* Hierarchy management
+* Shutdown coordination
+
+---
+
+# Error Handling
+
+MMF provides centralized error collection through MMFErr.
+
+Errors returned by:
+
+```rust
+on_init()
+
+on_message()
+
+on_close()
+```
+
+are automatically recorded.
+
+Each error event contains:
+
+```text
+ErrorInstanceID
+Timestamp
+SenderID
+ErrorMessage
+ErrorSourceChain
+```
+
+Error events are stored in a circular buffer.
+
+Applications may retrieve error events through MMFErr APIs or publish their own error events using:
+
+```rust
+MMFErr::add_error(...)
+```
+
+This allows framework and application errors to share the same monitoring infrastructure.
 
 ---
 
 # Serialization
 
-MMF transports opaque MessageDatas.
+MMF transports opaque MessageData values.
 
-The framework is intentionally unaware of application-specific data structures.
+The framework is intentionally unaware of application-specific structures.
 
 Example:
 
@@ -254,27 +353,20 @@ with minimal user configuration.
 
 # Quality Requirements
 
-MMF must include automated tests.
+MMF includes automated tests.
 
 A build must fail if tests fail.
 
-The project should eventually include:
+The project includes:
 
 * Unit tests
 * Integration tests
-* Example-based tests
+
+Additional validation may be added in the future:
+
 * Windows CI validation
 * Linux CI validation
+* Example-based tests
 
----
-
-# Open Design Topics
-
-The following topics remain under active design:
-
-* Mailbox implementation
-* Priority message implementation
-* Reply handling implementation
-* Runtime internals
-* Logging backend selection
-* Registry internals
+```
+```

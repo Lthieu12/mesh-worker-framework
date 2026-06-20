@@ -1,4 +1,4 @@
-//! Public MMFMod (module) API.
+//! Public MMFMod (module and messaging) API.
 //!
 //! This API exposes the framework entry points used to
 //! manage modules and send messages.
@@ -8,12 +8,10 @@ use std::sync::atomic::Ordering;
 
 use crate::mmf::{MMF_DATA, MMF_MOD_MESSAGE_INSTANCE_COUNTER, MMF_MOD_INIT_NOTIFY, MMF_MOD_CLOSE_NOTIFY};
 use crate::framework_error::{FrameworkError, MMFPanic};
-use crate::module::{Module, ModuleID, EntityID, ModuleState, ModuleStatus};
+use crate::module::{Module, ModuleID, EntityID, ModuleState, ModuleStatus, ModuleError};
 use crate::module_task::spawn_module_task;
 use crate::channel::{ModuleCommand, ModuleNormalSenderChannel, ModulePrioritySenderChannel};
 use crate::message::{FrameworkMessage, MessageID, MessageInstanceID};
-
-pub type ModuleError = anyhow::Error;
 
 pub struct MMFMod;
 

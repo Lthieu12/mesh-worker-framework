@@ -6,10 +6,13 @@
 use async_trait::async_trait;
 
 use crate::message::FrameworkMessage;
-use crate::ModuleError;
 
 /// Unique identifier of a module instance.
 pub type ModuleID = String;
+
+/// Generic error type used by on_init(),
+/// on_message() and on_close().
+pub type ModuleError = anyhow::Error;
 
 /// Identifier of an entity interacting with MMF.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

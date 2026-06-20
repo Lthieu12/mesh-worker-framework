@@ -1,16 +1,5 @@
-//! Mesh Module Framework (MMF).
-//!
-//! MMF is a lightweight messaging framework designed to build
-//! modular and hierarchical applications.
-//!
-//! The framework provides:
-//! - Module lifecycle management
-//! - Message-based communication
-//! - Parent/child module hierarchy
-//! - Centralized logging
-//! - Request/reply messaging patterns
-//!
-//! Applications interact with the framework through the MMF API.
+#![doc = include_str!("../README.md")]
+#![forbid(unsafe_code)]
 mod registry;
 mod channel;
 mod module_task;
@@ -33,7 +22,7 @@ pub use mmf_err::MMFErr;
 
 pub use framework_error::FrameworkError;
 
-pub use mmf_mod::ModuleError;
+pub use module::ModuleError;
 
 pub use module::{
     Module,
