@@ -148,7 +148,18 @@ impl MMFErr {
     }
 
 
-    /// Wait until a new error event is added to MMFErr.
+    /// Wait until new error events are available.
+    ///
+    /// If last_error_instance_id is None, all error
+    /// events currently stored in MMFErr are returned.
+    ///
+    /// If last_error_instance_id is provided, only
+    /// events with a greater ErrorInstanceID are
+    /// returned.
+    ///
+    /// If matching error events are already present
+    /// in the MMFErr buffer, they are returned
+    /// immediately without waiting.
     ///
     /// Returns Framework_NotInitialized if MMFErr
     /// has not been initialized through MMF::init().
