@@ -1,15 +1,20 @@
 /// Verify that MMFErr records callback failures.
 ///
-/// This test generates failures from module lifecycle
+/// The first test generates failures from module lifecycle
 /// callbacks (on_init and on_close) as well as business
 /// message processing (on_message) and verifies that
 /// the resulting error events can be retrieved through
 /// MMFErr.
+/// 
+/// The second test verify that MMFErr correctly reports overwritten
+/// error events when the circular buffer capacity is
+/// exceeded.
 mod common;
 
 use serial_test::serial;
 
 use mesh_module_framework::*;
+use crate::mmf::MMFConfiguration;
 use common::simulation_module::{
     SimulationBehavior,
     SimulationModule,
@@ -99,6 +104,50 @@ async fn test_mmf_err_module_failures() {
     MMFMod::abort_module(&module_a_id).unwrap();
     MMFMod::abort_module(&module_b_id).unwrap();
     MMFMod::abort_module(&module_c_id).unwrap();
+
+    MMF::close().unwrap();
+}
+
+
+// MMF uses a global runtime instance.
+// Integration tests must run serially.
+#[tokio::test]
+#[serial]
+async fn test_mmf_err_buffer_overflow() {
+
+    MMF::init_with_configuration(
+        MMFConfiguration {
+
+            module_normal_channel_capacity: 50,
+            module_priority_channel_capacity: 10,
+            error_event_buffer_capacity: 10,
+        }
+    )
+    .unwrap();
+
+    let module_id = SimulationModule::spawn(&EntityID::External("Test".to_string()), 0, 0, SimulationBehavior::Message_Fail, false, None).await.unwrap();
+
+    MMFMod::init_module(&module_id).await.unwrap();
+
+    MMFMod::wait_module_init(&module_id, Some(1000)).await.unwrap();
+
+    // Generate more errors than the buffer can hold.
+    for _ in 0..15 {
+
+    let _ =  MMFMod::send_message_and_wait(&EntityID::External("Test".to_string()), &module_id, &"TEST".to_string(), Bytes::new(), Some(1000)).await;
+    }
+
+    let error_list = MMFErr::wait_error(Some(0)).await.unwrap();
+
+    assert_eq!(error_list.missing_error_count, 5);
+
+    assert_eq!(error_list.first_error_instance_id, Some(6));
+
+    assert_eq!(error_list.last_error_instance_id, Some(15));
+
+    assert_eq!(error_list.error_event_list.len(), 10);
+
+    MMFMod::abort_children(&EntityID::External("Test".to_string())).unwrap();
 
     MMF::close().unwrap();
 }
