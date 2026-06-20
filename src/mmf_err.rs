@@ -5,7 +5,7 @@
 
 use std::collections::VecDeque;
 use std::sync::atomic::Ordering;
-use chrono::Utc;
+use chrono::{Utc, SecondsFormat};
 
 use crate::module::EntityID;
 use crate::framework_error::{FrameworkError, MMFPanic};
@@ -113,7 +113,7 @@ impl MMFErr {
             source = error_source.source();
         }
         
-        let timestamp_rfc3339 = Utc::now().to_rfc3339();
+        let timestamp_rfc3339 = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
 
         let error_event = ErrorEvent {
 

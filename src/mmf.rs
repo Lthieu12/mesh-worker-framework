@@ -4,7 +4,7 @@
 //! initialize and shutdown the API global runtime.
 
 use std::sync::{LazyLock, RwLock};
-use std::sync::atomic::AtomicU64;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::collections::VecDeque;
 use tokio::sync::Notify;
 
@@ -108,6 +108,9 @@ impl MMF {
     /// Initialize the MMF framework with custom configuration.
     pub fn init_with_configuration(mmf_configuration: MMFConfiguration) -> Result<(), FrameworkError> {
         
+        MMF_ERR_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
+        MMF_MOD_MESSAGE_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
+
         let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
         if mmf_data_guard.is_some() {
             return Err(FrameworkError::Framework_AlreadyInitialized);
