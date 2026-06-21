@@ -256,6 +256,7 @@ where T: Module + Send + 'static{
                             // Once removed, the module is no longer visible
                             // to MMF and cannot receive new commands.
                             mmf_data.registry.remove_module(&module_id).expect(MMFPanic::Registry_ModuleMissing.message());
+                            let _ = MMFLog::remove_logged_module(&module_id);
                         }
                         Err(error) => {
 

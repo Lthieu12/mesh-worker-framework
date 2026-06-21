@@ -1,14 +1,14 @@
-/// Verify that MMFErr records callback failures.
-///
-/// The first test generates failures from module lifecycle
-/// callbacks (on_init and on_close) as well as business
-/// message processing (on_message) and verifies that
-/// the resulting error events can be retrieved through
-/// MMFErr.
-/// 
-/// The second test verify that MMFErr correctly reports overwritten
-/// error events when the circular buffer capacity is
-/// exceeded.
+//! Verify that MMFErr records callback failures.
+//!
+//! The first test generates failures from module lifecycle
+//! callbacks (on_init and on_close) as well as business
+//! message processing (on_message) and verifies that
+//! the resulting error events can be retrieved through
+//! MMFErr.
+//! 
+//! The second test verify that MMFErr correctly reports overwritten
+//! error events when the circular buffer capacity is
+//! exceeded.
 mod common;
 
 use serial_test::serial;

@@ -23,10 +23,10 @@ pub enum LogMode {
 
     /// Logging disabled.
     NoLog = 0,
-    /// Log only selected modules.
-    LogSelected = 1,
     /// Log all modules.
-    LogAll = 2,
+    LogAll = 1,
+    /// Log only selected modules.
+    LogSelected = 2,
 }
 
 /// Log execution status.
@@ -70,6 +70,14 @@ pub struct LogEvent {
     pub duration_ms: u128,
     /// Final action status.
     pub log_status: LogStatus,
+}
+
+
+struct LogEventTemp {
+
+    module_id: ModuleID,
+    log_timer: LogTimer,
+    log_status: LogStatus,
 }
 
 /// Internal MMFLog storage.
@@ -152,7 +160,7 @@ impl MMFLog {
     pub fn get_log_mode() -> Result<LogMode, FrameworkError> {
 
         let mmf_log_data_guard = MMF_LOG_DATA.read().expect(MMFPanic::MMFLogData_ReadLockPoisoned.message());
-        
+
         if mmf_log_data_guard.is_none() {
 
             return Err(FrameworkError::Framework_NotInitialized);
@@ -187,12 +195,30 @@ impl MMFLog {
     }
 
 
+    /// Remove a module from the MMFLog selected module list.
+    ///
+    /// If the module is not currently present in the
+    /// selected module list, this function does nothing.
+    ///
+    /// Returns Framework_NotInitialized if MMF has not
+    /// been initialized through MMF::init().
+    pub(crate) fn remove_logged_module(module_id: &ModuleID) -> Result<(), FrameworkError> {
+
+        let mut mmf_log_data_guard = MMF_LOG_DATA.write().expect(MMFPanic::MMFLogData_WriteLockPoisoned.message());
+        let mmf_log_data = mmf_log_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
+        mmf_log_data.logged_module_list.retain(|logged_module_id| logged_module_id != module_id);
+        drop(mmf_log_data_guard);
+
+        Ok(())
+    }
+
+
     /// Generate a unique ErrorInstanceID.
     fn generate_log_instance_id() -> Result<u64, FrameworkError> {
 
         let current_id = MMF_LOG_INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed);
         if current_id == u64::MAX {
-            return Err(FrameworkError::Error_InstanceIDExhausted);
+            return Err(FrameworkError::Logging_InstanceIDExhausted);
         }
 
         Ok(current_id)
