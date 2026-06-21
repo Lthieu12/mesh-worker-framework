@@ -158,6 +158,7 @@ impl MMFLog {
         Ok(false)
     }
 
+    
     /// Start a new log timer.
     ///
     /// The returned LogTimer stores the current
@@ -188,7 +189,7 @@ impl MMFLog {
             return Ok(());
         }
 
-        let log_instance_id = MMF_LOG_INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let log_instance_id = MMFLog::generate_log_instance_id()?;
         let duration_ms = log_timer.start.elapsed().as_millis();
         let log_event = LogEvent {
 
