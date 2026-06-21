@@ -59,19 +59,23 @@ async fn test_mmf_log_module_lifecycle() {
 
     assert_eq!(log_list.missing_log_count, 0);
 
-    assert_eq!(log_list.log_event_list.len(), 3);
+    assert_eq!(log_list.log_event_list.len(), 5);
 
     assert!(matches!(log_list.log_event_list[0].log_action, LogAction::ModuleSpawn));
 
     assert!(matches!(log_list.log_event_list[1].log_action, LogAction::ModuleInit));
+    assert!(matches!(log_list.log_event_list[2].log_action, LogAction::ModuleInit));
 
-    assert!(matches!(log_list.log_event_list[2].log_action, LogAction::ModuleClose));
+    assert!(matches!(log_list.log_event_list[3].log_action, LogAction::ModuleClose));
+    assert!(matches!(log_list.log_event_list[4].log_action, LogAction::ModuleClose));
 
     assert_eq!(log_list.log_event_list[0].log_status, LogStatus::Ok);
 
-    assert_eq!(log_list.log_event_list[1].log_status, LogStatus::Ok);
-
+    assert_eq!(log_list.log_event_list[1].log_status, LogStatus::Started);
     assert_eq!(log_list.log_event_list[2].log_status, LogStatus::Ok);
+
+    assert_eq!(log_list.log_event_list[3].log_status, LogStatus::Started);
+    assert_eq!(log_list.log_event_list[4].log_status, LogStatus::Ok);
 
     MMF::close().unwrap();
 }
@@ -136,9 +140,11 @@ async fn test_mmf_log_messages() {
                     }
                 }
 
-                assert_eq!(
-                    log_event.log_status,
-                    LogStatus::Ok
+                assert!(
+                    matches!(
+                        log_event.log_status,
+                        LogStatus::Started | LogStatus::Ok
+                    )
                 );
             }
 
@@ -191,7 +197,7 @@ async fn test_mmf_log_buffer_overflow() {
 
     let log_list = MMFLog::wait_log(last_log_instance_id).await.unwrap();
 
-    assert_eq!(log_list.missing_log_count, 5);
+    assert_eq!(log_list.missing_log_count, 20);
 
     assert_eq!(log_list.log_event_list.len(), 10);
 

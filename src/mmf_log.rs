@@ -33,6 +33,7 @@ pub enum LogMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogStatus {
 
+    Started,
     Ok,
     Error,
 }
@@ -66,10 +67,10 @@ pub struct LogEvent {
     pub module_id: ModuleID,
     /// Logged action.
     pub log_action: LogAction,
-    /// Action duration in milliseconds.
-    pub duration_ms: u128,
     /// Final action status.
     pub log_status: LogStatus,
+    /// Action duration in milliseconds.
+    pub duration_ms: Option<u128>,
 }
 
 
@@ -87,17 +88,6 @@ pub(crate) struct LoggingData {
 
     /// Circular buffer of log events.
     pub(crate) log_event_list: VecDeque<LogEvent>,
-}
-
-/// Timing information associated with a future log event.
-///
-/// LogTimer captures the timestamp at which an
-/// operation starts as well as a monotonic timer
-/// used later to measure its execution duration.
-pub(crate) struct LogTimer {
-
-    pub(crate) timestamp_rfc3339: String,
-    pub(crate) start: Instant,
 }
 
 /// Result returned by MMFErr::get_log_list().
@@ -245,21 +235,6 @@ impl MMFLog {
     }
 
 
-    /// Start a new log timer.
-    ///
-    /// The returned LogTimer stores the current
-    /// RFC3339 timestamp and a monotonic timer that
-    /// can later be passed to MMFLog::add_log().
-    pub(crate) fn start_log_timer() -> LogTimer {
-
-        LogTimer {
-
-            timestamp_rfc3339:Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true), 
-            start: Instant::now(),
-                   }
-    }
-
-
     /// Add a log event to MMFLog.
     ///
     /// If logging is disabled for the specified module,
@@ -267,7 +242,7 @@ impl MMFLog {
     ///
     /// Returns Framework_NotInitialized if MMF has
     /// not been initialized through MMF::init().
-    pub(crate) fn add_log(log_timer: LogTimer, module_id: &ModuleID, log_action: LogAction, log_status: LogStatus) -> Result<(), FrameworkError> {
+    pub(crate) fn add_log(action_start_timer: Instant, module_id: &ModuleID, log_action: LogAction, log_status: LogStatus) -> Result<(), FrameworkError> {
 
         // Skip immediately if logging is disabled
         // for this module.
@@ -276,15 +251,25 @@ impl MMFLog {
         }
 
         let log_instance_id = MMFLog::generate_log_instance_id()?;
-        let duration_ms = log_timer.start.elapsed().as_millis();
+        let timestamp_rfc3339 = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
+        let duration_ms:Option<u128>  = match log_status {
+
+            LogStatus::Started => None,
+
+            LogStatus::Ok |
+            LogStatus::Error => {
+                Some(action_start_timer.elapsed().as_millis())
+            }
+        };
+
         let log_event = LogEvent {
 
             log_instance_id,
-            timestamp_rfc3339: log_timer.timestamp_rfc3339,
+            timestamp_rfc3339,
             module_id: module_id.clone(),
             log_action,
-            duration_ms,
             log_status,
+            duration_ms: duration_ms,
         };
 
         let mut mmf_log_data_guard = MMF_LOG_DATA.write().expect(MMFPanic::MMFLogData_WriteLockPoisoned.message());

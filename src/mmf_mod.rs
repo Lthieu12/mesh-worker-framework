@@ -5,6 +5,7 @@
 
 use bytes::Bytes;
 use std::sync::atomic::Ordering;
+use std::time::Instant;
 
 use crate::MMFLog;
 use crate::mmf::{MMF_DATA, MMF_MOD_MESSAGE_INSTANCE_COUNTER, MMF_MOD_INIT_NOTIFY, MMF_MOD_CLOSE_NOTIFY};
@@ -71,7 +72,7 @@ impl MMFMod {
         
         let module_id = mmf_data.registry.generate_module_id::<T>();
 
-        let log_timer = MMFLog::start_log_timer();
+        let action_start_timer = Instant::now();
         
         // Channel used to send Module commands (like Init and Close) and messages to the module.
         let (normal_sender_channel, normal_receiver_channel) = tokio::sync::mpsc::channel(mmf_data.module_normal_channel_capacity);
@@ -94,11 +95,11 @@ impl MMFMod {
         // - JoinHandle associated with the Tokio task.
         if let Err(error) = mmf_data.registry.add_module(&module_id, &father_id, normal_sender_channel, priority_sender_channel, join_handle) {
 
-            MMFLog::add_log(log_timer, &module_id, LogAction::ModuleSpawn, LogStatus::Error)?;
+            MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleSpawn, LogStatus::Error)?;
             return Err(error);
         }
 
-        MMFLog::add_log(log_timer, &module_id, LogAction::ModuleSpawn, LogStatus::Ok)?;
+        MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleSpawn, LogStatus::Ok)?;
 
         drop(mmf_data_guard);
 
@@ -442,7 +443,7 @@ impl MMFMod {
 
         for module_id in module_ids {
 
-            let log_timer = MMFLog::start_log_timer();
+            let action_start_timer = Instant::now();
             
             let join_handle = match mmf_data.registry.take_join_handle(module_id) {
 
@@ -450,7 +451,7 @@ impl MMFMod {
 
                 Err(error) => {
 
-                    MMFLog::add_log(log_timer, module_id, LogAction::ModuleAbort, LogStatus::Error)?;
+                    MMFLog::add_log(action_start_timer, module_id, LogAction::ModuleAbort, LogStatus::Error)?;
                     return Err(error);
                 }
             };
@@ -461,11 +462,11 @@ impl MMFMod {
             // Remove the module from the Registry.
             if let Err(error) = mmf_data.registry.remove_module(module_id) {
 
-                MMFLog::add_log(log_timer, module_id, LogAction::ModuleAbort, LogStatus::Error)?;
+                MMFLog::add_log(action_start_timer, module_id, LogAction::ModuleAbort, LogStatus::Error)?;
                 return Err(error);
             }
 
-            MMFLog::add_log(log_timer, module_id, LogAction::ModuleAbort, LogStatus::Ok)?;
+            MMFLog::add_log(action_start_timer, module_id, LogAction::ModuleAbort, LogStatus::Ok)?;
             let _ = MMFLog::remove_logged_module(&module_id);
         }
 

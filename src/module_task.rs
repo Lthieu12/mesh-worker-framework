@@ -22,6 +22,7 @@
 //! the module instance is owned by Tokio after spawn_module().
 
 use tokio::task::JoinHandle;
+use std::time::Instant;
 
 use crate::mmf::{MMF_DATA, MMF_MOD_INIT_NOTIFY, MMF_MOD_CLOSE_NOTIFY};
 use crate::channel::{ModuleCommand, ModuleNormalReceiverChannel, ModulePriorityReceiverChannel};
@@ -121,7 +122,9 @@ where T: Module + Send + 'static{
                 // as Initialized only after on_init() completes.
                 ModuleCommand::Init => {
 
-                    let log_timer = MMFLog::start_log_timer();
+                    let action_start_timer = Instant::now();
+                    MMFLog::add_log(action_start_timer.clone(), &module_id, LogAction::ModuleInit, LogStatus::Started).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+
                     let result_init = module.on_init(&module_id, &father_id).await;
 
                     // Publish successful initialization.
@@ -134,13 +137,13 @@ where T: Module + Send + 'static{
                         Ok(()) => {
 
                             mmf_data.registry.set_module_state(&module_id, ModuleState::Initialized).expect(MMFPanic::Registry_ModuleMissing.message());
-                            MMFLog::add_log(log_timer, &module_id, LogAction::ModuleInit, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                            MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleInit, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                         }
                         Err(error) => {
 
                             MMFErr::add_error(EntityID::Module(module_id.clone()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
                             mmf_data.registry.set_module_state(&module_id, ModuleState::InitFailed).expect(MMFPanic::Registry_ModuleMissing.message());
-                            MMFLog::add_log(log_timer, &module_id, LogAction::ModuleInit, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                            MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleInit, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                         }
 
                     }
@@ -161,7 +164,7 @@ where T: Module + Send + 'static{
                 // shutdown begins.
                 ModuleCommand::Message {message, priority} => {
 
-                    let log_timer = MMFLog::start_log_timer();
+                    let action_start_timer = Instant::now();
                     let log_action = LogAction::ReceiveMessage {
 
                         sender_id: message.sender_id.clone(),
@@ -169,6 +172,7 @@ where T: Module + Send + 'static{
                         priority,
                         wait_completion: false,
                     };
+                    MMFLog::add_log(action_start_timer.clone(), &module_id, log_action.clone(), LogStatus::Started).expect(MMFPanic::LogBuffer_AddLogFailed.message());
 
                     let result_message = module.on_message(message).await;
                     
@@ -176,13 +180,13 @@ where T: Module + Send + 'static{
 
                         Ok(()) => {
 
-                            MMFLog::add_log(log_timer, &module_id, log_action, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                            MMFLog::add_log(action_start_timer, &module_id, log_action, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                         }
 
                         Err(error) => {
 
                             MMFErr::add_error(EntityID::Module(module_id.clone()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
-                            MMFLog::add_log(log_timer, &module_id, log_action, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                            MMFLog::add_log(action_start_timer, &module_id, log_action, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                         }
                     }
                 }
@@ -200,7 +204,7 @@ where T: Module + Send + 'static{
                 // shutdown begins.
                 ModuleCommand::MessageAndWaitCompletion {reply_sender, message, priority} => {
  
-                    let log_timer = MMFLog::start_log_timer();
+                    let action_start_timer = Instant::now();
                     let log_action = LogAction::ReceiveMessage {
 
                         sender_id: message.sender_id.clone(),
@@ -208,6 +212,7 @@ where T: Module + Send + 'static{
                         priority,
                         wait_completion: true,
                     };
+                    MMFLog::add_log(action_start_timer.clone(), &module_id, log_action.clone(), LogStatus::Started).expect(MMFPanic::LogBuffer_AddLogFailed.message());
 
                     let result_message = module.on_message(message).await;
 
@@ -215,13 +220,13 @@ where T: Module + Send + 'static{
 
                         Ok(()) => {
 
-                            MMFLog::add_log(log_timer, &module_id, log_action, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                            MMFLog::add_log(action_start_timer, &module_id, log_action, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                         }
 
                         Err(error) => {
 
                             MMFErr::add_error(EntityID::Module(module_id.clone()), &error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
-                            MMFLog::add_log(log_timer, &module_id, log_action, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                            MMFLog::add_log(action_start_timer, &module_id, log_action, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                         }
                     }
                     
@@ -237,7 +242,9 @@ where T: Module + Send + 'static{
                 // from the Registry only after on_close() completes.
                 ModuleCommand::Close => {
 
-                    let log_timer = MMFLog::start_log_timer();
+                    let action_start_timer = Instant::now();
+                    MMFLog::add_log(action_start_timer.clone(), &module_id, LogAction::ModuleClose, LogStatus::Started).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+
                     let result_close = module.on_close().await;
 
                     // Mark the module as Closed.
@@ -250,7 +257,7 @@ where T: Module + Send + 'static{
                         Ok(()) => {
 
                             mmf_data.registry.set_module_state(&module_id, ModuleState::Closed).expect(MMFPanic::Registry_ModuleMissing.message());
-                            MMFLog::add_log(log_timer, &module_id, LogAction::ModuleClose, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                            MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleClose, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                             // Remove the module from the Registry.
                             //
                             // Once removed, the module is no longer visible
@@ -262,7 +269,7 @@ where T: Module + Send + 'static{
 
                             MMFErr::add_error(EntityID::Module(module_id.clone()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
                             mmf_data.registry.set_module_state(&module_id, ModuleState::CloseFailed).expect(MMFPanic::Registry_ModuleMissing.message());
-                            MMFLog::add_log(log_timer, &module_id, LogAction::ModuleClose, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                            MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleClose, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                         }
                     }
 
