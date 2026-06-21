@@ -11,10 +11,11 @@ use crate::MMFLog;
 use crate::mmf::{MMF_DATA, MMF_MOD_MESSAGE_INSTANCE_COUNTER, MMF_MOD_INIT_NOTIFY, MMF_MOD_CLOSE_NOTIFY};
 use crate::mmf_log::{LogAction, LogStatus};
 use crate::framework_error::{FrameworkError, MMFPanic};
-use crate::module::{Module, ModuleID, EntityID, ModuleState, ModuleStatus, ModuleError};
+use crate::module::{Module, ModuleID, EntityID, ModuleState, ModuleStatus, ModuleError, ModuleInfo};
 use crate::module_task::spawn_module_task;
 use crate::channel::{ModuleCommand, ModuleNormalSenderChannel, ModulePrioritySenderChannel};
 use crate::message::{FrameworkMessage, MessageID, MessageInstanceID};
+
 
 pub struct MMFMod;
 
@@ -127,7 +128,29 @@ impl MMFMod {
         };
 
         Ok(module_status)
-    }   
+    }
+
+
+    /// Retrieve information about all modules currently
+    /// registered in MMF.
+    ///
+    /// The returned list contains a snapshot of the Registry
+    /// state at the time of the call.
+    ///
+    /// This function is primarily intended for:
+    /// - Debug tools.
+    /// - Monitoring interfaces.
+    /// - Runtime inspection.
+    ///
+    /// Returns Framework_NotInitialized if MMF has not
+    /// been initialized through MMF::init().
+    pub fn get_module_info_list() -> Result<Vec<ModuleInfo>, FrameworkError> {
+
+        let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+        let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+
+        Ok(mmf_data.registry.get_module_info_list())
+    }      
 
 
     /// Request module initialization.

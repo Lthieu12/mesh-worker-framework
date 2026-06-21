@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use tokio::task::JoinHandle;
 
 use crate::channel::{ModuleNormalSenderChannel, ModulePrioritySenderChannel};
-use crate::module::{Module, ModuleID, EntityID, ModuleState};
+use crate::module::{Module, ModuleID, EntityID, ModuleState, ModuleInfo};
 use crate::framework_error::{FrameworkError, MMFPanic};
 
 /// Information associated with a registered module.
@@ -89,6 +89,31 @@ impl Registry {
     pub(crate) fn get_registry_entry_mut(&mut self, module_id: &ModuleID) -> Result<&mut RegistryEntry, FrameworkError> {
 
         self.module_map.get_mut(module_id).ok_or(FrameworkError::Module_NotFound)
+    }
+
+
+    /// Retrieve information about all modules currently
+    /// present in the Registry.
+    ///
+    /// The returned list contains one ModuleInfo entry
+    /// per registered module.
+    pub(crate) fn get_module_info_list(&self) -> Vec<ModuleInfo> {
+
+        let mut module_info_list = Vec::new();
+
+        for (module_id, registry_entry) in &self.module_map {
+
+            module_info_list.push(
+                ModuleInfo {
+
+                    module_id: module_id.clone(),
+                    father_id: registry_entry.father_id.clone(),
+                    module_state: registry_entry.module_state,
+                }
+            );
+        }
+
+        module_info_list
     }
 
 

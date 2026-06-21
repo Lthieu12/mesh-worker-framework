@@ -57,6 +57,24 @@ pub struct ModuleStatus {
 }
 
 
+/// Information describing a currently registered module.
+///
+/// This structure provides a snapshot of the module
+/// state at the time it was retrieved.
+///
+/// It is primarily intended for:
+/// - Debugging.
+/// - Monitoring.
+/// - User interfaces.
+/// - Logging configuration tools.
+pub struct ModuleInfo {
+
+    pub module_id: ModuleID,
+    pub father_id: EntityID,
+    pub module_state: ModuleState,
+}
+
+
 /// Interface that must be implemented by all MMF modules.
 #[async_trait]
 pub trait Module {
