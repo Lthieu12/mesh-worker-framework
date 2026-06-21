@@ -73,13 +73,6 @@ pub struct LogEvent {
 }
 
 
-struct LogEventTemp {
-
-    module_id: ModuleID,
-    log_timer: LogTimer,
-    log_status: LogStatus,
-}
-
 /// Internal MMFLog storage.
 ///
 /// LoggingData maintains a circular buffer containing
@@ -213,7 +206,7 @@ impl MMFLog {
     }
 
 
-    /// Generate a unique ErrorInstanceID.
+    /// Generate a unique LogInstanceID.
     fn generate_log_instance_id() -> Result<u64, FrameworkError> {
 
         let current_id = MMF_LOG_INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed);
