@@ -51,7 +51,7 @@ pub(crate) struct ErrorData {
     /// Capacity of error event buffer.
     pub(crate) error_event_buffer_capacity: usize,
 
-    pub error_event_list: VecDeque<ErrorEvent>,
+    pub(crate) error_event_list: VecDeque<ErrorEvent>,
 }
 
 /// Result returned by MMFErr::get_error_list().

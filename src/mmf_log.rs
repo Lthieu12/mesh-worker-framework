@@ -79,13 +79,24 @@ pub struct LogEvent {
 pub(crate) struct LoggingData {
 
     /// Maximum number of log events retained.
-    pub log_event_buffer_capacity: usize,
+    pub(crate) log_event_buffer_capacity: usize,
 
     /// Selected modules when LogSelected is active.
-    pub logged_module_list: Vec<ModuleID>,
+    pub(crate) logged_module_list: Vec<ModuleID>,
 
     /// Circular buffer of log events.
-    pub log_event_list: VecDeque<LogEvent>,
+    pub(crate) log_event_list: VecDeque<LogEvent>,
+}
+
+/// Timing information associated with a future log event.
+///
+/// LogTimer captures the timestamp at which an
+/// operation starts as well as a monotonic timer
+/// used later to measure its execution duration.
+pub(crate) struct LogTimer {
+
+    pub(crate) timestamp_rfc3339: String,
+    pub(crate) start: Instant,
 }
 
 /// Result returned by MMFErr::get_log_list().
@@ -104,21 +115,77 @@ pub struct LogList {
     pub log_event_list: Vec<LogEvent>,
 }
 
-/// Timing information associated with a future log event.
-///
-/// LogTimer captures the timestamp at which an
-/// operation starts as well as a monotonic timer
-/// used later to measure its execution duration.
-pub struct LogTimer {
-
-    pub timestamp_rfc3339: String,
-    pub start: Instant,
-}
 
 pub struct MMFLog;
 
 /// Public MMFLog entry point.
 impl MMFLog {
+
+    /// Change the current MMF logging mode.
+    ///
+    /// When LogSelected is used, the provided module list
+    /// replaces the previously configured selection.
+    ///
+    /// Returns Framework_NotInitialized if MMF has not
+    /// been initialized through MMF::init().
+    pub fn set_log_mode(log_mode: LogMode, logged_module_list: Option<Vec<ModuleID>>) -> Result<(), FrameworkError> {
+
+        let mut mmf_log_data_guard = MMF_LOG_DATA.write().expect(MMFPanic::MMFLogData_WriteLockPoisoned.message());
+        let mmf_log_data = mmf_log_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
+        
+        MMF_LOG_MODE.store(log_mode as u8, Ordering::Relaxed);
+
+        if let Some(logged_module_list) = logged_module_list {
+
+            mmf_log_data.logged_module_list = logged_module_list;
+        }
+
+        drop(mmf_log_data_guard);
+        Ok(())
+    }
+
+
+    /// Retrieve the current MMF logging mode.
+    ///
+    /// Returns Framework_NotInitialized if MMF has not
+    /// been initialized through MMF::init().
+    pub fn get_log_mode() -> Result<LogMode, FrameworkError> {
+
+        let mmf_log_data_guard = MMF_LOG_DATA.read().expect(MMFPanic::MMFLogData_ReadLockPoisoned.message());
+        
+        if mmf_log_data_guard.is_none() {
+
+            return Err(FrameworkError::Framework_NotInitialized);
+        }
+
+        let log_mode = match MMF_LOG_MODE.load(Ordering::Relaxed) {
+
+                0 => LogMode::NoLog,
+                1 => LogMode::LogAll,
+                2 => LogMode::LogSelected,
+                // Invalid value => NoLog
+                _ => LogMode::NoLog,
+            };
+
+        drop(mmf_log_data_guard);
+        Ok(log_mode)
+    }
+
+
+    /// Retrieve the currently selected module list.
+    ///
+    /// Returns Framework_NotInitialized if MMF has not
+    /// been initialized through MMF::init().
+    pub fn get_logged_module_list() -> Result<Vec<ModuleID>, FrameworkError> {
+
+        let mmf_log_data_guard = MMF_LOG_DATA.read().expect(MMFPanic::MMFLogData_ReadLockPoisoned.message());
+        let mmf_log_data = mmf_log_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let logged_module_list = mmf_log_data.logged_module_list.clone();
+
+        drop(mmf_log_data_guard);
+        Ok(logged_module_list)
+    }
+
 
     /// Generate a unique ErrorInstanceID.
     fn generate_log_instance_id() -> Result<u64, FrameworkError> {
@@ -158,7 +225,7 @@ impl MMFLog {
         Ok(false)
     }
 
-    
+
     /// Start a new log timer.
     ///
     /// The returned LogTimer stores the current
