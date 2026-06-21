@@ -121,6 +121,7 @@ async fn test_mmf_err_buffer_overflow() {
             module_normal_channel_capacity: 50,
             module_priority_channel_capacity: 10,
             error_event_buffer_capacity: 10,
+            log_event_buffer_capacity: 10,
         }
     )
     .unwrap();

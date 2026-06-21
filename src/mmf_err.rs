@@ -12,7 +12,7 @@ use crate::framework_error::{FrameworkError, MMFPanic};
 use crate::mmf::{MMF_ERR_DATA, MMF_ERR_NOTIFY, MMF_ERR_INSTANCE_COUNTER};
 use crate::ModuleError;
 
-
+/// Unique identifier assigned to each error event.
 pub type ErrorInstanceID = u64;
 
 /// Error event recorded by MMFErr.

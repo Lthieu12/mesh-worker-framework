@@ -28,6 +28,8 @@ use crate::channel::{ModuleCommand, ModuleNormalReceiverChannel, ModulePriorityR
 use crate::module::{Module, ModuleID, EntityID, ModuleState};
 use crate::framework_error::MMFPanic;
 use crate::MMFErr;
+use crate::MMFLog;
+use crate::mmf_log::{LogAction, LogStatus};
 
 /// Spawn a Tokio task that takes ownership of the module instance.
 ///
@@ -119,6 +121,7 @@ where T: Module + Send + 'static{
                 // as Initialized only after on_init() completes.
                 ModuleCommand::Init => {
 
+                    let log_timer = MMFLog::start_log_timer();
                     let result_init = module.on_init(&module_id, &father_id).await;
 
                     // Publish successful initialization.
@@ -127,15 +130,17 @@ where T: Module + Send + 'static{
                     // receive business messages.
                     let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
                     let mmf_data = mmf_data_guard.as_mut().expect(MMFPanic::MMFData_Missing.message());
-                    match result_init {
+                    match &result_init {
                         Ok(()) => {
 
                             mmf_data.registry.set_module_state(&module_id, ModuleState::Initialized).expect(MMFPanic::Registry_ModuleMissing.message());
+                            MMFLog::add_log(log_timer, &module_id, LogAction::ModuleInit, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                         }
                         Err(error) => {
 
-                            MMFErr::add_error(EntityID::Module(module_id.clone()), &error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
+                            MMFErr::add_error(EntityID::Module(module_id.clone()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
                             mmf_data.registry.set_module_state(&module_id, ModuleState::InitFailed).expect(MMFPanic::Registry_ModuleMissing.message());
+                            MMFLog::add_log(log_timer, &module_id, LogAction::ModuleInit, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                         }
 
                     }
@@ -154,16 +159,30 @@ where T: Module + Send + 'static{
                 // This guarantees that a message accepted before a
                 // Close command is always processed before module
                 // shutdown begins.
-                ModuleCommand::Message(message) => {
+                ModuleCommand::Message {message, priority} => {
+
+                    let log_timer = MMFLog::start_log_timer();
+                    let log_action = LogAction::ReceiveMessage {
+
+                        sender_id: message.sender_id.clone(),
+                        message_id: message.message_id.clone(),
+                        priority,
+                        wait_completion: false,
+                    };
+
                     let result_message = module.on_message(message).await;
                     
-                    match result_message {
+                    match &result_message {
 
-                        Ok(()) => {}
+                        Ok(()) => {
+
+                            MMFLog::add_log(log_timer, &module_id, log_action, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                        }
 
                         Err(error) => {
 
-                            MMFErr::add_error(EntityID::Module(module_id.clone()), &error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
+                            MMFErr::add_error(EntityID::Module(module_id.clone()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
+                            MMFLog::add_log(log_timer, &module_id, log_action, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                         }
                     }
                 }
@@ -179,15 +198,33 @@ where T: Module + Send + 'static{
                 // This guarantees that a message accepted before a
                 // Close command is always processed before module
                 // shutdown begins.
-                ModuleCommand::MessageAndWaitCompletion(reply_sender, message) => {
+                ModuleCommand::MessageAndWaitCompletion {reply_sender, message, priority} => {
  
+                    let log_timer = MMFLog::start_log_timer();
+                    let log_action = LogAction::ReceiveMessage {
+
+                        sender_id: message.sender_id.clone(),
+                        message_id: message.message_id.clone(),
+                        priority,
+                        wait_completion: true,
+                    };
+
                     let result_message = module.on_message(message).await;
 
-                    if let Err(error) = &result_message {
+                    match &result_message {
 
-                        MMFErr::add_error(EntityID::Module(module_id.clone()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
+                        Ok(()) => {
+
+                            MMFLog::add_log(log_timer, &module_id, log_action, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                        }
+
+                        Err(error) => {
+
+                            MMFErr::add_error(EntityID::Module(module_id.clone()), &error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
+                            MMFLog::add_log(log_timer, &module_id, log_action, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                        }
                     }
-
+                    
                     let _ = reply_sender.send(result_message);
                 }
 
@@ -200,6 +237,7 @@ where T: Module + Send + 'static{
                 // from the Registry only after on_close() completes.
                 ModuleCommand::Close => {
 
+                    let log_timer = MMFLog::start_log_timer();
                     let result_close = module.on_close().await;
 
                     // Mark the module as Closed.
@@ -208,10 +246,11 @@ where T: Module + Send + 'static{
                     // completed successfully.
                     let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
                     let mmf_data = mmf_data_guard.as_mut().expect(MMFPanic::MMFData_Missing.message());
-                    match result_close {
+                    match &result_close {
                         Ok(()) => {
 
                             mmf_data.registry.set_module_state(&module_id, ModuleState::Closed).expect(MMFPanic::Registry_ModuleMissing.message());
+                            MMFLog::add_log(log_timer, &module_id, LogAction::ModuleClose, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                             // Remove the module from the Registry.
                             //
                             // Once removed, the module is no longer visible
@@ -220,10 +259,10 @@ where T: Module + Send + 'static{
                         }
                         Err(error) => {
 
-                            MMFErr::add_error(EntityID::Module(module_id.clone()), &error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
+                            MMFErr::add_error(EntityID::Module(module_id.clone()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
                             mmf_data.registry.set_module_state(&module_id, ModuleState::CloseFailed).expect(MMFPanic::Registry_ModuleMissing.message());
+                            MMFLog::add_log(log_timer, &module_id, LogAction::ModuleClose, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                         }
-
                     }
 
                     drop(mmf_data_guard);

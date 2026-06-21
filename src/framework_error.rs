@@ -68,6 +68,10 @@ pub enum FrameworkError {
     /// The ErrorInstanceID counter has reached its maximum value
     /// and can no longer generate unique identifiers.
     Error_InstanceIDExhausted,
+
+    /// The LoggingInstanceID counter has reached its maximum value
+    /// and can no longer generate unique identifiers.
+    Logging_InstanceIDExhausted,
 }
 
 /// Human-readable representation of FrameworkError.
@@ -122,6 +126,9 @@ impl fmt::Display for FrameworkError {
             FrameworkError::Error_InstanceIDExhausted =>
                 write!(f, "ErrorInstanceID counter exhausted."),
 
+            FrameworkError::Logging_InstanceIDExhausted =>
+                write!(f, "LoggingInstanceID counter exhausted."),
+
         }
     }
 }
@@ -151,6 +158,12 @@ pub(crate) enum MMFPanic {
 
     ErrorBuffer_Inconsistency,
     ErrorBuffer_AddErrorFailed,
+
+    MMFLogData_ReadLockPoisoned,
+    MMFLogData_WriteLockPoisoned,
+
+    LogBuffer_Inconsistency,
+    LogBuffer_AddLogFailed,
 }
 
 impl MMFPanic {
@@ -201,6 +214,22 @@ impl MMFPanic {
 
             MMFPanic::ErrorBuffer_AddErrorFailed => {
                 "Internal MMF error: add error to buffer unexpectedly failed."
+            }
+
+            MMFPanic::MMFLogData_ReadLockPoisoned => {
+                "Internal MMF error: MMFLog_DATA read lock poisoned."
+            }
+
+            MMFPanic::MMFLogData_WriteLockPoisoned => {
+                "Internal MMF error: MMFLog_DATA write lock poisoned."
+            }
+
+            MMFPanic::LogBuffer_Inconsistency => {
+                "Internal MMF error: logging buffer is inconsistent."
+            }
+
+            MMFPanic::LogBuffer_AddLogFailed => {
+                "Internal MMF error: add log to buffer unexpectedly failed."
             }
         }
     }

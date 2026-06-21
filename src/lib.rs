@@ -3,7 +3,6 @@
 mod registry;
 mod channel;
 mod module_task;
-mod logging;
 mod framework_error;
 mod module;
 mod message;

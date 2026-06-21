@@ -6,7 +6,9 @@
 use bytes::Bytes;
 use std::sync::atomic::Ordering;
 
+use crate::MMFLog;
 use crate::mmf::{MMF_DATA, MMF_MOD_MESSAGE_INSTANCE_COUNTER, MMF_MOD_INIT_NOTIFY, MMF_MOD_CLOSE_NOTIFY};
+use crate::mmf_log::{LogAction, LogStatus};
 use crate::framework_error::{FrameworkError, MMFPanic};
 use crate::module::{Module, ModuleID, EntityID, ModuleState, ModuleStatus, ModuleError};
 use crate::module_task::spawn_module_task;
@@ -59,6 +61,7 @@ impl MMFMod {
                 let module_state = mmf_data.registry.get_module_state(father_id_ref)?;
 
                 if module_state != ModuleState::Initialized {
+
                     return Err(FrameworkError::Module_NotInitialized);
                 }
             }
@@ -68,6 +71,8 @@ impl MMFMod {
         
         let module_id = mmf_data.registry.generate_module_id::<T>();
 
+        let log_timer = MMFLog::start_log_timer();
+        
         // Channel used to send Module commands (like Init and Close) and messages to the module.
         let (normal_sender_channel, normal_receiver_channel) = tokio::sync::mpsc::channel(mmf_data.module_normal_channel_capacity);
         // Channel used to send priority commands and messages to the module.
@@ -87,7 +92,14 @@ impl MMFMod {
         // - Module state.
         // - Communication channels.
         // - JoinHandle associated with the Tokio task.
-        mmf_data.registry.add_module(&module_id, &father_id, normal_sender_channel, priority_sender_channel, join_handle,)?;
+        if let Err(error) = mmf_data.registry.add_module(&module_id, &father_id, normal_sender_channel, priority_sender_channel, join_handle) {
+
+            MMFLog::add_log(log_timer, &module_id, LogAction::ModuleSpawn, LogStatus::Error)?;
+            return Err(error);
+        }
+
+        MMFLog::add_log(log_timer, &module_id, LogAction::ModuleSpawn, LogStatus::Ok)?;
+
         drop(mmf_data_guard);
 
         Ok(module_id)
@@ -430,13 +442,30 @@ impl MMFMod {
 
         for module_id in module_ids {
 
-            let join_handle = mmf_data.registry.take_join_handle(module_id)?;
+            let log_timer = MMFLog::start_log_timer();
+            
+            let join_handle = match mmf_data.registry.take_join_handle(module_id) {
+
+                Ok(join_handle) => join_handle,
+
+                Err(error) => {
+
+                    MMFLog::add_log(log_timer, module_id, LogAction::ModuleAbort, LogStatus::Error)?;
+                    return Err(error);
+                }
+            };
 
             // Abort the Tokio task immediately.
             join_handle.abort();
 
             // Remove the module from the Registry.
-            mmf_data.registry.remove_module(module_id)?;
+            if let Err(error) = mmf_data.registry.remove_module(module_id) {
+
+                MMFLog::add_log(log_timer, module_id, LogAction::ModuleAbort, LogStatus::Error)?;
+                return Err(error);
+            }
+
+            MMFLog::add_log(log_timer, module_id, LogAction::ModuleAbort, LogStatus::Ok)?;
         }
 
         drop(mmf_data_guard);
@@ -527,7 +556,7 @@ impl MMFMod {
         let framework_message = FrameworkMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
 
         // Send the message to the target module.
-        normal_sender_channel.send(ModuleCommand::Message(framework_message)).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        normal_sender_channel.send(ModuleCommand::Message {message: framework_message, priority: true}).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         Ok(())
 
@@ -594,7 +623,7 @@ impl MMFMod {
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<Result<(), ModuleError>>();
 
         // Send the message to the receiver module.
-        normal_sender_channel.send(ModuleCommand::MessageAndWaitCompletion(reply_sender, framework_message)).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        normal_sender_channel.send(ModuleCommand::MessageAndWaitCompletion{reply_sender, message: framework_message, priority: false}).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         // Wait for completion or timeout.
         //
@@ -725,7 +754,7 @@ impl MMFMod {
         let framework_message = FrameworkMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
 
         // Send the priority message to the target module.
-        priority_sender_channel.send(ModuleCommand::Message(framework_message)).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        priority_sender_channel.send(ModuleCommand::Message {message: framework_message, priority: true}).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         Ok(())
 
@@ -792,7 +821,7 @@ impl MMFMod {
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel();
 
         // Send the message to the receiver module.
-        priority_sender_channel.send(ModuleCommand::MessageAndWaitCompletion(reply_sender, framework_message)).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        priority_sender_channel.send(ModuleCommand::MessageAndWaitCompletion {reply_sender, message: framework_message, priority: false}).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         // Wait for completion or timeout.
         //

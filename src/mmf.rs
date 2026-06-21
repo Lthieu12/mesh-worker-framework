@@ -4,14 +4,15 @@
 //! initialize and shutdown the API global runtime.
 
 use std::sync::{LazyLock, RwLock};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
 use std::collections::VecDeque;
 use tokio::sync::Notify;
 
 use crate::framework_error::{FrameworkError, MMFPanic};
 use crate::mmf_err::{ErrorData};
-use crate::logging::LoggingData;
+use crate::mmf_log::{LogMode, LoggingData};
 use crate::registry::Registry;
+
 
 /// Global MMF runtime storage.
 pub(crate) static MMF_DATA: LazyLock<RwLock<Option<MMFData>>> = LazyLock::new(|| RwLock::new(None));
@@ -25,6 +26,7 @@ pub(crate) static MMF_MOD_CLOSE_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Noti
 /// Global MMF message instance counter used to identify messages sent to modules.
 pub(crate) static MMF_MOD_MESSAGE_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
 
+
 /// Global MMF error event storage.
 pub(crate) static MMF_ERR_DATA: LazyLock<RwLock<Option<ErrorData>>> = LazyLock::new(|| RwLock::new(None));
 
@@ -34,6 +36,20 @@ pub(crate) static MMF_ERR_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Notify::ne
 
 /// Global MMF error instance counter.
 pub(crate) static MMF_ERR_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
+
+
+/// Current logging mode.
+pub(crate) static MMF_LOG_MODE: AtomicU8 = AtomicU8::new(LogMode::NoLog as u8);
+
+/// MMF error notification emitted whenever a new error event
+/// is added to MMFErr.
+pub(crate) static MMF_LOG_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Notify::new());
+
+/// Global log event counter.
+pub(crate) static MMF_LOG_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
+
+/// Global logging configuration.
+pub(crate) static MMF_LOG_DATA: LazyLock<RwLock<Option<LoggingData>>> = LazyLock::new(|| RwLock::new(None));
 
 
 /// MMF startup configuration.
@@ -47,6 +63,9 @@ pub struct MMFConfiguration {
 
     /// Capacity of the MMFErr circular buffer.
     pub error_event_buffer_capacity: usize,
+
+    /// Capacity of the MMFLog circular buffer.
+    pub log_event_buffer_capacity: usize,
 }
 
 impl Default for MMFConfiguration {
@@ -58,6 +77,7 @@ impl Default for MMFConfiguration {
             module_normal_channel_capacity: 50,
             module_priority_channel_capacity: 10,
             error_event_buffer_capacity: 100,
+            log_event_buffer_capacity: 100,
         }
     }
 }
@@ -67,9 +87,6 @@ pub(crate) struct MMFData {
 
     /// Registered modules and hierarchy information.
     pub(crate) registry: Registry,
-
-    /// Logging configuration.
-    pub(crate) logging_data: LoggingData,
 
     /// Capacity of normal module event queues.
     pub(crate) module_normal_channel_capacity: usize,
@@ -85,7 +102,6 @@ impl MMFData {
         
         Self {
             registry: Registry::new(),
-            logging_data: LoggingData::new(),
             module_normal_channel_capacity: mmf_configuration.module_normal_channel_capacity,
             module_priority_channel_capacity: mmf_configuration.module_priority_channel_capacity,
         }
@@ -108,8 +124,9 @@ impl MMF {
     /// Initialize the MMF framework with custom configuration.
     pub fn init_with_configuration(mmf_configuration: MMFConfiguration) -> Result<(), FrameworkError> {
         
-        MMF_ERR_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
         MMF_MOD_MESSAGE_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
+        MMF_ERR_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
+        MMF_LOG_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
 
         let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
         if mmf_data_guard.is_some() {
@@ -125,6 +142,15 @@ impl MMF {
             error_event_list: VecDeque::new(),
         });
         drop(mmf_err_data_guard);
+
+        let mut mmf_log_data_guard = MMF_LOG_DATA.write().expect(MMFPanic::MMFLogData_WriteLockPoisoned.message());
+        *mmf_log_data_guard = Some(LoggingData {
+            
+            log_event_buffer_capacity:mmf_configuration.log_event_buffer_capacity,
+            logged_module_list: Vec::new(),
+            log_event_list: VecDeque::new(),
+        });
+        drop(mmf_log_data_guard);
 
         Ok(())
     }
@@ -159,6 +185,10 @@ impl MMF {
         let mut mmf_err_data_guard = MMF_ERR_DATA.write().expect(MMFPanic::MMFErrData_WriteLockPoisoned.message());
         *mmf_err_data_guard = None;
         drop(mmf_err_data_guard);
+
+        let mut mmf_log_data_guard = MMF_LOG_DATA.write().expect(MMFPanic::MMFLogData_WriteLockPoisoned.message());
+        *mmf_log_data_guard = None;
+        drop(mmf_log_data_guard);
 
         Ok(())
     }
