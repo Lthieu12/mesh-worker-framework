@@ -9,13 +9,13 @@ use std::collections::VecDeque;
 use tokio::sync::Notify;
 
 use crate::framework_error::{FrameworkError, MMFPanic};
+use crate::mmf_mod::{ModuleData};
 use crate::mmf_err::{ErrorData};
 use crate::mmf_log::{LogMode, LoggingData};
-use crate::registry::Registry;
 
 
 /// Global MMF runtime storage.
-pub(crate) static MMF_DATA: LazyLock<RwLock<Option<MMFData>>> = LazyLock::new(|| RwLock::new(None));
+pub(crate) static MMF_MOD_DATA: LazyLock<RwLock<Option<ModuleData>>> = LazyLock::new(|| RwLock::new(None));
 
 /// Global MMF notifier used to signal child module initialized.
 pub(crate) static MMF_MOD_INIT_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Notify::new());
@@ -38,6 +38,9 @@ pub(crate) static MMF_ERR_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Notify::ne
 pub(crate) static MMF_ERR_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 
+/// Global logging storage.
+pub(crate) static MMF_LOG_DATA: LazyLock<RwLock<Option<LoggingData>>> = LazyLock::new(|| RwLock::new(None));
+
 /// Current logging mode.
 pub(crate) static MMF_LOG_MODE: AtomicU8 = AtomicU8::new(LogMode::NoLog as u8);
 
@@ -47,9 +50,6 @@ pub(crate) static MMF_LOG_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Notify::ne
 
 /// Global log event counter.
 pub(crate) static MMF_LOG_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
-
-/// Global logging configuration.
-pub(crate) static MMF_LOG_DATA: LazyLock<RwLock<Option<LoggingData>>> = LazyLock::new(|| RwLock::new(None));
 
 
 /// MMF startup configuration.
@@ -82,32 +82,7 @@ impl Default for MMFConfiguration {
     }
 }
 
-/// Internal MMF runtime data.
-pub(crate) struct MMFData {
 
-    /// Registered modules and hierarchy information.
-    pub(crate) registry: Registry,
-
-    /// Capacity of normal module event queues.
-    pub(crate) module_normal_channel_capacity: usize,
-
-    /// Capacity of priority module event queues.
-    pub(crate) module_priority_channel_capacity: usize,
-}
-
-impl MMFData {
-
-    /// Create a new MMF runtime instance.
-    fn new(mmf_configuration: &MMFConfiguration) -> Self {
-        
-        Self {
-            registry: Registry::new(),
-            module_normal_channel_capacity: mmf_configuration.module_normal_channel_capacity,
-            module_priority_channel_capacity: mmf_configuration.module_priority_channel_capacity,
-        }
-    }
-
-}
 
 
 /// Public MMF entry point.
@@ -128,11 +103,11 @@ impl MMF {
         MMF_ERR_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
         MMF_LOG_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
 
-        let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
+        let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
         if mmf_data_guard.is_some() {
             return Err(FrameworkError::Framework_AlreadyInitialized);
         }
-        *mmf_data_guard = Some(MMFData::new(&mmf_configuration));
+        *mmf_data_guard = Some(ModuleData::new(&mmf_configuration));
         drop(mmf_data_guard);
 
         let mut mmf_err_data_guard = MMF_ERR_DATA.write().expect(MMFPanic::MMFErrData_WriteLockPoisoned.message());
@@ -168,7 +143,7 @@ impl MMF {
     /// resort if a module becomes unresponsive.
     pub fn close() -> Result<(), FrameworkError> {
 
-        let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
+        let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
 
         let mmf_data = match mmf_data_guard.as_ref() {
             Some(mmf_data) => mmf_data,
@@ -197,7 +172,7 @@ impl MMF {
     /// Check whether the framework is initialized.
     pub fn is_initialized() -> bool {
         
-        MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message()).is_some()
+        MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message()).is_some()
     }
 
 

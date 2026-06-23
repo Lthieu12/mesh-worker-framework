@@ -24,7 +24,7 @@
 use tokio::task::JoinHandle;
 use std::time::Instant;
 
-use crate::mmf::{MMF_DATA, MMF_MOD_INIT_NOTIFY, MMF_MOD_CLOSE_NOTIFY};
+use crate::mmf::{MMF_MOD_DATA, MMF_MOD_INIT_NOTIFY, MMF_MOD_CLOSE_NOTIFY};
 use crate::channel::{ModuleCommand, ModuleNormalReceiverChannel, ModulePriorityReceiverChannel};
 use crate::module::{Module, ModuleID, EntityID, ModuleState};
 use crate::framework_error::MMFPanic;
@@ -131,7 +131,7 @@ where T: Module + Send + 'static{
                     //
                     // The module is now fully initialized and can
                     // receive business messages.
-                    let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
+                    let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
                     let mmf_data = mmf_data_guard.as_mut().expect(MMFPanic::MMFData_Missing.message());
                     match &result_init {
                         Ok(()) => {
@@ -251,7 +251,7 @@ where T: Module + Send + 'static{
                     //
                     // Closed indicates that the module lifecycle
                     // completed successfully.
-                    let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
+                    let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
                     let mmf_data = mmf_data_guard.as_mut().expect(MMFPanic::MMFData_Missing.message());
                     match &result_close {
                         Ok(()) => {

@@ -8,13 +8,41 @@ use std::sync::atomic::Ordering;
 use std::time::Instant;
 
 use crate::MMFLog;
-use crate::mmf::{MMF_DATA, MMF_MOD_MESSAGE_INSTANCE_COUNTER, MMF_MOD_INIT_NOTIFY, MMF_MOD_CLOSE_NOTIFY};
+use crate::mmf::{MMFConfiguration, MMF_MOD_DATA, MMF_MOD_MESSAGE_INSTANCE_COUNTER, MMF_MOD_INIT_NOTIFY, MMF_MOD_CLOSE_NOTIFY};
 use crate::mmf_log::{LogAction, LogStatus};
 use crate::framework_error::{FrameworkError, MMFPanic};
 use crate::module::{Module, ModuleID, EntityID, ModuleState, ModuleStatus, ModuleError, ModuleInfo};
+use crate::registry::Registry;
 use crate::module_task::spawn_module_task;
 use crate::channel::{ModuleCommand, ModuleNormalSenderChannel, ModulePrioritySenderChannel};
 use crate::message::{FrameworkMessage, MessageID, MessageInstanceID};
+
+/// Internal MMFMod runtime data.
+pub(crate) struct ModuleData {
+
+    /// Registered modules and hierarchy information.
+    pub(crate) registry: Registry,
+
+    /// Capacity of normal module event queues.
+    pub(crate) module_normal_channel_capacity: usize,
+
+    /// Capacity of priority module event queues.
+    pub(crate) module_priority_channel_capacity: usize,
+}
+
+impl ModuleData {
+
+    /// Create a new MMF runtime instance.
+    pub(crate) fn new(mmf_configuration: &MMFConfiguration) -> Self {
+        
+        Self {
+            registry: Registry::new(),
+            module_normal_channel_capacity: mmf_configuration.module_normal_channel_capacity,
+            module_priority_channel_capacity: mmf_configuration.module_priority_channel_capacity,
+        }
+    }
+
+}
 
 
 pub struct MMFMod;
@@ -48,7 +76,7 @@ impl MMFMod {
     pub fn spawn_module<T>(module: T, father_id: &EntityID) -> Result<ModuleID, FrameworkError>
     where T: Module + Send + 'static {
 
-        let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
+        let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
         
         // Child modules can only be attached to an
@@ -111,7 +139,7 @@ impl MMFMod {
     /// Get the current status of a module.
     pub fn get_module_status(module_id: &ModuleID) -> Result<ModuleStatus, FrameworkError> {
 
-        let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+        let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
         let registry_entry = mmf_data.registry.get_registry_entry(module_id)?;
         let normal_channel_capacity = mmf_data.module_normal_channel_capacity;
@@ -146,7 +174,7 @@ impl MMFMod {
     /// been initialized through MMF::init().
     pub fn get_module_info_list() -> Result<Vec<ModuleInfo>, FrameworkError> {
 
-        let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+        let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
 
         Ok(mmf_data.registry.get_module_info_list())
@@ -165,7 +193,7 @@ impl MMFMod {
         // associated with the target module.
         //
         // Only modules in the Created state can be initialized.
-        let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
+        let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
         let module_state = mmf_data.registry.get_module_state(module_id)?;
         if module_state != ModuleState::Created {
@@ -194,7 +222,7 @@ impl MMFMod {
         // associated with the target module.
         //
         // Only modules in the Initialized state can be closed.
-        let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
+        let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
         let module_state = mmf_data.registry.get_module_state(module_id)?;
         if module_state != ModuleState::Initialized {
@@ -214,7 +242,7 @@ impl MMFMod {
     /// Get the FatherID of a module.
     pub fn get_father_id(module_id: &ModuleID) -> Result<EntityID, FrameworkError>{
         
-        let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+        let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
         let father_id = mmf_data.registry.get_father_id(module_id)?;
         drop(mmf_data_guard);
@@ -226,7 +254,7 @@ impl MMFMod {
     /// Get the child ModuleIDs of an entity.
     pub fn get_children_ids(entity_id: &EntityID) -> Result<Vec<ModuleID>, FrameworkError> {
         
-        let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+        let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
 
         mmf_data.registry.get_children_ids(entity_id)
@@ -236,7 +264,7 @@ impl MMFMod {
     /// Get the number of child modules of an entity.
     pub fn get_children_count(entity_id: &EntityID) -> Result<usize, FrameworkError> {
 
-        let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+        let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
         let children_count = mmf_data.registry.get_children_count(entity_id)?;
         drop(mmf_data_guard);
@@ -265,7 +293,7 @@ impl MMFMod {
                 // next notification.
                 let (all_init_finished, one_init_failed) = {
 
-                    let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+                    let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
                     let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
 
                     let mut all_init_finished = true;
@@ -367,7 +395,7 @@ impl MMFMod {
                 // next notification.
                 let (all_close_finished, one_close_failed) = {
 
-                    let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+                    let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
                     let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
 
                     let mut all_close_finished = true;
@@ -461,7 +489,7 @@ impl MMFMod {
     /// when normal shutdown has failed.
     pub fn abort_module_list(module_ids: &Vec<ModuleID>) -> Result<(), FrameworkError> {
 
-        let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
+        let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
 
         for module_id in module_ids {
@@ -539,7 +567,7 @@ impl MMFMod {
             //
             // send_message() only requires a read lock because it does
             // not modify the Registry or ModuleState.
-            let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+            let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
 
             let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
 
@@ -602,7 +630,7 @@ impl MMFMod {
             //
             // send_message() only requires a read lock because it does
             // not modify the Registry or ModuleState.
-            let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+            let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
 
             let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
 
@@ -737,7 +765,7 @@ impl MMFMod {
             //
             // send_message() only requires a read lock because it does
             // not modify the Registry or ModuleState.
-            let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+            let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
 
             let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
 
@@ -800,7 +828,7 @@ impl MMFMod {
             //
             // send_message() only requires a read lock because it does
             // not modify the Registry or ModuleState.
-            let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+            let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
 
             let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
 
