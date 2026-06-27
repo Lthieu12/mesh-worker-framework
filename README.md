@@ -1,6 +1,6 @@
 # Mesh Module Framework (MMF)
 
-Mesh Module Framework (MMF) is a Rust Tokio-based modular runtime designed for applications composed of independent communicating modules.
+Mesh Module Framework (MMF) is a Rust Tokio/Futures-based modular runtime designed for applications composed of independent communicating modules.
 
 MMF provides:
 
