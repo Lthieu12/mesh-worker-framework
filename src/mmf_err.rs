@@ -11,9 +11,20 @@ use crate::module::EntityID;
 use crate::framework_error::{FrameworkError, MMFPanic};
 use crate::mmf::{MMF_ERR_DATA, MMF_ERR_NOTIFY, MMF_ERR_INSTANCE_COUNTER};
 use crate::ModuleError;
+use crate::string_helper;
 
 /// Unique identifier assigned to each error event.
 pub type ErrorInstanceID = u64;
+
+/// Terminal error column widths.
+mod terminal_error_column {
+
+    pub const ERROR_ID_LEN: usize = 12;
+    pub const TIME_LEN: usize = 12;
+    pub const SENDER_ID_LEN: usize = 30;
+    pub const MESSAGE_LEN: usize = 50;
+    pub const SOURCE_LEN: usize = 50;
+}
 
 /// Error event recorded by MMFErr.
 ///
@@ -42,6 +53,42 @@ pub struct ErrorEvent {
     pub error_source_list: Vec<String>,
 }
 
+impl ErrorEvent {
+
+    /// Converts the error event into a human-readable terminal string.
+    fn to_terminal_string(&self) -> String {
+
+        let root_error_source = string_helper::error_root_source(&self.error_source_list);
+        format!(
+            "{:0width_id$} | {:width_time$} | {:width_sender$} | {:width_message$} | {}",
+            self.error_instance_id,
+            &self.timestamp_rfc3339[11..23],
+            self.sender_id.to_short_string(terminal_error_column::SENDER_ID_LEN),
+            string_helper::to_short_string(&self.error_message, terminal_error_column::MESSAGE_LEN),
+            string_helper::to_short_string(&root_error_source, terminal_error_column::SOURCE_LEN),
+            width_id = terminal_error_column::ERROR_ID_LEN,
+            width_time = terminal_error_column::TIME_LEN,
+            width_sender = terminal_error_column::SENDER_ID_LEN,
+            width_message = terminal_error_column::MESSAGE_LEN,
+        )
+    }
+
+
+    /// Converts the error event into a CSV row.
+    fn to_csv_string(&self) -> String {
+
+        let error_source_list = string_helper::error_source_list_to_string(&self.error_source_list);
+        format!(
+            "{},{},{},{},{}",
+            self.error_instance_id,
+            string_helper::csv_escape(&self.timestamp_rfc3339),
+            string_helper::csv_escape(&self.sender_id.to_string()),
+            string_helper::csv_escape(&self.error_message),
+            string_helper::csv_escape(&error_source_list),
+        )
+    }
+}
+
 /// Internal MMFErr storage.
 ///
 /// ErrorData maintains a circular buffer containing
@@ -52,6 +99,15 @@ pub(crate) struct ErrorData {
     pub(crate) error_event_buffer_capacity: usize,
 
     pub(crate) error_event_list: VecDeque<ErrorEvent>,
+}
+
+/// String output format.
+pub enum ErrorOutputFormat {
+
+    /// Human-readable fixed-width table.
+    Terminal,
+    /// Comma-separated values.
+    CSV,
 }
 
 /// Result returned by MMFErr::get_error_list().
@@ -70,6 +126,47 @@ pub struct ErrorList {
     pub missing_error_count: u64,
 
     pub error_event_list: Vec<ErrorEvent>,
+}
+
+impl ErrorList {
+
+    /// Returns the column header corresponding to the requested format.
+    pub fn get_header(format: ErrorOutputFormat) -> String {
+
+        match format {
+
+            ErrorOutputFormat::Terminal => format!(
+                "{:<width_id$} | {:<width_time$} | {:<width_sender$} | {:<width_message$} | Source",
+                "ErrorID",
+                "Time",
+                "SenderID",
+                "Message",
+                width_id = terminal_error_column::ERROR_ID_LEN,
+                width_time = terminal_error_column::TIME_LEN,
+                width_sender = terminal_error_column::SENDER_ID_LEN,
+                width_message = terminal_error_column::MESSAGE_LEN,
+            ),
+
+            ErrorOutputFormat::CSV => String::from("ErrorID,Time,SenderID,Message,Source"),
+        }
+    }
+
+    /// Converts all error events into strings.
+    pub fn to_string_list(&self, format: ErrorOutputFormat) -> Vec<String> {
+
+        match format {
+
+            ErrorOutputFormat::Terminal => {
+
+                self.error_event_list.iter().map(|error_event| error_event.to_terminal_string()).collect()
+            }
+            
+            ErrorOutputFormat::CSV => {
+
+                self.error_event_list.iter().map(|error_event| error_event.to_csv_string()).collect()
+            }
+        }
+    }
 }
 
 
