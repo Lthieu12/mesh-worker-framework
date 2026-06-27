@@ -37,10 +37,28 @@ MMF uses one Tokio task per module.
 After a module is spawned:
 
 ```text
-MMF
- ├── Registry
- ├── MMFErr
- └── ModuleTask
+                           MMF Runtime
+
+                    ┌────────────────────┐
+                    │        MMF         │
+                    └─────────┬──────────┘
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        │                     │                     │
+        ▼                     ▼                     ▼
+  ┌────────────┐      ┌────────────┐       ┌────────────┐
+  │   MMFMod   │      │   MMFLog   │       │   MMFErr   │
+  └─────┬──────┘      └────────────┘       └────────────┘
+        │
+        │ owns
+        ▼
+  ┌──────────────────────────────────────────────┐
+  │                 ModuleTask                   │
+  └──────────────────┬───────────────────────────┘
+                     │ owns
+                     ▼
+              User Module
+          (implements Module)
 ```
 
 MMF owns:
@@ -92,6 +110,35 @@ on_close()
 
 These lifecycle methods are mandatory.
 
+```text
+              User Application
+
+        ex: AcquisitionModule
+        ex: FFTModule
+        ex: DisplayModule
+             │
+             ▼
+     implements Module trait
+
+             │
+             ▼
+        MMF::spawn_module()
+
+             │
+             ▼
+        creates ModuleTask
+
+             │
+             ▼
+      executes callbacks
+
+        on_init()
+
+        on_message()
+
+        on_close()
+```
+
 ---
 
 # Execution Model
@@ -99,23 +146,33 @@ These lifecycle methods are mandatory.
 A module processes one event at a time.
 
 ```text
-on_init()
+                 ModuleTask
 
-↓
+                    │
 
-Message A
+               on_init()
 
-↓
+                    │
 
-Message B
+         +----------+----------+
+         |                     |
+         ▼                     ▼
 
-↓
+    Priority Queue        Normal Queue
 
-Message C
+         │                     │
+         └──────────┬──────────┘
+                    ▼
 
-↓
+             on_message()
 
-on_close()
+                    │
+
+             on_message()
+
+                    │
+
+               on_close()
 ```
 
 No two callbacks can execute simultaneously on the same module instance.
@@ -174,6 +231,29 @@ ReceiverID
 MessageID
 MessageInstanceID
 MessageData
+```
+
+```text
+User Module A
+      │
+      │ send_message()
+      ▼
++-------------+
+|   MMFMod    |
++-------------+
+      │
+      │ route message
+      ▼
++-------------+
+| ModuleTask  |
++-------------+
+      │
+      │ execute callback
+      ▼
++--------------+
+| User Module B|
+| on_message() |
++--------------+
 ```
 
 MessageData is transported as:

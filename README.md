@@ -13,6 +13,26 @@ MMF provides:
 * Centralized logging and observability
 * Cross-platform support (Windows and Linux)
 
+```text
+                          MMF
+               Framework Entry Point
+      (Initialization / Shutdown / Configuration)
+
+                             │
+         ┌───────────────────┼───────────────────┐
+         │                   │                   │
+         ▼                   ▼                   ▼
+ +----------------+   +----------------+   +----------------+
+ |     MMFMod     |   |     MMFLog     |   |     MMFErr     |
+ +----------------+   +----------------+   +----------------+
+ | Messaging      |   | Log events     |   | Error events   |
+ | Lifecycle      |   | Monitoring     |   | Monitoring     |
+ | Registry       |   | Export         |   | Export         |
+ +----------------+   +----------------+   +----------------+
+```
+
+Throughout this documentation, "Module" always refers to an MMF runtime module, not a Rust language module.
+
 ---
 
 ## 1. Core Principles
@@ -135,25 +155,116 @@ Each error event contains:
 
 ## 4. Logging and Observability
 
-In progress.
+MMF provides a centralized logging and observability system.
+
+Framework lifecycle events and message processing are automatically recorded by MMFLog.
+
+Supported framework events include:
+
+* Module spawn
+* Module initialization
+* Module shutdown
+* Module abort
+* Message reception
+
+Log events are stored in a circular buffer and can be retrieved asynchronously by monitoring tools, loggers or application code.
+
+Each log event contains:
+
+* LogInstanceID
+* Timestamp
+* ModuleID
+* Event
+* SenderID (when applicable)
+* MessageID (when applicable)
+* Priority flag (when applicable)
+* Wait flag (when applicable)
+* Status
+* Duration
 
 ---
 
 ## 5. Architecture Overview
 
+### Runtime architecture
+
 ```text
-MMF Runtime
-│
-├── Registry
-├── MMFErr
-│
-├── Module A
-├── Module B
-├── Module C
-└── Module D
+                           MMF Runtime
+
+                    ┌────────────────────┐
+                    │        MMF         │
+                    └─────────┬──────────┘
+                              │
+      ┌───────────────────────┼────────────────────────┐
+      │                       │                        │
+      ▼                       ▼                        ▼
+┌────────────┐        ┌────────────┐          ┌────────────────┐
+│   MMFMod   │        │   MMFLog   │          │     MMFErr     │
+├────────────┤        ├────────────┤          ├────────────────┤
+│ Registry   │        │ Log buffer │          │ Error buffer   │
+│ Messaging  │        │ Waiters    │          │ Waiters        │
+│ Lifecycle  │        │ Filters    │          │                │
+└─────┬──────┘        └────────────┘          └────────────────┘
+      │
+      ▼
+┌──────────────────────────────────────────────────────────────┐
+│                         ModuleTask                           │
+│                                                              │
+│  • owns the Module instance                                  │
+│  • executes lifecycle callbacks                              │
+└──────────────────────────────┬───────────────────────────────┘
+                               │ owns
+                               ▼
+                   ┌───────────────────────────┐
+                   │        User Module        │
+                   │   (implements Module)     │
+                   ├───────────────────────────┤
+                   │ on_init()                 │
+                   │ on_message()              │
+                   │ on_close()                │
+                   └───────────────────────────┘
 ```
 
+---
+
+### Application architecture
+
+```text
+                      User Application
+
+     ex: CameraModule     ex: FFTModule      ex : DisplayModule
+    (implements Module) (implements Module) (implements Module)
+             │                │                  │
+             └────────────────┼──────────────────┘
+                              │
+                              ▼
+                    MMF::spawn_module(...)
+                              │
+                              ▼
+                    ┌──────────────────┐
+                    │       MMF        │
+                    └────────┬─────────┘
+                             │
+                spawns one Tokio task per module
+                             │
+                             ▼
+        ┌─────────────┬─────────────┬─────────────┐
+        ▼             ▼             ▼
+   +-----------+ +-----------+ +---------------+
+   |ModuleTask | |ModuleTask | |  ModuleTask   |
+   +-----┬-----+ +-----┬-----+ +-------┬-------+
+         │             │               │
+         ▼             ▼               ▼
+   CameraModule    FFTModule     DisplayModule
+```
+
+---
+
+### Architecture main rule
+
 Each module owns its own mailbox and processes messages sequentially.
+
+Parallelism is achieved by running multiple modules concurrently, not by processing multiple messages concurrently inside a single module.
 
 ---
 
@@ -226,7 +337,9 @@ must not execute concurrently.
 
 The project uses the `serial_test` crate and integration tests are annotated with:
 
+```text
 #[serial]
+```
 
 to ensure exclusive access to the MMF runtime during execution.
 
@@ -238,8 +351,11 @@ Running multiple integration tests concurrently could cause
 Framework_AlreadyInitialized errors because several tests would
 attempt to initialize the same MMF runtime simultaneously.
 
+
 For this reason, integration tests using MMF are marked with
-#[serial].
+```text
+#[serial]
+```
 
 ---
 
