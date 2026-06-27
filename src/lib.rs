@@ -30,6 +30,8 @@ pub use module::{
     EntityID,
     ModuleState,
     ModuleStatus,
+    ModuleInfo,
+    ModuleList,
 };
 
 pub use message::{

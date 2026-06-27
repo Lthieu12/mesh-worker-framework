@@ -89,6 +89,24 @@ pub enum ModuleState {
     Closed,
 }
 
+impl ModuleState {
+
+    /// Returns a human-readable representation of the module state.
+    fn to_string(&self) -> &'static str {
+
+        match self {
+
+            ModuleState::Created => "Created",
+            ModuleState::Initializing => "Initializing",
+            ModuleState::InitFailed => "InitFailed",
+            ModuleState::Initialized => "Initialized",
+            ModuleState::Closing => "Closing",
+            ModuleState::CloseFailed => "CloseFailed",
+            ModuleState::Closed => "Closed",
+        }
+    }
+}
+
 
 /// Current status of a module within the framework.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -114,11 +132,111 @@ pub struct ModuleStatus {
 /// - Monitoring.
 /// - User interfaces.
 /// - Logging configuration tools.
+#[derive(Clone)]
 pub struct ModuleInfo {
 
     pub module_id: ModuleID,
     pub father_id: EntityID,
     pub module_state: ModuleState,
+}
+
+impl ModuleInfo {
+
+    /// Converts the module information into a human-readable terminal string.
+    fn to_terminal_string(&self) -> String {
+
+        format!(
+            "{:width_module$} | {:width_father$} | {:width_state$}",
+            EntityID::Module(self.module_id.clone()).to_short_string(
+                terminal_module_column::MODULE_ID_LEN,
+            ),
+            self.father_id.to_short_string(
+                terminal_module_column::FATHER_ID_LEN,
+            ),
+            self.module_state.to_string(),
+            width_module = terminal_module_column::MODULE_ID_LEN,
+            width_father = terminal_module_column::FATHER_ID_LEN,
+            width_state = terminal_module_column::STATE_LEN,
+        )
+    }
+
+    /// Converts the module information into a CSV row.
+    fn to_csv_string(&self) -> String {
+
+        format!(
+            "{},{},{}",
+            string_helper::csv_escape(&self.module_id),
+            string_helper::csv_escape(&self.father_id.to_string()),
+            string_helper::csv_escape(self.module_state.to_string()),
+        )
+    }
+
+}
+
+/// Output format used to represent module information.
+pub enum ModuleOutputFormat {
+
+    Terminal,
+    CSV,
+}
+
+/// Terminal module column widths.
+mod terminal_module_column {
+
+    pub(crate) const MODULE_ID_LEN: usize = 30;
+    pub(crate) const FATHER_ID_LEN: usize = 30;
+    pub(crate) const STATE_LEN: usize = 12;
+}
+
+
+/// List of module information returned by MMFMod.
+pub struct ModuleList {
+
+    pub module_info_list: Vec<ModuleInfo>,
+}
+
+impl ModuleList {
+
+        /// Returns the column header corresponding to the requested format.
+    pub fn get_header(format: ModuleOutputFormat) -> String {
+
+        match format {
+
+            ModuleOutputFormat::Terminal => format!(
+                "{:<width_module$} | {:<width_father$} | {:<width_state$}",
+                "ModuleID",
+                "FatherID",
+                "State",
+                width_module = terminal_module_column::MODULE_ID_LEN,
+                width_father = terminal_module_column::FATHER_ID_LEN,
+                width_state = terminal_module_column::STATE_LEN,
+            ),
+
+            ModuleOutputFormat::CSV => {
+                String::from("ModuleID,FatherID,State")
+            }
+        }
+    }
+
+    /// Converts a module information list into strings.
+    pub fn to_string_list(module_info_list: &Vec<ModuleInfo>, format: ModuleOutputFormat) -> Vec<String> {
+
+        let mut module_info_list = module_info_list.clone();
+        module_info_list.sort_by(|a, b| a.module_id.cmp(&b.module_id));
+
+        match format {
+
+            ModuleOutputFormat::Terminal => {
+
+                module_info_list.iter().map(|module_info| module_info.to_terminal_string()).collect()
+            }
+
+            ModuleOutputFormat::CSV => {
+
+                module_info_list.iter().map(|module_info| module_info.to_csv_string()).collect()
+            }
+        }
+    }
 }
 
 
