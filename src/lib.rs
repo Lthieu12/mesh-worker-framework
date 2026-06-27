@@ -6,6 +6,7 @@ mod module_task;
 mod framework_error;
 mod module;
 mod message;
+mod string_helper;
 
 pub mod mmf;
 pub mod mmf_mod;

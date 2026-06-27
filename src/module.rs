@@ -6,6 +6,7 @@
 use async_trait::async_trait;
 
 use crate::message::FrameworkMessage;
+use crate::string_helper;
 
 /// Unique identifier of a module instance.
 pub type ModuleID = String;
@@ -22,6 +23,52 @@ pub enum EntityID {
     /// External entity not managed by MMF.
     External(String),
 }
+
+impl EntityID {
+
+    /// Returns a human-readable representation of the entity.
+    pub(crate) fn to_string(&self) -> String {
+
+        match self {
+
+            EntityID::Module(module_id) => module_id.to_string(),
+            EntityID::External(name) => name.clone(),
+        }
+    }
+
+
+    /// Returns a shortened human-readable representation of the entity.
+    ///
+    /// Module entities preserve the instance suffix whenever possible.
+    /// External entities are truncated at the end.
+    pub(crate) fn to_short_string(&self, max_len: usize) -> String {
+
+        match self {
+
+            EntityID::Module(module_id) => {
+
+                let text = module_id.to_string();
+                if text.len() <= max_len {
+                    return text;
+                }
+
+                // Keep the instance suffix (":000001") visible.
+                const SUFFIX_LEN: usize = 7;
+                if max_len <= SUFFIX_LEN + 3 {
+                    return text[..max_len].to_string();
+                }
+                let prefix_len = max_len - SUFFIX_LEN - 3;
+                format!("{}...{}", &text[..prefix_len], &text[text.len() - SUFFIX_LEN..])
+            }
+
+            EntityID::External(text) => {
+
+                string_helper::to_short_string(text, max_len)
+            }
+        }
+    }
+}
+
 
 /// Current state of a module within the framework.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
