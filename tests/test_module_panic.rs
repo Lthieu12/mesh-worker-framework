@@ -24,7 +24,7 @@ async fn test_module_message_panic() {
     let module_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 0, 0, SimulationBehavior::Message_Panic, false, None).await.unwrap();
 
     MMFMod::init_module(&module_id).await.unwrap();
-    MMFMod::wait_module_list_init(&vec![module_id.clone()], Some(1000)).await.unwrap();
+    MMFMod::wait_module_init(&module_id, Some(1000)).await.unwrap();
 
     // Trigger the panic.
     MMFMod::send_message(&EntityID::External("MAIN".to_string()), &module_id, &"TEST".to_string(), bytes::Bytes::new()).await.unwrap();
