@@ -15,7 +15,7 @@ pub type MessageID = String;
 /// tracing and request/reply correlation.
 pub type MessageInstanceID = u64;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 /// Message exchanged between modules through MMF.
 pub struct FrameworkMessage {
 

@@ -132,7 +132,7 @@ pub struct ModuleStatus {
 /// - Monitoring.
 /// - User interfaces.
 /// - Logging configuration tools.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ModuleInfo {
 
     pub module_id: ModuleID,
@@ -174,6 +174,7 @@ impl ModuleInfo {
 }
 
 /// Output format used to represent module information.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ModuleOutputFormat {
 
     Terminal,
@@ -190,6 +191,7 @@ mod terminal_module_column {
 
 
 /// List of module information returned by MMFMod.
+#[derive(Debug, Clone)]
 pub struct ModuleList {
 
     pub module_info_list: Vec<ModuleInfo>,
@@ -213,7 +215,7 @@ impl ModuleList {
             ),
 
             ModuleOutputFormat::CSV => {
-                
+
                 String::from("ModuleID,FatherID,State")
             }
         }

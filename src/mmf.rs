@@ -53,6 +53,7 @@ pub(crate) static MMF_LOG_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 
 /// MMF startup configuration.
+#[derive(Debug, Clone)]
 pub struct MMFConfiguration {
 
     /// Capacity of normal module event queues.

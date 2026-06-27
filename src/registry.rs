@@ -52,6 +52,7 @@ impl RegistryEntry {
 }
 
 /// Stores all modules known by the framework.
+#[derive(Debug)]
 pub(crate) struct Registry {
 
     /// Maps a ModuleID to its registry entry.

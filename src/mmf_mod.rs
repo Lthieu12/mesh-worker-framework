@@ -18,6 +18,7 @@ use crate::channel::{ModuleCommand, ModuleNormalSenderChannel, ModulePrioritySen
 use crate::message::{FrameworkMessage, MessageID, MessageInstanceID};
 
 /// Internal MMFMod runtime data.
+#[derive(Debug)]
 pub(crate) struct ModuleData {
 
     /// Registered modules and hierarchy information.
