@@ -200,7 +200,7 @@ impl MMFErr {
     ///
     /// Error events are stored in a circular buffer and
     /// notify all MMFErr waiters.
-    pub fn add_error(sender_id: EntityID, error: &ModuleError) -> Result<(), FrameworkError> {
+    pub fn add_error(sender_id: &EntityID, error: &ModuleError) -> Result<(), FrameworkError> {
 
         let error_instance_id = MMFErr::generate_error_instance_id()?;
         let error_message = error.to_string();
@@ -219,7 +219,7 @@ impl MMFErr {
 
             error_instance_id,
             timestamp_rfc3339,
-            sender_id,
+            sender_id: sender_id.clone(),
             error_message,
             error_source_list,
         };

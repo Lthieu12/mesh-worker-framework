@@ -404,7 +404,7 @@ impl MMFMod {
 
                     // Closing is complete only when all modules
                     // have either been removed from the Registry
-                    // or reached the CloseFailed state.
+                    // or reached the CloseFailed or the Panicked state.
                     for module_id in module_ids {
 
                         match mmf_data.registry.get_module_state(module_id) {

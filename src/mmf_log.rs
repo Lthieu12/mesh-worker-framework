@@ -47,6 +47,7 @@ pub enum LogAction {
     ModuleInit,
     ModuleClose,
     ModuleAbort,
+    ModulePanic,
     ReceiveMessage {
 
         sender_id: EntityID,
@@ -115,6 +116,7 @@ impl LogEvent{
             LogAction::ModuleInit => ("INIT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
             LogAction::ModuleClose => ("CLOSE", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
             LogAction::ModuleAbort => ("ABORT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
+            LogAction::ModulePanic => ("PANIC", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
             LogAction::ReceiveMessage {
                 sender_id,
                 message_id,
@@ -175,6 +177,7 @@ impl LogEvent{
             LogAction::ModuleInit => ("INIT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
             LogAction::ModuleClose => ("CLOSE", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
             LogAction::ModuleAbort => ("ABORT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
+            LogAction::ModulePanic => ("PANIC", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
             LogAction::ReceiveMessage {
                 sender_id,
                 message_id,

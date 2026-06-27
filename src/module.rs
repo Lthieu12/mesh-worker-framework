@@ -87,6 +87,8 @@ pub enum ModuleState {
     CloseFailed,
     /// Module has been closed and is not usable anymore.
     Closed,
+    /// Module has panicked and is not usable anymore.
+    Panicked,
 }
 
 impl ModuleState {
@@ -103,6 +105,7 @@ impl ModuleState {
             ModuleState::Closing => "Closing",
             ModuleState::CloseFailed => "CloseFailed",
             ModuleState::Closed => "Closed",
+            ModuleState::Panicked => "Panicked",
         }
     }
 }

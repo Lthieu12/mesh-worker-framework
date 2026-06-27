@@ -54,6 +54,9 @@ pub enum FrameworkError {
     /// The requested module has not been initialized.
     Module_NotInitialized,
 
+    /// A module has panicked.
+    Module_Panicked(anyhow::Error),
+
     /// Error returned by a module while processing
     /// a message sent through send_message_and_wait_reply().
     Module_MessageError(anyhow::Error),
@@ -113,6 +116,10 @@ impl fmt::Display for FrameworkError {
 
             FrameworkError::Module_NotInitialized =>
                 write!(f, "The requested module has not been initialized."),
+
+            FrameworkError::Module_Panicked(panic_message) => {
+                write!(f, "A module has panicked: {}", panic_message)
+            },
 
             FrameworkError::Module_MessageError(error) =>
                 write!(f, "Module message processing failed: {}", error),

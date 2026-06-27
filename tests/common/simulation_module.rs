@@ -46,6 +46,7 @@ pub enum SimulationBehavior {
 
     Message_Fail,
 
+    Message_Panic,
 }
 
 pub struct SimulationModule {
@@ -147,6 +148,11 @@ impl Module for SimulationModule {
             SimulationBehavior::Message_Fail => {
                 
                 return Err(anyhow::anyhow!("Simulation message failure"));
+            }
+
+            SimulationBehavior::Message_Panic => {
+                
+                panic!("Simulation message panic");
             }
 
             _ => {} 
