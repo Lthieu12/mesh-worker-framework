@@ -277,9 +277,6 @@ pub trait Module {
 
     /// Unique identifier of this module type.
     ///
-    /// This identifier is used by MMFFlow to instantiate modules from a
-    /// workflow definition.
-    ///
     /// Every module implementation must provide a unique ModuleTypeID.
     const MODULE_TYPE_ID: ModuleTypeID;
 
