@@ -60,7 +60,7 @@ impl ErrorEvent {
 
         let root_error_source = string_helper::error_root_source(&self.error_source_list);
         format!(
-            "{:0width_id$} | {:width_time$} | {:width_sender$} | {:width_message$} | {}",
+            "{:0width_id$} | {:width_time$} | {:width_sender$} | {:width_message$} | {:width_source$}",
             self.error_instance_id,
             &self.timestamp_rfc3339[11..23],
             self.sender_id.to_short_string(terminal_error_column::SENDER_ID_LEN),
@@ -70,6 +70,7 @@ impl ErrorEvent {
             width_time = terminal_error_column::TIME_LEN,
             width_sender = terminal_error_column::SENDER_ID_LEN,
             width_message = terminal_error_column::MESSAGE_LEN,
+            width_source = terminal_error_column::SOURCE_LEN,
         )
     }
 
@@ -141,15 +142,17 @@ impl ErrorList {
             ErrorOutputFormat::Terminal => {
                 
                 let header = format!(
-                    "{:<width_id$} | {:<width_time$} | {:<width_sender$} | {:<width_message$} | Source",
+                    "{:<width_id$} | {:<width_time$} | {:<width_sender$} | {:<width_message$} | {:<width_source$}",
                     "ErrorID",
                     "Time",
                     "SenderID",
                     "Message",
+                    "Source",
                     width_id = terminal_error_column::ERROR_ID_LEN,
                     width_time = terminal_error_column::TIME_LEN,
                     width_sender = terminal_error_column::SENDER_ID_LEN,
                     width_message = terminal_error_column::MESSAGE_LEN,
+                    width_source = terminal_error_column::SOURCE_LEN,
                 );
 
                 let separator = "-".repeat(header.len());
@@ -199,23 +202,30 @@ impl MMFErr {
     }
 
 
+    
     /// Record a new error event.
     ///
-    /// This function can be used by MMF internally to
-    /// record errors returned by module callbacks
-    /// (on_init(), on_message() and on_close()), or by
-    /// application code to report custom errors through
-    /// the MMFErr infrastructure.
+    /// This internal function is used by MMF to enrich error
+    /// events with framework-specific context, such as the
+    /// module callback where the error occurred.
+    ///
+    /// Application code should use `add_error()` instead.
     ///
     /// Error events are stored in a circular buffer and
     /// notify all MMFErr waiters.
-    pub fn add_error(sender_id: &EntityID, error: &ModuleError) -> Result<(), FrameworkError> {
+    pub(crate) fn add_error_internal(sender_id: &EntityID, callback_name: Option<&'static str>, error: &ModuleError) -> Result<(), FrameworkError> {
 
         let error_instance_id = MMFErr::generate_error_instance_id()?;
         let error_message = error.to_string();
-        let mut error_source_list = Vec::new();
-        let mut source = error.source();
 
+        let mut error_source_list = Vec::new();
+
+        // Record the MMF callback that generated the error.
+        if let Some(callback_name) = callback_name {
+            error_source_list.push(callback_name.to_string());
+        }
+
+        let mut source = error.source();
         while let Some(error_source) = source {
 
             error_source_list.push(error_source.to_string());
@@ -254,6 +264,23 @@ impl MMFErr {
         MMF_ERR_NOTIFY.notify_waiters();
 
         Ok(())
+    }
+
+
+    /// Record a new application error event.
+    ///
+    /// This function allows application code to report
+    /// custom errors through the MMFErr infrastructure.
+    ///
+    /// MMF internal errors are recorded through a dedicated
+    /// internal API that automatically enriches the error
+    /// context.
+    ///
+    /// Error events are stored in a circular buffer and
+    /// notify all MMFErr waiters.
+    pub fn add_error(sender_id: &EntityID, error: &ModuleError) -> Result<(), FrameworkError> {
+
+        MMFErr::add_error_internal(&sender_id, None, error)
     }
 
 
