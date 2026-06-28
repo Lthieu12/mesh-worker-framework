@@ -103,6 +103,8 @@ impl SimulationModule {
 #[async_trait]
 impl Module for SimulationModule {
 
+    const MODULE_TYPE_ID: ModuleTypeID = "SimulationModule";
+
     async fn on_init(&mut self, module_id: &ModuleID, father_id: &EntityID) -> Result<(), ModuleError> {
 
         // Store runtime identifiers provided by MMF.

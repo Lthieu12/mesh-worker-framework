@@ -70,6 +70,8 @@ impl MessageRecorderModule {
 #[async_trait]
 impl Module for MessageRecorderModule {
 
+    const MODULE_TYPE_ID: ModuleTypeID = "MessageRecorderModule";
+
     async fn on_init(&mut self, module_id: &ModuleID, father_id: &EntityID) -> Result<(), ModuleError> {
 
         self.module_id = Some(module_id.clone());

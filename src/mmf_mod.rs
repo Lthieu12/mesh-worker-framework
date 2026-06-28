@@ -120,13 +120,23 @@ impl MMFMod {
         //
         // The Registry stores:
         // - Module hierarchy information.
-        // - Module state.
+        // - Module state. 
         // - Communication channels.
         // - JoinHandle associated with the Tokio task.
-        if let Err(error) = mmf_data.registry.add_module(&module_id, &father_id, normal_sender_channel, priority_sender_channel, join_handle) {
+        match mmf_data.registry.add_module(&module_id, T::MODULE_TYPE_ID, std::any::type_name::<T>(), &father_id, normal_sender_channel, priority_sender_channel, join_handle) {
 
-            MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleSpawn, LogStatus::Error)?;
-            return Err(error);
+            Ok(()) => {}
+
+            Err((error, join_handle)) => {
+
+                // Abort the spawned Tokio task to avoid leaving
+                // an orphan module running.
+                join_handle.abort();
+
+                MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleSpawn, LogStatus::Error)?;
+
+                return Err(error);
+            }
         }
 
         MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleSpawn, LogStatus::Ok)?;

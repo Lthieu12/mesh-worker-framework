@@ -26,6 +26,7 @@ pub use module::ModuleError;
 
 pub use module::{
     Module,
+    ModuleTypeID,
     ModuleID,
     EntityID,
     ModuleState,

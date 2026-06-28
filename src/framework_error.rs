@@ -45,6 +45,9 @@ pub enum FrameworkError {
     /// A module communication channel is closed.
     Module_ChannelClosed,
 
+    /// ModuleTypeID is already used by another module type.
+    Module_DuplicateModuleTypeID,
+
     /// The requested module already exists.
     Module_AlreadyExists,
 
@@ -107,6 +110,9 @@ impl fmt::Display for FrameworkError {
 
             FrameworkError::Module_ChannelClosed =>
                 write!(f, "A module communication channel is closed."),
+
+            FrameworkError::Module_DuplicateModuleTypeID =>
+                write!(f, "ModuleTypeID is already used by another module type."),
 
             FrameworkError::Module_AlreadyExists =>
                 write!(f, "The requested module already exists."),

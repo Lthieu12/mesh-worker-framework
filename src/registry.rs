@@ -7,12 +7,18 @@ use std::collections::HashMap;
 use tokio::task::JoinHandle;
 
 use crate::channel::{ModuleNormalSenderChannel, ModulePrioritySenderChannel};
-use crate::module::{Module, ModuleID, EntityID, ModuleState, ModuleInfo};
+use crate::module::{Module, ModuleTypeID, ModuleID, EntityID, ModuleState, ModuleInfo};
 use crate::framework_error::{FrameworkError, MMFPanic};
 
 /// Information associated with a registered module.
 #[derive(Debug)]
 pub(crate) struct RegistryEntry {
+
+    /// Public identifier of the module type.
+    pub(crate) module_type_id: ModuleTypeID,
+
+    /// Fully qualified Rust type name of the module.
+    module_type_name: &'static str,
 
     /// Identifier of the entity that spawned this module.
     father_id: EntityID,
@@ -35,6 +41,8 @@ impl RegistryEntry {
 
     /// Create a registry entry for a newly created module.
     fn new(
+        module_type_id: ModuleTypeID,
+        module_type_name: &'static str,
         father_id: EntityID,
         normal_sender_channel: ModuleNormalSenderChannel,
         priority_sender_channel: ModulePrioritySenderChannel,
@@ -42,6 +50,8 @@ impl RegistryEntry {
     ) -> Self {
 
         Self {
+            module_type_id,
+            module_type_name,
             father_id,
             module_state: ModuleState::Created,
             normal_sender_channel,
@@ -157,11 +167,24 @@ impl Registry {
 
 
     /// Register a newly created module.
-    pub(crate) fn add_module(&mut self, module_id: &ModuleID, father_id: &EntityID, normal_sender_channel: ModuleNormalSenderChannel, priority_sender_channel: ModulePrioritySenderChannel, join_handle: JoinHandle<()>) -> Result<(), FrameworkError> {
+    pub(crate) fn add_module(&mut self, module_id: &ModuleID, module_type_id: ModuleTypeID, module_type_name: &'static str, father_id: &EntityID, normal_sender_channel: ModuleNormalSenderChannel, priority_sender_channel: ModulePrioritySenderChannel, join_handle: JoinHandle<()>) -> Result<(), (FrameworkError, JoinHandle<()>)> {
         
         // Prevent duplicate ModuleIDs.
         if self.module_map.contains_key(module_id) {
-            return Err(FrameworkError::Module_AlreadyExists);
+            return Err((FrameworkError::Module_AlreadyExists, join_handle));
+        }
+
+        // Prevent different Rust module types from sharing
+        // the same ModuleTypeID.
+        for registry_entry in self.module_map.values() {
+
+            if registry_entry.module_type_id == module_type_id {
+
+                if registry_entry.module_type_name != module_type_name {
+
+                    return Err((FrameworkError::Module_DuplicateModuleTypeID, join_handle));
+                }
+            }
         }
 
         // Validate the parent entity.
@@ -174,14 +197,14 @@ impl Registry {
         match father_id {
             EntityID::Module(father_id_ref) => {
                 if !Registry::contains_module(&self, father_id_ref) {
-                    return Err(FrameworkError::FatherModule_NotFound);
+                    return Err((FrameworkError::FatherModule_NotFound, join_handle));
                 }
             }
             EntityID::External(_) => {}
         }
 
         // Create the Registry entry associated with the module.
-        let registry_entry = RegistryEntry::new(father_id.clone(), normal_sender_channel, priority_sender_channel, join_handle);
+        let registry_entry = RegistryEntry::new(module_type_id, module_type_name, father_id.clone(), normal_sender_channel, priority_sender_channel, join_handle);
         // Register the module.
         self.module_map.insert(module_id.clone(), registry_entry);
 

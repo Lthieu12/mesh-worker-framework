@@ -8,6 +8,25 @@ use async_trait::async_trait;
 use crate::message::FrameworkMessage;
 use crate::string_helper;
 
+/// Unique identifier of a module type.
+///
+/// A ModuleTypeID identifies a module *type*, not a module instance.
+///
+/// It is used by MMFFlow to instantiate modules from workflow definitions
+/// and by MMF to register module factories.
+///
+/// Rules:
+/// - Must be unique across the whole application.
+/// - Should remain stable between software versions if persisted in workflow definitions.
+/// - Is case-sensitive.
+///
+/// Examples:
+/// - "Acquisition"
+/// - "Filtering"
+/// - "FFT"
+/// - "SimulationModule"
+pub type ModuleTypeID = &'static str;
+
 /// Unique identifier of a module instance.
 pub type ModuleID = String;
 
@@ -249,6 +268,14 @@ impl ModuleList {
 /// Interface that must be implemented by all MMF modules.
 #[async_trait]
 pub trait Module {
+
+    /// Unique identifier of this module type.
+    ///
+    /// This identifier is used by MMFFlow to instantiate modules from a
+    /// workflow definition.
+    ///
+    /// Every module implementation must provide a unique ModuleTypeID.
+    const MODULE_TYPE_ID: ModuleTypeID;
 
     /// Called once when the module is initialized.
     async fn on_init(&mut self, module_id: &ModuleID, father_id: &EntityID) -> Result<(), ModuleError>;

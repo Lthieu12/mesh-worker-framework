@@ -43,7 +43,7 @@ use crate::mmf_log::{LogAction, LogStatus};
 /// The spawned Tokio task executes the complete module lifecycle,
 /// including initialization, message processing and shutdown.
 pub(crate) fn spawn_module_task<T>(module: T, normal_receiver_channel: ModuleNormalReceiverChannel, priority_receiver_channel: ModulePriorityReceiverChannel, module_id:ModuleID, father_id:EntityID) -> JoinHandle<()>
-where T: Module + Send + 'static{
+where T: Module + Send + 'static {
    
     tokio::spawn(async move {
 
