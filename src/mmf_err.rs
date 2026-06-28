@@ -132,6 +132,19 @@ pub struct ErrorList {
     pub error_event_list: Vec<ErrorEvent>,
 }
 
+impl std::fmt::Display for ErrorList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+
+        writeln!(f)?;
+        writeln!(f, "{}", Self::get_header(ErrorOutputFormat::Terminal))?;
+
+        for line in self.to_string_list(ErrorOutputFormat::Terminal) {
+            writeln!(f, "{line}")?;
+        }
+        Ok(())
+    }
+}
+
 impl ErrorList {
 
     /// Returns the column header corresponding to the requested format.

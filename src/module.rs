@@ -218,6 +218,19 @@ pub struct ModuleList {
     pub module_info_list: Vec<ModuleInfo>,
 }
 
+impl std::fmt::Display for ModuleList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+
+        writeln!(f)?;
+        writeln!(f, "{}", Self::get_header(ModuleOutputFormat::Terminal))?;
+
+        for line in self.to_string_list(ModuleOutputFormat::Terminal) {
+            writeln!(f, "{line}")?;
+        }
+        Ok(())
+    }
+}
+
 impl ModuleList {
 
     /// Returns the column header corresponding to the requested format.

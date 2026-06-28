@@ -251,6 +251,19 @@ pub struct LogList {
     pub log_event_list: Vec<LogEvent>,
 }
 
+impl std::fmt::Display for LogList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+
+        writeln!(f)?;
+        writeln!(f, "{}", Self::get_header(LogOutputFormat::Terminal))?;
+
+        for line in self.to_string_list(LogOutputFormat::Terminal) {
+            writeln!(f, "{line}")?;
+        }
+        Ok(())
+    }
+}
+
 impl LogList {
 
     /// Returns the column header corresponding to the requested format.
