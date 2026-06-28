@@ -23,7 +23,9 @@ use common::simulation_module::{SimulationModule, SimulationBehavior};
 #[tokio::test]
 #[serial]
 async fn test_module_timeout_init() {
+    
     MMF::init().unwrap();
+    MMF::register_module_type::<SimulationModule>().unwrap();
 
     // Very long init
     let module_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 5_000, 0, SimulationBehavior::DoNothing, false, None).await.unwrap();
@@ -45,7 +47,9 @@ async fn test_module_timeout_init() {
 #[tokio::test]
 #[serial]
 async fn test_module_timeout_close() {
+    
     MMF::init().unwrap();
+    MMF::register_module_type::<SimulationModule>().unwrap();
 
     // Very long close
     let module_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 0, 5_000, SimulationBehavior::DoNothing, false, None).await.unwrap();

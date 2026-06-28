@@ -8,11 +8,11 @@ use std::sync::atomic::Ordering;
 use std::time::Instant;
 
 use crate::MMFLog;
-use crate::mmf::{MMFConfiguration, MMF_MOD_DATA, MMF_MOD_MESSAGE_INSTANCE_COUNTER, MMF_MOD_INIT_NOTIFY, MMF_MOD_CLOSE_NOTIFY};
+use crate::mmf::{MMFConfiguration, MMF_DATA, MMF_MOD_DATA, MMF_MOD_MESSAGE_INSTANCE_COUNTER, MMF_MOD_INIT_NOTIFY, MMF_MOD_CLOSE_NOTIFY};
 use crate::mmf_log::{LogAction, LogStatus};
 use crate::framework_error::{FrameworkError, MMFPanic};
 use crate::module::{Module, ModuleID, EntityID, ModuleState, ModuleStatus, ModuleError, ModuleList};
-use crate::registry::Registry;
+use crate::module_registry::Registry;
 use crate::module_task::spawn_module_task;
 use crate::channel::{ModuleCommand, ModuleNormalSenderChannel, ModulePrioritySenderChannel};
 use crate::message::{FrameworkMessage, MessageID, MessageInstanceID};
@@ -22,7 +22,7 @@ use crate::message::{FrameworkMessage, MessageID, MessageInstanceID};
 pub(crate) struct ModuleData {
 
     /// Registered modules and hierarchy information.
-    pub(crate) registry: Registry,
+    pub(crate) module_registry: Registry,
 
     /// Capacity of normal module event queues.
     pub(crate) module_normal_channel_capacity: usize,
@@ -37,7 +37,7 @@ impl ModuleData {
     pub(crate) fn new(mmf_configuration: &MMFConfiguration) -> Self {
         
         Self {
-            registry: Registry::new(),
+            module_registry: Registry::new(),
             module_normal_channel_capacity: mmf_configuration.module_normal_channel_capacity,
             module_priority_channel_capacity: mmf_configuration.module_priority_channel_capacity,
         }
@@ -65,6 +65,9 @@ impl MMFMod {
 
     /// Create and register a new module instance.
     ///
+    /// The module type must have been previously
+    /// registered using MMF::register_module_type().
+    /// 
     /// Steps:
     /// 1. Generate a unique ModuleID.
     /// 2. Create communication channels used by MMF.
@@ -77,7 +80,18 @@ impl MMFMod {
     pub fn spawn_module<T>(module: T, father_id: &EntityID) -> Result<ModuleID, FrameworkError>
     where T: Module + Send + 'static {
 
-        let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
+        // Ensure the framework has been initialized.
+        let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+        let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+        
+        // Ensure the module type has been registered.
+        if !mmf_data.module_type_registry.contains_module_type(T::MODULE_TYPE_ID) {
+            
+            return Err(FrameworkError::ModuleType_NotRegistered);
+        }
+        drop(mmf_data_guard);
+
+        let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
         
         // Child modules can only be attached to an
@@ -89,7 +103,7 @@ impl MMFMod {
 
             EntityID::Module(father_id_ref) => {
 
-                let module_state = mmf_data.registry.get_module_state(father_id_ref)?;
+                let module_state = mmf_data.module_registry.get_module_state(father_id_ref)?;
 
                 if module_state != ModuleState::Initialized {
 
@@ -100,7 +114,7 @@ impl MMFMod {
             EntityID::External(_) => {}
         }
         
-        let module_id = mmf_data.registry.generate_module_id::<T>();
+        let module_id = mmf_data.module_registry.generate_module_id(T::MODULE_TYPE_ID);
 
         let action_start_timer = Instant::now();
         
@@ -123,7 +137,7 @@ impl MMFMod {
         // - Module state. 
         // - Communication channels.
         // - JoinHandle associated with the Tokio task.
-        match mmf_data.registry.add_module(&module_id, T::MODULE_TYPE_ID, std::any::type_name::<T>(), &father_id, normal_sender_channel, priority_sender_channel, join_handle) {
+        match mmf_data.module_registry.add_module(&module_id, T::MODULE_TYPE_ID, &father_id, normal_sender_channel, priority_sender_channel, join_handle) {
 
             Ok(()) => {}
 
@@ -150,9 +164,9 @@ impl MMFMod {
     /// Get the current status of a module.
     pub fn get_module_status(module_id: &ModuleID) -> Result<ModuleStatus, FrameworkError> {
 
-        let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+        let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
-        let registry_entry = mmf_data.registry.get_registry_entry(module_id)?;
+        let registry_entry = mmf_data.module_registry.get_registry_entry(module_id)?;
         let normal_channel_capacity = mmf_data.module_normal_channel_capacity;
         let priority_channel_capacity = mmf_data.module_priority_channel_capacity;
         let normal_channel_size = normal_channel_capacity - registry_entry.normal_sender_channel.capacity();
@@ -185,11 +199,33 @@ impl MMFMod {
     /// been initialized through MMF::init().
     pub fn get_module_info_list() -> Result<ModuleList, FrameworkError> {
 
-        let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+        let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
 
-        Ok(ModuleList {module_info_list: mmf_data.registry.get_module_info_list()})
-    }     
+        Ok(ModuleList {module_info_list: mmf_data.module_registry.get_module_info_list()})
+    } 
+
+
+    /// Get the Rust type name associated with a module.
+    ///
+    /// Returns:
+    /// - Framework_NotInitialized if MMF has not been initialized.
+    /// - Module_NotFound if the module does not exist.
+    pub fn get_module_rust_type_name(module_id: &ModuleID) -> Result<&'static str, FrameworkError> {
+
+        // Get the ModuleTypeID associated with the module.
+        let mmf_mod_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
+        let mmf_mod_data = mmf_mod_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let module_type_id = mmf_mod_data.module_registry.get_module_type_id(module_id)?;
+        drop(mmf_mod_data_guard);
+
+        // Get the Rust type name associated with the ModuleTypeID.
+        let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+        let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let module_rust_type_name = mmf_data.module_type_registry.get_module_rust_type_name(module_type_id)?;
+
+        Ok(module_rust_type_name)
+    }    
 
 
     /// Request module initialization.
@@ -204,14 +240,14 @@ impl MMFMod {
         // associated with the target module.
         //
         // Only modules in the Created state can be initialized.
-        let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
+        let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
-        let module_state = mmf_data.registry.get_module_state(module_id)?;
+        let module_state = mmf_data.module_registry.get_module_state(module_id)?;
         if module_state != ModuleState::Created {
             return Err(FrameworkError::Module_AlreadyInitialized);
         }
-        mmf_data.registry.set_module_state(module_id, ModuleState::Initializing)?;
-        let normal_sender_channel = mmf_data.registry.get_module_normal_channel(module_id)?;
+        mmf_data.module_registry.set_module_state(module_id, ModuleState::Initializing)?;
+        let normal_sender_channel = mmf_data.module_registry.get_module_normal_channel(module_id)?;
         drop(mmf_data_guard);
 
         // Send the Init command to ModuleTask.
@@ -233,14 +269,14 @@ impl MMFMod {
         // associated with the target module.
         //
         // Only modules in the Initialized state can be closed.
-        let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
+        let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
-        let module_state = mmf_data.registry.get_module_state(module_id)?;
+        let module_state = mmf_data.module_registry.get_module_state(module_id)?;
         if module_state != ModuleState::Initialized {
             return Err(FrameworkError::Module_NotInitialized);
         }
-        mmf_data.registry.set_module_state(module_id, ModuleState::Closing)?;
-        let normal_sender_channel = mmf_data.registry.get_module_normal_channel(module_id)?;
+        mmf_data.module_registry.set_module_state(module_id, ModuleState::Closing)?;
+        let normal_sender_channel = mmf_data.module_registry.get_module_normal_channel(module_id)?;
         drop(mmf_data_guard);
 
         // Send the Close command to ModuleTask.
@@ -253,9 +289,9 @@ impl MMFMod {
     /// Get the FatherID of a module.
     pub fn get_father_id(module_id: &ModuleID) -> Result<EntityID, FrameworkError>{
         
-        let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+        let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
-        let father_id = mmf_data.registry.get_father_id(module_id)?;
+        let father_id = mmf_data.module_registry.get_father_id(module_id)?;
         drop(mmf_data_guard);
 
         Ok(father_id)
@@ -265,19 +301,19 @@ impl MMFMod {
     /// Get the child ModuleIDs of an entity.
     pub fn get_children_ids(entity_id: &EntityID) -> Result<Vec<ModuleID>, FrameworkError> {
         
-        let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+        let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
 
-        mmf_data.registry.get_children_ids(entity_id)
+        mmf_data.module_registry.get_children_ids(entity_id)
     }
 
 
     /// Get the number of child modules of an entity.
     pub fn get_children_count(entity_id: &EntityID) -> Result<usize, FrameworkError> {
 
-        let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+        let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
-        let children_count = mmf_data.registry.get_children_count(entity_id)?;
+        let children_count = mmf_data.module_registry.get_children_count(entity_id)?;
         drop(mmf_data_guard);
         Ok(children_count)
     }
@@ -304,7 +340,7 @@ impl MMFMod {
                 // next notification.
                 let (all_init_finished, one_init_failed) = {
 
-                    let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+                    let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
                     let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
 
                     let mut all_init_finished = true;
@@ -314,7 +350,7 @@ impl MMFMod {
                     // have reached the Initialized or InitFailed state.
                     for module_id in module_ids {
 
-                        match mmf_data.registry.get_module_state(module_id)? {
+                        match mmf_data.module_registry.get_module_state(module_id)? {
 
                             ModuleState::Initialized => {}
 
@@ -406,7 +442,7 @@ impl MMFMod {
                 // next notification.
                 let (all_close_finished, one_close_failed) = {
 
-                    let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+                    let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
                     let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
 
                     let mut all_close_finished = true;
@@ -417,7 +453,7 @@ impl MMFMod {
                     // or reached the CloseFailed or the Panicked state.
                     for module_id in module_ids {
 
-                        match mmf_data.registry.get_module_state(module_id) {
+                        match mmf_data.module_registry.get_module_state(module_id) {
 
                             // A module not found has been properly closed.
                             Err(FrameworkError::Module_NotFound) => {}
@@ -500,14 +536,14 @@ impl MMFMod {
     /// when normal shutdown has failed.
     pub fn abort_module_list(module_ids: &Vec<ModuleID>) -> Result<(), FrameworkError> {
 
-        let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
+        let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
 
         for module_id in module_ids {
 
             let action_start_timer = Instant::now();
             
-            let join_handle = match mmf_data.registry.take_join_handle(module_id) {
+            let join_handle = match mmf_data.module_registry.take_join_handle(module_id) {
 
                 Ok(join_handle) => join_handle,
 
@@ -522,7 +558,7 @@ impl MMFMod {
             join_handle.abort();
 
             // Remove the module from the Registry.
-            if let Err(error) = mmf_data.registry.remove_module(module_id) {
+            if let Err(error) = mmf_data.module_registry.remove_module(module_id) {
 
                 MMFLog::add_log(action_start_timer, module_id, LogAction::ModuleAbort, LogStatus::Error)?;
                 return Err(error);
@@ -578,7 +614,7 @@ impl MMFMod {
             //
             // send_message() only requires a read lock because it does
             // not modify the Registry or ModuleState.
-            let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+            let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
 
             let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
 
@@ -590,7 +626,7 @@ impl MMFMod {
             // External senders are not validated.
             match sender_id {
                 EntityID::Module(module_id) => {
-                    let module_state = mmf_data.registry.get_module_state(module_id)?;
+                    let module_state = mmf_data.module_registry.get_module_state(module_id)?;
                     if module_state != ModuleState::Initialized {
                         return Err(FrameworkError::Module_NotInitialized);
                     }
@@ -601,7 +637,7 @@ impl MMFMod {
             // Validate the receiver module state.
             //
             // Messages can only be sent to initialized modules.
-            let module_state = mmf_data.registry.get_module_state(receiver_id)?;
+            let module_state = mmf_data.module_registry.get_module_state(receiver_id)?;
             if module_state != ModuleState::Initialized {
                 return Err(FrameworkError::Module_NotInitialized);
             }
@@ -612,7 +648,7 @@ impl MMFMod {
             // State validation and channel retrieval are performed
             // under the same lock to avoid race conditions with
             // close_module().
-            mmf_data.registry.get_module_normal_channel(receiver_id)?
+            mmf_data.module_registry.get_module_normal_channel(receiver_id)?
         };
 
         // Generate the unique id and build the message
@@ -641,7 +677,7 @@ impl MMFMod {
             //
             // send_message() only requires a read lock because it does
             // not modify the Registry or ModuleState.
-            let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+            let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
 
             let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
 
@@ -653,7 +689,7 @@ impl MMFMod {
             // External senders are not validated.
             match sender_id {
                 EntityID::Module(module_id) => {
-                    let module_state = mmf_data.registry.get_module_state(module_id)?;
+                    let module_state = mmf_data.module_registry.get_module_state(module_id)?;
                     if module_state != ModuleState::Initialized {
                         return Err(FrameworkError::Module_NotInitialized);
                     }
@@ -664,7 +700,7 @@ impl MMFMod {
             // Validate the receiver module state.
             //
             // Messages can only be sent to initialized modules.
-            let module_state = mmf_data.registry.get_module_state(receiver_id)?;
+            let module_state = mmf_data.module_registry.get_module_state(receiver_id)?;
             if module_state != ModuleState::Initialized {
                 return Err(FrameworkError::Module_NotInitialized);
             }
@@ -675,7 +711,7 @@ impl MMFMod {
             // State validation and channel retrieval are performed
             // under the same lock to avoid race conditions with
             // close_module().
-            mmf_data.registry.get_module_normal_channel(receiver_id)?
+            mmf_data.module_registry.get_module_normal_channel(receiver_id)?
         };
 
         // Generate the unique id and build the message
@@ -776,7 +812,7 @@ impl MMFMod {
             //
             // send_message() only requires a read lock because it does
             // not modify the Registry or ModuleState.
-            let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+            let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
 
             let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
 
@@ -788,7 +824,7 @@ impl MMFMod {
             // External senders are not validated.
             match sender_id {
                 EntityID::Module(module_id) => {
-                    let module_state = mmf_data.registry.get_module_state(module_id)?;
+                    let module_state = mmf_data.module_registry.get_module_state(module_id)?;
                     if module_state != ModuleState::Initialized {
                         return Err(FrameworkError::Module_NotInitialized);
                     }
@@ -799,7 +835,7 @@ impl MMFMod {
             // Validate the receiver module state.
             //
             // Messages can only be sent to initialized modules.
-            let module_state = mmf_data.registry.get_module_state(receiver_id)?;
+            let module_state = mmf_data.module_registry.get_module_state(receiver_id)?;
             if module_state != ModuleState::Initialized {
                 return Err(FrameworkError::Module_NotInitialized);
             }
@@ -810,7 +846,7 @@ impl MMFMod {
             // State validation and channel retrieval are performed
             // under the same lock to avoid race conditions with
             // close_module().
-            mmf_data.registry.get_module_priority_channel(receiver_id)?
+            mmf_data.module_registry.get_module_priority_channel(receiver_id)?
         };
 
         // Generate the unique id and build the message
@@ -839,7 +875,7 @@ impl MMFMod {
             //
             // send_message() only requires a read lock because it does
             // not modify the Registry or ModuleState.
-            let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+            let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
 
             let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
 
@@ -851,7 +887,7 @@ impl MMFMod {
             // External senders are not validated.
             match sender_id {
                 EntityID::Module(module_id) => {
-                    let module_state = mmf_data.registry.get_module_state(module_id)?;
+                    let module_state = mmf_data.module_registry.get_module_state(module_id)?;
                     if module_state != ModuleState::Initialized {
                         return Err(FrameworkError::Module_NotInitialized);
                     }
@@ -862,7 +898,7 @@ impl MMFMod {
             // Validate the receiver module state.
             //
             // Messages can only be sent to initialized modules.
-            let module_state = mmf_data.registry.get_module_state(receiver_id)?;
+            let module_state = mmf_data.module_registry.get_module_state(receiver_id)?;
             if module_state != ModuleState::Initialized {
                 return Err(FrameworkError::Module_NotInitialized);
             }
@@ -873,7 +909,7 @@ impl MMFMod {
             // State validation and channel retrieval are performed
             // under the same lock to avoid race conditions with
             // close_module().
-            mmf_data.registry.get_module_priority_channel(receiver_id)?
+            mmf_data.module_registry.get_module_priority_channel(receiver_id)?
         };
 
         // Generate the unique id and build the message

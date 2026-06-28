@@ -36,6 +36,7 @@ use serial_test::serial;
 
 use mesh_module_framework::*;
 use common::simulation_module::{SimulationModule, SimulationBehavior};
+use common::print_helper::*;
 
 
 // MMF uses a global runtime instance.
@@ -45,6 +46,7 @@ use common::simulation_module::{SimulationModule, SimulationBehavior};
 async fn test_mmf_log_module_lifecycle() {
 
     MMF::init().unwrap();
+    MMF::register_module_type::<SimulationModule>().unwrap();
 
     MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
 
@@ -56,6 +58,8 @@ async fn test_mmf_log_module_lifecycle() {
     MMFMod::wait_module_close(&module_id, Some(1000)).await.unwrap();
 
     let log_list = MMFLog::wait_log(None).await.unwrap();
+
+    print_log_list().await;
 
     assert_eq!(log_list.missing_log_count, 0);
 
@@ -88,6 +92,7 @@ async fn test_mmf_log_module_lifecycle() {
 async fn test_mmf_log_messages() {
 
     MMF::init().unwrap();
+    MMF::register_module_type::<SimulationModule>().unwrap();
 
     MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
 
@@ -108,6 +113,8 @@ async fn test_mmf_log_messages() {
     let mut found_priority = false;
     let mut found_wait = false;
     let mut found_priority_wait = false;
+
+    print_log_list().await;
 
     for log_event in &log_list.log_event_list {
 
@@ -175,6 +182,7 @@ async fn test_mmf_log_buffer_overflow() {
     };
 
     MMF::init_with_configuration(config).unwrap();
+    MMF::register_module_type::<SimulationModule>().unwrap();
 
     MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
 

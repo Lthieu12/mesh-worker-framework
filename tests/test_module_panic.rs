@@ -18,6 +18,7 @@ use common::simulation_module::{SimulationBehavior, SimulationModule};
 async fn test_module_message_panic() {
 
     MMF::init().unwrap();
+    MMF::register_module_type::<SimulationModule>().unwrap();
 
     MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
 

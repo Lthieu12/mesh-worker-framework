@@ -9,12 +9,19 @@ use std::collections::VecDeque;
 use tokio::sync::Notify;
 
 use crate::framework_error::{FrameworkError, MMFPanic};
+use crate::module_type_registry::{ModuleTypeRegistry};
+use crate::module::{Module};
 use crate::mmf_mod::{ModuleData};
 use crate::mmf_err::{ErrorData};
 use crate::mmf_log::{LogMode, LoggingData};
 
 
-/// Global MMF runtime storage.
+/// Global MMF runtime storage shared by all
+/// framework components.
+pub(crate) static MMF_DATA: LazyLock<RwLock<Option<MMFData>>> = LazyLock::new(|| RwLock::new(None));
+
+
+/// Global MMF module runtime storage.
 pub(crate) static MMF_MOD_DATA: LazyLock<RwLock<Option<ModuleData>>> = LazyLock::new(|| RwLock::new(None));
 
 /// Global MMF notifier used to signal child module initialized.
@@ -50,6 +57,26 @@ pub(crate) static MMF_LOG_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Notify::ne
 
 /// Global log event counter.
 pub(crate) static MMF_LOG_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
+
+
+
+/// Internal MMF runtime data.
+#[derive(Debug)]
+pub(crate) struct MMFData {
+
+    /// Registered module types.
+    pub(crate) module_type_registry: ModuleTypeRegistry,
+}
+
+impl MMFData {
+
+    pub(crate) fn new() -> Self {
+
+        Self {
+            module_type_registry: ModuleTypeRegistry::new(),
+        }
+    }
+}
 
 
 /// MMF startup configuration.
@@ -100,16 +127,20 @@ impl MMF {
     /// Initialize the MMF framework with custom configuration.
     pub fn init_with_configuration(mmf_configuration: MMFConfiguration) -> Result<(), FrameworkError> {
         
+        let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
+        if mmf_data_guard.is_some() {
+            return Err(FrameworkError::Framework_AlreadyInitialized);
+        }
+        *mmf_data_guard = Some(MMFData::new());
+        drop(mmf_data_guard);
+
         MMF_MOD_MESSAGE_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
         MMF_ERR_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
         MMF_LOG_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
 
-        let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
-        if mmf_data_guard.is_some() {
-            return Err(FrameworkError::Framework_AlreadyInitialized);
-        }
-        *mmf_data_guard = Some(ModuleData::new(&mmf_configuration));
-        drop(mmf_data_guard);
+        let mut mmf_mod_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
+        *mmf_mod_data_guard = Some(ModuleData::new(&mmf_configuration));
+        drop(mmf_mod_data_guard);
 
         let mut mmf_err_data_guard = MMF_ERR_DATA.write().expect(MMFPanic::MMFErrData_WriteLockPoisoned.message());
         *mmf_err_data_guard = Some(ErrorData {
@@ -144,27 +175,34 @@ impl MMF {
     /// resort if a module becomes unresponsive.
     pub fn close() -> Result<(), FrameworkError> {
 
-        let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
+        // Check that MMF has been initialized.
+        let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+        if mmf_data_guard.is_none() {
+            return Err(FrameworkError::Framework_NotInitialized);
+        }
+        drop(mmf_data_guard);
 
-        let mmf_data = match mmf_data_guard.as_ref() {
-            Some(mmf_data) => mmf_data,
-            None => return Err(FrameworkError::Framework_NotInitialized),
-        };
-
-        if !mmf_data.registry.is_empty() {
-            return Err(FrameworkError::Framework_CannotClose_ModulesStillRunning);
+        // Make sure no module is still running.
+        {
+            let mmf_mod_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
+            let mmf_mod_data = mmf_mod_data_guard.as_ref().expect(MMFPanic::MMFModData_Missing.message());
+            if !mmf_mod_data.module_registry.is_empty() {
+                return Err(FrameworkError::Framework_CannotClose_ModulesStillRunning);
+            }
         }
 
+        // Destroy MMF data.
+        let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
         *mmf_data_guard = None;
-        drop(mmf_data_guard);
+
+        let mut mmf_mod_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
+        *mmf_mod_data_guard = None;
 
         let mut mmf_err_data_guard = MMF_ERR_DATA.write().expect(MMFPanic::MMFErrData_WriteLockPoisoned.message());
         *mmf_err_data_guard = None;
-        drop(mmf_err_data_guard);
 
         let mut mmf_log_data_guard = MMF_LOG_DATA.write().expect(MMFPanic::MMFLogData_WriteLockPoisoned.message());
         *mmf_log_data_guard = None;
-        drop(mmf_log_data_guard);
 
         Ok(())
     }
@@ -173,9 +211,49 @@ impl MMF {
     /// Check whether the framework is initialized.
     pub fn is_initialized() -> bool {
         
-        MMF_MOD_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message()).is_some()
+        MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message()).is_some()
     }
 
+
+    /// Register a module type.
+    ///
+    /// Module types must be registered before they can be
+    /// instantiated by MMF.
+    ///
+    /// Returns:
+    /// - Framework_NotInitialized if MMF has not been initialized.
+    /// - ModuleType_AlreadyRegistered if the module type has
+    ///   already been registered.
+    /// - Module_DuplicateModuleTypeID if the ModuleTypeID is
+    ///   already associated with a different Rust module type.
+    pub fn register_module_type<T>() -> Result<(), FrameworkError>
+    where T: Module {
+
+        let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
+        let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let rust_type_name = std::any::type_name::<T>();
+        
+        match mmf_data.module_type_registry.get_module_rust_type_name(T::MODULE_TYPE_ID)
+        {
+            Ok(registered_rust_type_name) => {
+
+                if registered_rust_type_name == rust_type_name {
+                    return Err(FrameworkError::ModuleType_AlreadyRegistered);
+                }
+
+                return Err(FrameworkError::ModuleType_DuplicateModuleTypeID);
+            }
+
+            Err(FrameworkError::ModuleType_NotFound) => {
+
+                mmf_data.module_type_registry.add_module_type(T::MODULE_TYPE_ID, rust_type_name);
+            }
+
+            Err(error) => return Err(error),
+        }
+
+        Ok(())
+    }
 
 }
 

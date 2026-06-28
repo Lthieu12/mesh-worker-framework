@@ -138,19 +138,28 @@ impl ErrorList {
 
         match format {
 
-            ErrorOutputFormat::Terminal => format!(
-                "{:<width_id$} | {:<width_time$} | {:<width_sender$} | {:<width_message$} | Source",
-                "ErrorID",
-                "Time",
-                "SenderID",
-                "Message",
-                width_id = terminal_error_column::ERROR_ID_LEN,
-                width_time = terminal_error_column::TIME_LEN,
-                width_sender = terminal_error_column::SENDER_ID_LEN,
-                width_message = terminal_error_column::MESSAGE_LEN,
-            ),
+            ErrorOutputFormat::Terminal => {
+                
+                let header = format!(
+                    "{:<width_id$} | {:<width_time$} | {:<width_sender$} | {:<width_message$} | Source",
+                    "ErrorID",
+                    "Time",
+                    "SenderID",
+                    "Message",
+                    width_id = terminal_error_column::ERROR_ID_LEN,
+                    width_time = terminal_error_column::TIME_LEN,
+                    width_sender = terminal_error_column::SENDER_ID_LEN,
+                    width_message = terminal_error_column::MESSAGE_LEN,
+                );
 
-            ErrorOutputFormat::CSV => String::from("ErrorID,Time,SenderID,Message,Source"),
+                let separator = "-".repeat(header.len());
+                format!("{header}\n{separator}")
+                }
+
+            ErrorOutputFormat::CSV => {
+                
+                String::from("ErrorID,Time,SenderID,Message,Source")
+            }
         }
     }
 

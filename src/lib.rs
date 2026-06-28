@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
-mod registry;
+mod module_registry;
+mod module_type_registry;
 mod channel;
 mod module_task;
 mod framework_error;
@@ -17,8 +18,8 @@ pub mod mmf_err;
 // Public MMF API
 pub use mmf::{MMF, MMFConfiguration}; 
 pub use mmf_mod::MMFMod;
-pub use mmf_log::{MMFLog, LogInstanceID, LogAction, LogStatus, LogMode, LogEvent, LogList};
-pub use mmf_err::{MMFErr, ErrorInstanceID, ErrorEvent, ErrorList};
+pub use mmf_log::{MMFLog, LogInstanceID, LogAction, LogStatus, LogMode, LogEvent, LogList, LogOutputFormat};
+pub use mmf_err::{MMFErr, ErrorInstanceID, ErrorEvent, ErrorList, ErrorOutputFormat};
 
 pub use framework_error::FrameworkError;
 
@@ -33,6 +34,7 @@ pub use module::{
     ModuleStatus,
     ModuleInfo,
     ModuleList,
+    ModuleOutputFormat,
 };
 
 pub use message::{

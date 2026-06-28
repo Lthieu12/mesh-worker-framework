@@ -26,6 +26,8 @@ use common::simulation_module_recorder::{MessageRecorderModule, MESSAGE_CHAIN, M
 async fn test_module_message_chain() {
 
     MMF::init().unwrap();
+    MMF::register_module_type::<SimulationModule>().unwrap();
+    MMF::register_module_type::<MessageRecorderModule>().unwrap();
 
     let execution_log =
         Arc::new(Mutex::new(Vec::<String>::new()));
@@ -93,6 +95,8 @@ async fn test_module_message_chain() {
 async fn test_module_message_chain_and_priority() {
 
     MMF::init().unwrap();
+    MMF::register_module_type::<SimulationModule>().unwrap();
+    MMF::register_module_type::<MessageRecorderModule>().unwrap();
 
     let execution_log =
         Arc::new(Mutex::new(Vec::<String>::new()));

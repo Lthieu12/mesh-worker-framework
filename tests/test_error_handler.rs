@@ -21,6 +21,7 @@ use common::simulation_module::{
 };
 
 use bytes::Bytes;
+use common::print_helper::*;
 
 
 // MMF uses a global runtime instance.
@@ -30,6 +31,7 @@ use bytes::Bytes;
 async fn test_mmf_err_module_failures() {
 
     MMF::init().unwrap();
+    MMF::register_module_type::<SimulationModule>().unwrap();
 
     // Simulation module with error on message
     let module_a_id = SimulationModule::spawn(&EntityID::External("Test".to_string()), 0, 0, SimulationBehavior::Message_Fail, false, None).await.unwrap();
@@ -66,6 +68,8 @@ async fn test_mmf_err_module_failures() {
     );
 
     let error_list = MMFErr::wait_error(None).await.unwrap();
+
+    print_error_list().await;
 
     assert_eq!(error_list.missing_error_count, 0);
 
@@ -125,6 +129,7 @@ async fn test_mmf_err_buffer_overflow() {
         }
     )
     .unwrap();
+    MMF::register_module_type::<SimulationModule>().unwrap();
 
     let module_id = SimulationModule::spawn(&EntityID::External("Test".to_string()), 0, 0, SimulationBehavior::Message_Fail, false, None).await.unwrap();
 

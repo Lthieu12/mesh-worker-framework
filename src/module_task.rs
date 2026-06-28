@@ -83,14 +83,14 @@ where T: Module + Send + 'static {
                 // Log the panic in MMFLog
                 MMFLog::add_log(Instant::now(), &task_module_id, LogAction::ModulePanic, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
     
-                let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
-                let mmf_data = mmf_data_guard.as_mut().expect(MMFPanic::MMFData_Missing.message());
+                let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
+                let mmf_data = mmf_data_guard.as_mut().expect(MMFPanic::MMFModData_Missing.message());
 
                 // Update the module state.
-                mmf_data.registry.set_module_state(&task_module_id, ModuleState::Panicked).expect(MMFPanic::Registry_ModuleMissing.message());
+                mmf_data.module_registry.set_module_state(&task_module_id, ModuleState::Panicked).expect(MMFPanic::Registry_ModuleMissing.message());
 
                 // Remove the module from the Registry.
-                mmf_data.registry.remove_module(&task_module_id).expect(MMFPanic::Registry_ModuleMissing.message());
+                mmf_data.module_registry.remove_module(&task_module_id).expect(MMFPanic::Registry_ModuleMissing.message());
 
                 drop(mmf_data_guard);
 
@@ -209,18 +209,18 @@ where T: Module + Send + 'static {
                 //
                 // The module is now fully initialized and can
                 // receive business messages.
-                let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
-                let mmf_data = mmf_data_guard.as_mut().expect(MMFPanic::MMFData_Missing.message());
+                let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
+                let mmf_data = mmf_data_guard.as_mut().expect(MMFPanic::MMFModData_Missing.message());
                 match &result_init {
                     Ok(()) => {
 
-                        mmf_data.registry.set_module_state(&module_id, ModuleState::Initialized).expect(MMFPanic::Registry_ModuleMissing.message());
+                        mmf_data.module_registry.set_module_state(&module_id, ModuleState::Initialized).expect(MMFPanic::Registry_ModuleMissing.message());
                         MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleInit, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                     }
                     Err(error) => {
 
                         MMFErr::add_error(&EntityID::Module(module_id.clone()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
-                        mmf_data.registry.set_module_state(&module_id, ModuleState::InitFailed).expect(MMFPanic::Registry_ModuleMissing.message());
+                        mmf_data.module_registry.set_module_state(&module_id, ModuleState::InitFailed).expect(MMFPanic::Registry_ModuleMissing.message());
                         MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleInit, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                     }
 
@@ -329,24 +329,24 @@ where T: Module + Send + 'static {
                 //
                 // Closed indicates that the module lifecycle
                 // completed successfully.
-                let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
-                let mmf_data = mmf_data_guard.as_mut().expect(MMFPanic::MMFData_Missing.message());
+                let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
+                let mmf_data = mmf_data_guard.as_mut().expect(MMFPanic::MMFModData_Missing.message());
                 match &result_close {
                     Ok(()) => {
 
-                        mmf_data.registry.set_module_state(&module_id, ModuleState::Closed).expect(MMFPanic::Registry_ModuleMissing.message());
+                        mmf_data.module_registry.set_module_state(&module_id, ModuleState::Closed).expect(MMFPanic::Registry_ModuleMissing.message());
                         MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleClose, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                         // Remove the module from the Registry.
                         //
                         // Once removed, the module is no longer visible
                         // to MMF and cannot receive new commands.
-                        mmf_data.registry.remove_module(&module_id).expect(MMFPanic::Registry_ModuleMissing.message());
+                        mmf_data.module_registry.remove_module(&module_id).expect(MMFPanic::Registry_ModuleMissing.message());
                         let _ = MMFLog::remove_logged_module(&module_id);
                     }
                     Err(error) => {
 
                         MMFErr::add_error(&EntityID::Module(module_id.clone()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
-                        mmf_data.registry.set_module_state(&module_id, ModuleState::CloseFailed).expect(MMFPanic::Registry_ModuleMissing.message());
+                        mmf_data.module_registry.set_module_state(&module_id, ModuleState::CloseFailed).expect(MMFPanic::Registry_ModuleMissing.message());
                         MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleClose, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                     }
                 }

@@ -258,27 +258,36 @@ impl LogList {
 
         match format {
 
-            LogOutputFormat::Terminal => format!(
-                "{:<width_log$} | {:<width_time$} | {:<width_module$} | {:<width_event$} | {:<width_sender$} | {:<width_message$} | P | W | {:<width_status$} | {:<width_duration$}",
-                "LogID",
-                "Time",
-                "ModuleID",
-                "Event",
-                "SenderID",
-                "MessageID",
-                "ST",
-                "Duration",
-                width_log = terminal_log_column::LOG_ID_LEN,
-                width_time = terminal_log_column::TIME_LEN,
-                width_module = terminal_log_column::MODULE_ID_LEN,
-                width_event = terminal_log_column::EVENT_LEN,
-                width_sender = terminal_log_column::SENDER_ID_LEN,
-                width_message = terminal_log_column::MESSAGE_ID_LEN,
-                width_status = terminal_log_column::STATUS_LEN,
-                width_duration = terminal_log_column::DURATION_LEN,
-            ),
+            LogOutputFormat::Terminal => {
 
-            LogOutputFormat::CSV => String::from("LogID,Time,ModuleID,Event,SenderID,MessageID,Priority,Wait,Status,Duration"),
+                let header = format!(
+                    "{:<width_log$} | {:<width_time$} | {:<width_module$} | {:<width_event$} | {:<width_sender$} | {:<width_message$} | P | W | {:<width_status$} | {:<width_duration$}",
+                    "LogID",
+                    "Time",
+                    "ModuleID",
+                    "Event",
+                    "SenderID",
+                    "MessageID",
+                    "ST",
+                    "Duration",
+                    width_log = terminal_log_column::LOG_ID_LEN,
+                    width_time = terminal_log_column::TIME_LEN,
+                    width_module = terminal_log_column::MODULE_ID_LEN,
+                    width_event = terminal_log_column::EVENT_LEN,
+                    width_sender = terminal_log_column::SENDER_ID_LEN,
+                    width_message = terminal_log_column::MESSAGE_ID_LEN,
+                    width_status = terminal_log_column::STATUS_LEN,
+                    width_duration = terminal_log_column::DURATION_LEN,
+                );
+
+                let separator = "-".repeat(header.len());
+                format!("{header}\n{separator}")
+            }
+
+            LogOutputFormat::CSV => {
+
+                String::from("LogID,Time,ModuleID,Event,SenderID,MessageID,Priority,Wait,Status,Duration")
+            }
         }
     }
 

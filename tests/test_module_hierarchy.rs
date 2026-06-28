@@ -18,6 +18,7 @@ use serial_test::serial;
 
 use mesh_module_framework::*;
 use common::simulation_module::{SimulationModule, SimulationBehavior};
+use common::print_helper::*;
 
 // MMF uses a global runtime instance.
 // Integration tests must run serially.
@@ -26,6 +27,7 @@ use common::simulation_module::{SimulationModule, SimulationBehavior};
 async fn test_module_hierarchy() {
 
     MMF::init().unwrap();
+    MMF::register_module_type::<SimulationModule>().unwrap();
 
     let module_a_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 100, 100, SimulationBehavior::DoNothing, true, Some(500)).await.unwrap();
     println!("module a state = {:?}", MMFMod::get_module_status(&module_a_id).unwrap().module_state);
@@ -43,6 +45,7 @@ async fn test_module_hierarchy() {
 
     MMFMod::wait_module_list_init(&vec![module_b_id.clone(), module_c_id.clone()], Some(1000)).await.unwrap();
 
+    print_module_list();
 
     // Verify father relationships.
 

@@ -97,7 +97,36 @@ This allows runtime debugging in both development and production environments.
 
 ---
 
-## 2. Communication Patterns
+## 2. Module Type Registration
+
+Before any module instance can be spawned,
+its module type must be registered with MMF.
+
+Each module implementation defines its own unique
+`ModuleTypeID` through the Module trait.
+
+Module types are typically registered once during
+application startup:
+
+```text
+MMF::init()?;
+
+MMF::register_module_type::<CameraModule>()?;
+MMF::register_module_type::<FFTModule>()?;
+MMF::register_module_type::<DisplayModule>()?;
+```
+
+Once registered, module instances can be spawned normally.
+
+This registration step allows MMF to associate each
+`ModuleTypeID` with its corresponding Rust module type.
+
+Future MMF features, such as workflow-based module
+instantiation, will rely on this information.
+
+---
+
+## 3. Communication Patterns
 
 ### Send
 
@@ -123,7 +152,7 @@ The caller receives the processing result.
 
 ---
 
-## 3. Error Handling
+## 4. Error Handling
 
 MMF provides a centralized error collection system.
 
@@ -153,7 +182,7 @@ Each error event contains:
 
 ---
 
-## 4. Logging and Observability
+## 5. Logging and Observability
 
 MMF provides a centralized logging and observability system.
 
@@ -184,7 +213,7 @@ Each log event contains:
 
 ---
 
-## 5. Architecture Overview
+## 6. Architecture Overview
 
 ### Runtime architecture
 
@@ -230,19 +259,26 @@ Each log event contains:
 ### Application architecture
 
 ```text
-                      User Application
+                   Application Startup
 
-     ex: CameraModule     ex: FFTModule      ex : DisplayModule
-    (implements Module) (implements Module) (implements Module)
-             │                │                  │
-             └────────────────┼──────────────────┘
-                              │
-                              ▼
-                    MMF::spawn_module(...)
-                              │
-                              ▼
+                       MMF::init()
+                             │
+                             ▼
+           MMF::register_module_type::<CameraModule>()
+           MMF::register_module_type::<FFTModule>()
+           MMF::register_module_type::<DisplayModule>()
+                             │
+                             ▼
+            ──────────── Runtime ────────────
+                             │
+                             ▼
+                 CameraModule::spawn(...)
+                 FFTModule::spawn(...)
+                 DisplayModule::spawn(...)
+                             │
+                             ▼
                     ┌──────────────────┐
-                    │       MMF        │
+                    │     MMFMod       │
                     └────────┬─────────┘
                              │
                 spawns one Tokio task per module
@@ -268,7 +304,7 @@ Parallelism is achieved by running multiple modules concurrently, not by process
 
 ---
 
-## 6. Design Goals
+## 7. Design Goals
 
 * Easy integration
 * Minimal boilerplate
@@ -280,7 +316,7 @@ Parallelism is achieved by running multiple modules concurrently, not by process
 
 ---
 
-## 7. Platform Support
+## 8. Platform Support
 
 * Windows
 * Linux
@@ -289,7 +325,7 @@ No platform-specific application code should be required.
 
 ---
 
-## 8. Quality Requirements
+## 9. Quality Requirements
 
 MMF includes automated tests.
 
@@ -305,7 +341,7 @@ The long-term objective is to validate:
 
 ---
 
-## 9. Project Status
+## 10. Project Status
 
 Core runtime implementation in progress.
 
@@ -324,7 +360,7 @@ still under development.
 
 ---
 
-## 10. Running Tests
+## 11. Running Tests
 
 MMF currently uses a global runtime instance.
 
@@ -359,7 +395,7 @@ For this reason, integration tests using MMF are marked with
 
 ---
 
-## 11. Documentation
+## 12. Documentation
 
 Additional design information is available in:
 

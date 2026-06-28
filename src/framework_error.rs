@@ -33,6 +33,20 @@ pub enum FrameworkError {
     /// The framework shutdown failed: one or more modules are still running.
     Framework_CannotClose_ModulesStillRunning,
 
+    /// The requested module type was not found.
+    /// Internal registry lookup error.
+    ModuleType_NotFound,
+
+    /// ModuleTypeID is already used by another module type.
+    ModuleType_DuplicateModuleTypeID,
+
+    /// The requested module type is already registered.
+    ModuleType_AlreadyRegistered,
+
+    /// The requested module type has not been registered.
+    /// Public API error.
+    ModuleType_NotRegistered,
+
     /// A module failed during its initialization.
     Module_InitializationFailed,
 
@@ -44,9 +58,6 @@ pub enum FrameworkError {
 
     /// A module communication channel is closed.
     Module_ChannelClosed,
-
-    /// ModuleTypeID is already used by another module type.
-    Module_DuplicateModuleTypeID,
 
     /// The requested module already exists.
     Module_AlreadyExists,
@@ -99,6 +110,18 @@ impl fmt::Display for FrameworkError {
             FrameworkError::Framework_CannotClose_ModulesStillRunning =>
                 write!(f, "The framework shutdown failed: one or more modules are still running."),
 
+            FrameworkError::ModuleType_NotFound =>
+                write!(f, "The requested module type was not found."),
+
+            FrameworkError::ModuleType_DuplicateModuleTypeID =>
+                write!(f, "ModuleTypeID is already used by another module type."),
+
+            FrameworkError::ModuleType_AlreadyRegistered =>
+                write!(f, "The requested module type is already registered."),
+
+            FrameworkError::ModuleType_NotRegistered =>
+                write!(f, "The requested module type has not been registered."),
+
             FrameworkError::Module_InitializationFailed =>
                 write!(f, "A module failed during its initialization."),
 
@@ -110,9 +133,6 @@ impl fmt::Display for FrameworkError {
 
             FrameworkError::Module_ChannelClosed =>
                 write!(f, "A module communication channel is closed."),
-
-            FrameworkError::Module_DuplicateModuleTypeID =>
-                write!(f, "ModuleTypeID is already used by another module type."),
 
             FrameworkError::Module_AlreadyExists =>
                 write!(f, "The requested module already exists."),
@@ -160,7 +180,10 @@ pub(crate) enum MMFPanic {
 
     MMFData_ReadLockPoisoned,
     MMFData_WriteLockPoisoned,
-    MMFData_Missing,
+
+    MMFModData_ReadLockPoisoned,
+    MMFModData_WriteLockPoisoned,
+    MMFModData_Missing,
 
     Registry_ModuleMissing,
 
@@ -201,8 +224,16 @@ impl MMFPanic {
                 "Internal MMF error: MMF_DATA write lock poisoned."
             }
 
-            MMFPanic::MMFData_Missing => {
-                "Internal MMF error: MMF_DATA is unexpectedly missing"
+            MMFPanic::MMFModData_ReadLockPoisoned => {
+                "Internal MMF error: MMFMod_DATA read lock poisoned."
+            }
+
+            MMFPanic::MMFModData_WriteLockPoisoned => {
+                "Internal MMF error: MMFMod_DATA write lock poisoned."
+            }
+
+            MMFPanic::MMFModData_Missing => {
+                "Internal MMF error: MMFMod_DATA is unexpectedly missing"
             }
 
             MMFPanic::Registry_ModuleMissing => {

@@ -12,9 +12,6 @@ use crate::string_helper;
 ///
 /// A ModuleTypeID identifies a module *type*, not a module instance.
 ///
-/// It is used by MMFFlow to instantiate modules from workflow definitions
-/// and by MMF to register module factories.
-///
 /// Rules:
 /// - Must be unique across the whole application.
 /// - Should remain stable between software versions if persisted in workflow definitions.
@@ -66,18 +63,20 @@ impl EntityID {
 
             EntityID::Module(module_id) => {
 
-                let text = module_id.to_string();
-                if text.len() <= max_len {
-                    return text;
+                if module_id.len() <= max_len {
+                    return module_id.clone();
                 }
 
-                // Keep the instance suffix (":000001") visible.
-                const SUFFIX_LEN: usize = 7;
+                // Keep the instance suffix (":00001") visible.
+                const SUFFIX_LEN: usize = 6;
+
                 if max_len <= SUFFIX_LEN + 3 {
-                    return text[..max_len].to_string();
+                    return module_id[..max_len].to_string();
                 }
+
                 let prefix_len = max_len - SUFFIX_LEN - 3;
-                format!("{}...{}", &text[..prefix_len], &text[text.len() - SUFFIX_LEN..])
+
+                format!("{}...{}", &module_id[..prefix_len], &module_id[module_id.len() - SUFFIX_LEN..])
             }
 
             EntityID::External(text) => {
@@ -221,20 +220,27 @@ pub struct ModuleList {
 
 impl ModuleList {
 
-        /// Returns the column header corresponding to the requested format.
+    /// Returns the column header corresponding to the requested format.
     pub fn get_header(format: ModuleOutputFormat) -> String {
 
         match format {
 
-            ModuleOutputFormat::Terminal => format!(
-                "{:<width_module$} | {:<width_father$} | {:<width_state$}",
-                "ModuleID",
-                "FatherID",
-                "State",
-                width_module = terminal_module_column::MODULE_ID_LEN,
-                width_father = terminal_module_column::FATHER_ID_LEN,
-                width_state = terminal_module_column::STATE_LEN,
-            ),
+            ModuleOutputFormat::Terminal => {
+
+                let header = format!(
+                    "{:<width_module$} | {:<width_father$} | {:<width_state$}",
+                    "ModuleID",
+                    "FatherID",
+                    "State",
+                    width_module = terminal_module_column::MODULE_ID_LEN,
+                    width_father = terminal_module_column::FATHER_ID_LEN,
+                    width_state = terminal_module_column::STATE_LEN,
+                );
+
+                let separator = "-".repeat(header.len());
+
+                format!("{header}\n{separator}")
+            }
 
             ModuleOutputFormat::CSV => {
 
@@ -244,9 +250,9 @@ impl ModuleList {
     }
 
     /// Converts a module information list into strings.
-    pub fn to_string_list(module_info_list: &Vec<ModuleInfo>, format: ModuleOutputFormat) -> Vec<String> {
+    pub fn to_string_list(&self, format: ModuleOutputFormat) -> Vec<String> {
 
-        let mut module_info_list = module_info_list.clone();
+        let mut module_info_list = self.module_info_list.clone();
         module_info_list.sort_by(|a, b| a.module_id.cmp(&b.module_id));
 
         match format {
