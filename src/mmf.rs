@@ -10,7 +10,7 @@ use tokio::sync::Notify;
 
 use crate::framework_error::{FrameworkError, MMFPanic};
 use crate::module_type_registry::{ModuleTypeRegistry};
-use crate::module::{Module};
+use crate::module::{Module, ModuleConstructor};
 use crate::mmf_mod::{ModuleData};
 use crate::mmf_err::{ErrorData};
 use crate::mmf_log::{LogMode, LoggingData};
@@ -220,6 +220,15 @@ impl MMF {
     /// Module types must be registered before they can be
     /// instantiated by MMF.
     ///
+    /// Registration associates the module's ModuleTypeID
+    /// with:
+    /// - its Rust type name, used for diagnostics;
+    /// - a constructor function used by MMF to create new 
+    ///   module instances dynamically.
+    ///
+    /// The registered constructor creates a new default
+    /// instance of the module each time MMF spawns it.
+    ///
     /// Returns:
     /// - Framework_NotInitialized if MMF has not been initialized.
     /// - ModuleType_AlreadyRegistered if the module type has
@@ -227,13 +236,13 @@ impl MMF {
     /// - Module_DuplicateModuleTypeID if the ModuleTypeID is
     ///   already associated with a different Rust module type.
     pub fn register_module_type<T>() -> Result<(), FrameworkError>
-    where T: Module {
+    where T: Module + Send + 'static {
 
         let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
         let rust_type_name = std::any::type_name::<T>();
         
-        match mmf_data.module_type_registry.get_module_rust_type_name(T::MODULE_TYPE_ID)
+        match mmf_data.module_type_registry.get_module_rust_type_name(T::module_type_id())
         {
             Ok(registered_rust_type_name) => {
 
@@ -246,7 +255,17 @@ impl MMF {
 
             Err(FrameworkError::ModuleType_NotFound) => {
 
-                mmf_data.module_type_registry.add_module_type(T::MODULE_TYPE_ID, rust_type_name);
+                // Create the constructor associated with this module type.
+                //
+                // The constructor is stored in the ModuleTypeRegistry and
+                // invoked by MMF whenever a new instance of this module
+                // type must be spawned.
+                //
+                // Note that T::new() is not executed here.
+                // Instead, a function calling T::new() is created and
+                // stored for later use.
+                let module_constructor: ModuleConstructor = || Box::new(T::new());
+                mmf_data.module_type_registry.add_module_type(T::module_type_id(), rust_type_name, module_constructor);
             }
 
             Err(error) => return Err(error),

@@ -67,10 +67,13 @@ impl MessageRecorderModule {
     }
 }
 
+
 #[async_trait]
 impl Module for MessageRecorderModule {
 
-    const MODULE_TYPE_ID: ModuleTypeID = "MessageRecorderModule";
+    fn module_type_id() -> ModuleTypeID {
+        "MessageRecorderModule"
+    }
 
     async fn on_init(&mut self, module_id: &ModuleID, father_id: &EntityID) -> Result<(), ModuleError> {
 
@@ -78,6 +81,17 @@ impl Module for MessageRecorderModule {
         self.father_id = Some(father_id.clone());
 
         Ok(())
+    }
+
+    fn new() -> Self {
+
+        Self {
+            module_id: None,
+            father_id: None,
+            target_module_id: ModuleID::new(),
+            execution_log: Arc::new(Mutex::new(Vec::new())),
+            wait_duration_ms: Arc::new(Mutex::new(None)),
+        }
     }
 
     async fn on_message(&mut self, message: FrameworkMessage) -> Result<(), ModuleError> {

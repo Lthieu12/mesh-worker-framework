@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use crate::module::ModuleTypeID;
+use crate::module::{ModuleTypeID, ModuleConstructor};
 use crate::framework_error::{FrameworkError};
 
 /// Information associated with a registered module type.
@@ -16,6 +16,9 @@ pub(crate) struct ModuleTypeEntry {
 
     /// Fully qualified Rust type name.
     pub(crate) module_rust_type_name: &'static str,
+
+    /// Function creating a new instance of this module type.
+    pub(crate) module_constructor: ModuleConstructor,
 }
 
 /// Stores all module types known by the framework.
@@ -38,10 +41,11 @@ impl ModuleTypeRegistry {
 
 
     /// Register a module type.
-    pub(crate) fn add_module_type(&mut self, module_type_id: ModuleTypeID, module_rust_type_name: &'static str) {
+    pub(crate) fn add_module_type(&mut self, module_type_id: ModuleTypeID, module_rust_type_name: &'static str, module_constructor: ModuleConstructor) {
 
         self.module_type_map.insert(module_type_id, ModuleTypeEntry {
                 module_rust_type_name,
+                module_constructor,
             },
         );
     }

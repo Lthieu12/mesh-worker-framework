@@ -85,7 +85,7 @@ impl MMFMod {
         let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
         
         // Ensure the module type has been registered.
-        if !mmf_data.module_type_registry.contains_module_type(T::MODULE_TYPE_ID) {
+        if !mmf_data.module_type_registry.contains_module_type(T::module_type_id()) {
             
             return Err(FrameworkError::ModuleType_NotRegistered);
         }
@@ -114,7 +114,7 @@ impl MMFMod {
             EntityID::External(_) => {}
         }
         
-        let module_id = mmf_data.module_registry.generate_module_id(T::MODULE_TYPE_ID);
+        let module_id = mmf_data.module_registry.generate_module_id(T::module_type_id());
 
         let action_start_timer = Instant::now();
         
@@ -137,7 +137,7 @@ impl MMFMod {
         // - Module state. 
         // - Communication channels.
         // - JoinHandle associated with the Tokio task.
-        match mmf_data.module_registry.add_module(&module_id, T::MODULE_TYPE_ID, &father_id, normal_sender_channel, priority_sender_channel, join_handle) {
+        match mmf_data.module_registry.add_module(&module_id, T::module_type_id(), &father_id, normal_sender_channel, priority_sender_channel, join_handle) {
 
             Ok(()) => {}
 

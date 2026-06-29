@@ -103,7 +103,22 @@ impl SimulationModule {
 #[async_trait]
 impl Module for SimulationModule {
 
-    const MODULE_TYPE_ID: ModuleTypeID = "SimulationModule";
+    fn module_type_id() -> ModuleTypeID {
+        "SimulationModule"
+    }
+
+    fn new() -> Self {
+
+        Self {
+            module_id: None,
+            father_id: None,
+            init_delay_ms: 0,
+            close_delay_ms: 0,
+            simulation_behavior: SimulationBehavior::DoNothing,
+            wait_children_close: false,
+            wait_children_close_timeout_ms: None,
+        }
+    }
 
     async fn on_init(&mut self, module_id: &ModuleID, father_id: &EntityID) -> Result<(), ModuleError> {
 

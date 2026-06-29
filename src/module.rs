@@ -8,6 +8,20 @@ use async_trait::async_trait;
 use crate::message::FrameworkMessage;
 use crate::string_helper;
 
+/// Function creating a new module instance.
+///
+/// Each registered module type provides a constructor
+/// that MMF stores in the ModuleTypeRegistry.
+///
+/// Whenever MMF needs to spawn a module from its
+/// ModuleTypeID (for example when executing a workflow),
+/// this constructor is invoked to create a fresh module
+/// instance.
+///
+/// The returned instance is then owned by the spawned
+/// module task.
+pub(crate) type ModuleConstructor = fn() -> Box<dyn Module + Send>;
+
 /// Unique identifier of a module type.
 ///
 /// A ModuleTypeID identifies a module *type*, not a module instance.
@@ -284,14 +298,36 @@ impl ModuleList {
 }
 
 
-/// Interface that must be implemented by all MMF modules.
+/// Interface implemented by all MMF modules.
+///
+/// Modules must implement `Default` so that MMF can
+/// create new instances dynamically from their
+/// registered ModuleTypeID.
 #[async_trait]
 pub trait Module {
 
-    /// Unique identifier of this module type.
+    /// Returns the unique identifier of this module type.
     ///
     /// Every module implementation must provide a unique ModuleTypeID.
-    const MODULE_TYPE_ID: ModuleTypeID;
+    ///
+    /// This associated function is only available on concrete module
+    /// types (`Self: Sized`). It is intentionally excluded from trait
+    /// objects (`dyn Module`) so that MMF can store modules behind
+    /// `Box<dyn Module>`.
+    fn module_type_id() -> ModuleTypeID
+    where Self: Sized;
+
+    /// Creates a new module instance.
+    ///
+    /// MMF calls this function whenever a new module
+    /// instance must be spawned from its registered
+    /// ModuleTypeID.
+    ///
+    /// The returned instance must be in its initial state.
+    /// Runtime resources should be acquired later during
+    /// on_init().
+    fn new() -> Self
+    where Self: Sized;
 
     /// Called once when the module is initialized.
     async fn on_init(&mut self, module_id: &ModuleID, father_id: &EntityID) -> Result<(), ModuleError>;
