@@ -301,9 +301,8 @@ impl ModuleList {
 
 /// Interface implemented by all MMF modules.
 ///
-/// Modules must implement `Default` so that MMF can
-/// create new instances dynamically from their
-/// registered ModuleTypeID.
+/// MMF creates module instances dynamically by calling
+/// `Module::new()` on the registered module type.
 #[async_trait]
 pub trait Module {
 
