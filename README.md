@@ -137,7 +137,7 @@ This allows runtime debugging in both development and production environments.
 
 ---
 
-## 4. Module Type Registration
+### Module Type Registration
 
 Before any module instance can be spawned,
 its module type must be registered with MMF.
@@ -166,7 +166,7 @@ instantiation, will rely on this information.
 
 ---
 
-## 5. Communication Patterns
+## 4. Communication Patterns
 
 ### Send
 
@@ -192,7 +192,7 @@ The caller receives the processing result.
 
 ---
 
-## 6. Error Handling
+## 5. Error Handling
 
 MMF provides a centralized error collection system.
 
@@ -222,7 +222,7 @@ Each error event contains:
 
 ---
 
-## 7. Logging and Observability
+## 6. Logging and Observability
 
 MMF provides a centralized logging and observability system.
 
@@ -253,7 +253,7 @@ Each log event contains:
 
 ---
 
-## 8. Architecture Overview
+## 7. Architecture Overview
 
 ### Runtime architecture
 
@@ -344,7 +344,7 @@ Parallelism is achieved by running multiple modules concurrently, not by process
 
 ---
 
-## 9. Design Goals
+## 8. Design Goals
 
 * Easy integration
 * Minimal boilerplate
@@ -356,7 +356,7 @@ Parallelism is achieved by running multiple modules concurrently, not by process
 
 ---
 
-## 10. Platform Support
+## 9. Platform Support
 
 * Windows
 * Linux
@@ -365,7 +365,7 @@ No platform-specific application code should be required.
 
 ---
 
-## 11. Quality Requirements
+## 10. Quality Requirements
 
 MMF includes automated tests.
 
@@ -381,7 +381,7 @@ The long-term objective is to validate:
 
 ---
 
-## 12. Project Status
+## 11. Project Status
 
 The core runtime is implemented and continuously evolving.
 
@@ -390,7 +390,7 @@ workflow support and production hardening.
 
 ---
 
-## 13. Running Tests
+## 12. Running Tests
 
 MMF currently uses a global runtime instance.
 
@@ -425,7 +425,7 @@ For this reason, integration tests using MMF are marked with
 
 ---
 
-## 14. Documentation
+## 13. Documentation
 
 Additional design information is available in:
 
