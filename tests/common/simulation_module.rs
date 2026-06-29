@@ -21,9 +21,11 @@
 use async_trait::async_trait;
 use std::time::Duration;
 use bytes::Bytes;
+use serde::{Serialize, Deserialize};
 
 use mesh_module_framework::*;
 
+#[derive(Debug, Serialize, Deserialize)]
 #[allow(non_camel_case_types)]
 pub enum SimulationBehavior {
 
@@ -33,7 +35,7 @@ pub enum SimulationBehavior {
         message_delay_ms: u64,
     },
 
-    Message_SendAndWaitReply {
+    Message_SendAndWait {
         target_module_id: ModuleID,
         message_id: MessageID,
         timeout_ms: Option<u64>,
@@ -48,6 +50,22 @@ pub enum SimulationBehavior {
 
     Message_Panic,
 }
+
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SimulationModuleConfig {
+
+    pub init_delay_ms: u64,
+
+    pub close_delay_ms: u64,
+
+    pub simulation_behavior: SimulationBehavior,
+
+    pub wait_children_close: bool,
+
+    pub wait_children_close_timeout_ms: Option<u64>,
+}
+
 
 pub struct SimulationModule {
 
@@ -72,34 +90,15 @@ pub struct SimulationModule {
     pub wait_children_close_timeout_ms: Option<u64>,
 }
 
-impl SimulationModule {
 
-    /// Spawn and initialize a SimulationModule.
-    ///
-    /// This helper is intended for integration tests and
-    /// returns only when the module has reached the
-    /// Initialized state.
-    pub async fn spawn(father_id: &EntityID, init_delay_ms: u64, close_delay_ms: u64, message_behavior: SimulationBehavior, wait_children_close: bool, wait_children_close_timeout_ms: Option<u64>) -> Result<ModuleID, FrameworkError> {
-
-        let module_id =
-            MMFMod::spawn_module(
-                SimulationModule {
-                    module_id: None,
-                    father_id: None,
-                    init_delay_ms,
-                    close_delay_ms,
-                    simulation_behavior: message_behavior,
-                    wait_children_close,
-                    wait_children_close_timeout_ms,
-
-                },
-                father_id,
-            )?;
-
-        Ok(module_id)
-    }
-}
-
+/// Defines the unique behavior simulated by this module.
+///
+/// A SimulationModule always simulates exactly one runtime
+/// behavior. The configured behavior is applied to every
+/// message received by the module.
+///
+/// This keeps integration tests deterministic and easy
+/// to understand.
 #[async_trait]
 impl Module for SimulationModule {
 
@@ -120,11 +119,20 @@ impl Module for SimulationModule {
         }
     }
 
-    async fn on_init(&mut self, module_id: &ModuleID, father_id: &EntityID) -> Result<(), ModuleError> {
+    async fn on_init(&mut self, module_id: ModuleID, father_id: EntityID, lifecycle_data: Bytes) -> Result<(), ModuleError> {
 
+        // Deserialize the simulation module configuration.
+        let configuration: SimulationModuleConfig = bincode::deserialize(lifecycle_data.as_ref())?;
+
+        self.init_delay_ms = configuration.init_delay_ms;
+        self.close_delay_ms = configuration.close_delay_ms;
+        self.simulation_behavior = configuration.simulation_behavior;
+        self.wait_children_close = configuration.wait_children_close;
+        self.wait_children_close_timeout_ms = configuration.wait_children_close_timeout_ms;
+        
         // Store runtime identifiers provided by MMF.
-        self.module_id = Some(module_id.clone());
-        self.father_id = Some(father_id.clone());
+        self.module_id = Some(module_id);
+        self.father_id = Some(father_id);
 
         // Simulate init work.
         tokio::time::sleep(Duration::from_millis(self.init_delay_ms)).await;
@@ -140,11 +148,11 @@ impl Module for SimulationModule {
         Ok(())
     }
 
-    async fn on_message(&mut self, _message: FrameworkMessage) -> Result<(), ModuleError> {
+    async fn on_message(&mut self, _message: ModuleMessage) -> Result<(), ModuleError> {
         
         match &self.simulation_behavior {
 
-            SimulationBehavior::Message_SendAndWaitReply {
+            SimulationBehavior::Message_SendAndWait {
                 target_module_id,
                 message_id,
                 timeout_ms,
@@ -178,7 +186,7 @@ impl Module for SimulationModule {
         Ok(())
     }
 
-    async fn on_close(&mut self) -> Result<(), ModuleError> {
+    async fn on_close(&mut self, _lifecycle_data: Bytes) -> Result<(), ModuleError> {
 
         // Optionally wait until all direct children
         // have been removed from the Registry.

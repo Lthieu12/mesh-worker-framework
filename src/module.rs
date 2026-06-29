@@ -4,8 +4,9 @@
 //! to identify and manage modules within the framework.
 
 use async_trait::async_trait;
+use bytes::Bytes;
 
-use crate::message::FrameworkMessage;
+use crate::message::ModuleMessage;
 use crate::string_helper;
 
 /// Function creating a new module instance.
@@ -330,11 +331,11 @@ pub trait Module {
     where Self: Sized;
 
     /// Called once when the module is initialized.
-    async fn on_init(&mut self, module_id: &ModuleID, father_id: &EntityID) -> Result<(), ModuleError>;
+    async fn on_init(&mut self, module_id: ModuleID, father_id: EntityID, lifecycle_data: Bytes) -> Result<(), ModuleError>;
 
     /// Called when a message is received by the module.
-    async fn on_message(&mut self, message: FrameworkMessage) -> Result<(), ModuleError>;
+    async fn on_message(&mut self, message: ModuleMessage) -> Result<(), ModuleError>;
 
     /// Called once before the module is closed.
-    async fn on_close(&mut self) -> Result<(), ModuleError>;
+    async fn on_close(&mut self, lifecycle_data: Bytes) -> Result<(), ModuleError>;
 }

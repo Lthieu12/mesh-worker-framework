@@ -11,11 +11,11 @@ use crate::MMFLog;
 use crate::mmf::{MMFConfiguration, MMF_DATA, MMF_MOD_DATA, MMF_MOD_MESSAGE_INSTANCE_COUNTER, MMF_MOD_INIT_NOTIFY, MMF_MOD_CLOSE_NOTIFY};
 use crate::mmf_log::{LogAction, LogStatus};
 use crate::framework_error::{FrameworkError, MMFPanic};
-use crate::module::{Module, ModuleID, EntityID, ModuleState, ModuleStatus, ModuleError, ModuleList};
+use crate::module::{Module, ModuleTypeID, ModuleID, EntityID, ModuleState, ModuleStatus, ModuleError, ModuleList};
 use crate::module_registry::Registry;
 use crate::module_task::spawn_module_task;
 use crate::channel::{ModuleCommand, ModuleNormalSenderChannel, ModulePrioritySenderChannel};
-use crate::message::{FrameworkMessage, MessageID, MessageInstanceID};
+use crate::message::{ModuleMessage, MessageID, MessageInstanceID};
 
 /// Internal MMFMod runtime data.
 #[derive(Debug)]
@@ -63,11 +63,42 @@ impl MMFMod {
     }
 
 
-    /// Create and register a new module instance.
+    /// Create and register a new module instance from its ModuleTypeID.
     ///
     /// The module type must have been previously
     /// registered using MMF::register_module_type().
-    /// 
+    ///
+    /// MMF retrieves the registered module constructor,
+    /// creates a new module instance, then spawns it.
+    pub fn spawn_module(module_type_id: ModuleTypeID, father_id: &EntityID) -> Result<ModuleID, FrameworkError> {
+
+        // Ensure the framework has been initialized.
+        let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
+        let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+        
+        // Ensure the module type has been registered.
+        if !mmf_data.module_type_registry.contains_module_type(module_type_id) {
+            
+            return Err(FrameworkError::ModuleType_NotRegistered);
+        }
+
+        // Retrieve the constructor associated with the ModuleTypeID.
+        let module_constructor = mmf_data.module_type_registry.get_module_constructor(module_type_id)?;
+
+        // Create a new module instance.
+        let module = module_constructor();
+
+        drop(mmf_data_guard);
+
+        MMFMod::spawn_module_instance(module_type_id, module, father_id)
+    }
+
+
+    /// Spawn and register a module instance.
+    ///
+    /// The module instance must have been created from a
+    /// previously registered ModuleTypeID.
+    ///
     /// Steps:
     /// 1. Generate a unique ModuleID.
     /// 2. Create communication channels used by MMF.
@@ -77,19 +108,7 @@ impl MMFMod {
     /// After this function returns:
     /// - MMF owns the ModuleID, channels and JoinHandle.
     /// - The Tokio task owns the module instance itself.
-    pub fn spawn_module<T>(module: T, father_id: &EntityID) -> Result<ModuleID, FrameworkError>
-    where T: Module + Send + 'static {
-
-        // Ensure the framework has been initialized.
-        let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
-        
-        // Ensure the module type has been registered.
-        if !mmf_data.module_type_registry.contains_module_type(T::module_type_id()) {
-            
-            return Err(FrameworkError::ModuleType_NotRegistered);
-        }
-        drop(mmf_data_guard);
+    pub(crate) fn spawn_module_instance(module_type_id: ModuleTypeID, module: Box<dyn Module + Send>, father_id: &EntityID) -> Result<ModuleID, FrameworkError> {
 
         let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
@@ -114,7 +133,7 @@ impl MMFMod {
             EntityID::External(_) => {}
         }
         
-        let module_id = mmf_data.module_registry.generate_module_id(T::module_type_id());
+        let module_id = mmf_data.module_registry.generate_module_id(module_type_id);
 
         let action_start_timer = Instant::now();
         
@@ -137,7 +156,7 @@ impl MMFMod {
         // - Module state. 
         // - Communication channels.
         // - JoinHandle associated with the Tokio task.
-        match mmf_data.module_registry.add_module(&module_id, T::module_type_id(), &father_id, normal_sender_channel, priority_sender_channel, join_handle) {
+        match mmf_data.module_registry.add_module(&module_id, module_type_id, &father_id, normal_sender_channel, priority_sender_channel, join_handle) {
 
             Ok(()) => {}
 
@@ -233,7 +252,7 @@ impl MMFMod {
     /// The module state is immediately changed to Initializing.
     /// This function only queues the Init command and does not wait
     /// for on_init() completion.
-    pub async fn init_module(module_id: &ModuleID) -> Result<(), FrameworkError> {
+    pub async fn init_module(module_id: &ModuleID, lifecycle_data: Bytes) -> Result<(), FrameworkError> {
 
         // Change Module state to Initializing
         // and read MMF data to retrieve the Module channel
@@ -251,7 +270,7 @@ impl MMFMod {
         drop(mmf_data_guard);
 
         // Send the Init command to ModuleTask.
-        normal_sender_channel.send(ModuleCommand::Init).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        normal_sender_channel.send(ModuleCommand::Init {lifecycle_data}).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         Ok(())
     }
@@ -262,7 +281,7 @@ impl MMFMod {
     /// The module state is immediately changed to Closing.
     /// This function only queues the Close command and does not wait
     /// for on_close() completion.
-    pub async fn close_module(module_id: &ModuleID) -> Result<(), FrameworkError> {
+    pub async fn close_module(module_id: &ModuleID, lifecycle_data: Bytes) -> Result<(), FrameworkError> {
 
         // Change Module state to Closing
         // and read MMF data to retrieve the Module channel
@@ -280,7 +299,7 @@ impl MMFMod {
         drop(mmf_data_guard);
 
         // Send the Close command to ModuleTask.
-        normal_sender_channel.send(ModuleCommand::Close).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        normal_sender_channel.send(ModuleCommand::Close {lifecycle_data}).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         Ok(())
     }
@@ -653,7 +672,7 @@ impl MMFMod {
 
         // Generate the unique id and build the message
         let message_instance_id = MMFMod::generate_message_instance_id()?;
-        let framework_message = FrameworkMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
+        let framework_message = ModuleMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
 
         // Send the message to the target module.
         normal_sender_channel.send(ModuleCommand::Message {message: framework_message, priority: false}).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
@@ -716,7 +735,7 @@ impl MMFMod {
 
         // Generate the unique id and build the message
         let message_instance_id = MMFMod::generate_message_instance_id()?;
-        let framework_message = FrameworkMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
+        let framework_message = ModuleMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
 
         // Create a temporary reply channel used to signal
         // completion of on_message().
@@ -851,7 +870,7 @@ impl MMFMod {
 
         // Generate the unique id and build the message
         let message_instance_id = MMFMod::generate_message_instance_id()?;
-        let framework_message = FrameworkMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
+        let framework_message = ModuleMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
 
         // Send the priority message to the target module.
         priority_sender_channel.send(ModuleCommand::Message {message: framework_message, priority: true}).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
@@ -914,7 +933,7 @@ impl MMFMod {
 
         // Generate the unique id and build the message
         let message_instance_id = MMFMod::generate_message_instance_id()?;
-        let framework_message = FrameworkMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
+        let framework_message = ModuleMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
 
         // Create a temporary reply channel used to signal
         // completion of on_message().

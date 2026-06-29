@@ -30,6 +30,99 @@ All modules are considered application code. MMF itself remains unaware of their
 
 ---
 
+# Design Principles
+
+MMF intentionally makes several architectural choices that may differ from traditional actor frameworks.
+
+These decisions are intended to keep the runtime deterministic, application-agnostic and easy to reason about.
+
+## Registered Module Types
+
+Modules are registered once during application startup.
+
+```rust
+MMF::register_module_type::<CameraModule>()?;
+```
+
+MMF associates each ModuleTypeID with a constructor capable of creating new module instances.
+
+Modules are then spawned using their ModuleTypeID rather than concrete Rust types.
+
+```rust
+let module_id = MMFMod::spawn_module("CameraModule", &EntityID::External("MAIN".into()))?;
+```
+
+This also decouples application configuration from Rust code. Workflows can be loaded from configuration files, 
+databases or graphical editors without embedding Rust types into application data.
+
+---
+
+## Explicit Lifecycle
+
+Creating a module and initializing it are two independent operations.
+
+```text
+spawn_module()
+
+↓
+
+init_module()
+
+↓
+
+on_init()
+```
+
+Separating creation from initialization gives the application complete control over the module startup sequence.
+
+For example, multiple modules can be spawned first, then initialized simultaneously or in a specific order.
+
+Modules can therefore be created before the resources they require become available.
+
+---
+
+## Opaque Binary Data
+
+MMF never interprets application data.
+
+Both lifecycle data and message data are transported as opaque Bytes.
+
+MMF does not require or recommend any particular serialization format.
+
+```rust
+MMFMod::init_module(module_id, lifecycle_data).await?;
+
+MMFMod::send_message(..., message_data).await?;
+```
+
+Serialization and deserialization remain entirely under application control.
+
+This keeps MMF independent from any serialization library or application-specific data model.
+
+---
+
+## One Message at a Time
+
+Each module processes a single message at a time.
+
+Callbacks are never executed concurrently on the same module instance.
+
+This greatly simplifies stateful module development, since most modules can safely mutate their internal state without additional synchronization primitives.
+
+Parallelism is achieved by running multiple modules concurrently rather than processing multiple messages simultaneously inside a single module.
+
+---
+
+## Explicit Observability
+
+MMF automatically records module lifecycle events, message processing and framework errors.
+
+Applications can inspect these events through MMFLog and MMFErr without instrumenting their own modules.
+
+This makes runtime diagnostics available by default while keeping application code focused on business logic.
+
+---
+
 # Runtime Model
 
 MMF uses one Tokio task per module.

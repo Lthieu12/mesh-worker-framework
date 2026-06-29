@@ -15,9 +15,10 @@ pub type MessageID = String;
 /// tracing and request/reply correlation.
 pub type MessageInstanceID = u64;
 
+
 #[derive(Debug, Clone)]
 /// Message exchanged between modules through MMF.
-pub struct FrameworkMessage {
+pub struct ModuleMessage {
 
     /// Identifier of the sender entity.
     pub sender_id: EntityID,
@@ -35,9 +36,9 @@ pub struct FrameworkMessage {
     pub message_data: Bytes,
 }
 
-impl FrameworkMessage {
+impl ModuleMessage {
 
-    /// Create a new framework message.
+    /// Create a new module message.
     pub(crate) fn new(sender_id: EntityID, receiver_id: ModuleID, message_id: MessageID, message_instance_id: MessageInstanceID, message_data: Bytes) -> Self {
 
         Self {

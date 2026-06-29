@@ -54,9 +54,19 @@ impl ModuleTypeRegistry {
     /// Get the Rust type name associated with a ModuleTypeID.
     pub(crate) fn get_module_rust_type_name(&self, module_type_id: ModuleTypeID) -> Result<&'static str, FrameworkError> {
 
-            let module_type_entry = self.module_type_map.get(module_type_id).ok_or(FrameworkError::ModuleType_NotFound)?;
+        let module_type_entry = self.module_type_map.get(module_type_id).ok_or(FrameworkError::ModuleType_NotFound)?;
+        Ok(module_type_entry.module_rust_type_name)
+    }
 
-    Ok(module_type_entry.module_rust_type_name)
+
+    /// Returns the constructor associated with a ModuleTypeID.
+    ///
+    /// The returned function creates a new instance of the
+    /// corresponding module type each time it is invoked.
+    pub(crate) fn get_module_constructor(&self, module_type_id: ModuleTypeID) -> Result<ModuleConstructor, FrameworkError> {
+
+        let module_type_entry = self.module_type_map.get(module_type_id).ok_or(FrameworkError::ModuleType_NotFound)?;
+        Ok(module_type_entry.module_constructor)
     }
 
 

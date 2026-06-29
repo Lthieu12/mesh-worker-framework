@@ -38,7 +38,7 @@ pub use module::{
 };
 
 pub use message::{
-    FrameworkMessage,
+    ModuleMessage,
     MessageID,
 };
 

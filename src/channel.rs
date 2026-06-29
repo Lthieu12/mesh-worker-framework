@@ -16,25 +16,30 @@
 use tokio::sync::mpsc::Sender;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot;
+use bytes::Bytes;
 
-use crate::message::FrameworkMessage;
+use crate::message::ModuleMessage;
 use crate::framework_error::ModuleError;
 
 /// Command processed by a ModuleTask.
 #[derive(Debug)]
 pub(crate) enum ModuleCommand {
 
-    Init,
+    Init {
+        lifecycle_data: Bytes,
+    },
     Message {
-        message: FrameworkMessage,
+        message: ModuleMessage,
         priority: bool,
     },
     MessageAndWaitCompletion {
         reply_sender: oneshot::Sender<Result<(), ModuleError>>,
-        message: FrameworkMessage,
+        message: ModuleMessage,
         priority: bool,
     },
-    Close,
+    Close {
+        lifecycle_data: Bytes,
+    },
 }
 
 pub(crate) type ModuleNormalSenderChannel = Sender<ModuleCommand>;

@@ -11,6 +11,7 @@
 //! exceeded.
 mod common;
 
+use bytes::Bytes;
 use serial_test::serial;
 
 use mesh_module_framework::*;
@@ -18,10 +19,10 @@ use crate::mmf::MMFConfiguration;
 use common::simulation_module::{
     SimulationBehavior,
     SimulationModule,
+    SimulationModuleConfig,
 };
 
-use bytes::Bytes;
-use common::print_helper::*;
+use common::helper::*;
 
 
 // MMF uses a global runtime instance.
@@ -34,9 +35,20 @@ async fn test_mmf_err_module_failures() {
     MMF::register_module_type::<SimulationModule>().unwrap();
 
     // Simulation module with error on message
-    let module_a_id = SimulationModule::spawn(&EntityID::External("Test".to_string()), 0, 0, SimulationBehavior::Message_Fail, false, None).await.unwrap();
-    MMFMod::init_module(&module_a_id).await.unwrap();
+    let module_a_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("Test".to_string())).unwrap();
+
+    let configuration = SimulationModuleConfig {
+        init_delay_ms: 0,
+        close_delay_ms: 0,
+        simulation_behavior: SimulationBehavior::Message_Fail,
+        wait_children_close: false,
+        wait_children_close_timeout_ms: None,
+    };
+    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
+
+    MMFMod::init_module(&module_a_id, lifecycle_data).await.unwrap();
     MMFMod::wait_module_init(&module_a_id, Some(1000)).await.unwrap();
+
     // Generate multiple message failures.
     for _ in 0..3 {
 
@@ -44,8 +56,18 @@ async fn test_mmf_err_module_failures() {
     }
 
     // Simulation module with error on init
-    let module_b_id = SimulationModule::spawn(&EntityID::External("Test".to_string()), 0, 0, SimulationBehavior::Init_Fail, false, None).await.unwrap();
-    MMFMod::init_module(&module_b_id).await.unwrap();
+    let module_b_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("Test".to_string())).unwrap();
+
+    let configuration = SimulationModuleConfig {
+        init_delay_ms: 0,
+        close_delay_ms: 0,
+        simulation_behavior: SimulationBehavior::Init_Fail,
+        wait_children_close: false,
+        wait_children_close_timeout_ms: None,
+    };
+    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
+
+    MMFMod::init_module(&module_b_id, lifecycle_data).await.unwrap();
     let result = MMFMod::wait_module_init(&module_b_id, Some(1000)).await;
     assert!(
         matches!(
@@ -55,10 +77,21 @@ async fn test_mmf_err_module_failures() {
     );
 
     // Simulation module with error on close
-    let module_c_id = SimulationModule::spawn(&EntityID::External("Test".to_string()), 0, 0, SimulationBehavior::Close_Fail, false, None).await.unwrap();
-    MMFMod::init_module(&module_c_id).await.unwrap();
+    let module_c_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("Test".to_string())).unwrap();
+
+    let configuration = SimulationModuleConfig {
+        init_delay_ms: 0,
+        close_delay_ms: 0,
+        simulation_behavior: SimulationBehavior::Close_Fail,
+        wait_children_close: false,
+        wait_children_close_timeout_ms: None,
+    };
+    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
+
+    MMFMod::init_module(&module_c_id, lifecycle_data).await.unwrap();
     MMFMod::wait_module_init(&module_c_id, Some(1000)).await.unwrap();
-    MMFMod::close_module(&module_c_id).await.unwrap();
+    MMFMod::close_module(&module_c_id, Bytes::new()).await.unwrap();
+
     let result = MMFMod::wait_module_close(&module_c_id, Some(1000)).await;
     assert!(
         matches!(
@@ -76,7 +109,7 @@ async fn test_mmf_err_module_failures() {
     assert_eq!(error_list.error_event_list.len(), 5);
 
     assert!(error_list.first_error_instance_id.is_some());
-
+ 
     assert!(error_list.last_error_instance_id.is_some());
 
     let error_messages: Vec<&str> = error_list.error_event_list.iter().map(|error_event| error_event.error_message.as_str()).collect();
@@ -131,9 +164,18 @@ async fn test_mmf_err_buffer_overflow() {
     .unwrap();
     MMF::register_module_type::<SimulationModule>().unwrap();
 
-    let module_id = SimulationModule::spawn(&EntityID::External("Test".to_string()), 0, 0, SimulationBehavior::Message_Fail, false, None).await.unwrap();
+    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("Test".to_string())).unwrap();
 
-    MMFMod::init_module(&module_id).await.unwrap();
+    let configuration = SimulationModuleConfig {
+        init_delay_ms: 0,
+        close_delay_ms: 0,
+        simulation_behavior: SimulationBehavior::Message_Fail,
+        wait_children_close: false,
+        wait_children_close_timeout_ms: None,
+    };
+    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
+
+    MMFMod::init_module(&module_id, lifecycle_data).await.unwrap();
 
     MMFMod::wait_module_init(&module_id, Some(1000)).await.unwrap();
 

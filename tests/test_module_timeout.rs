@@ -14,9 +14,10 @@
 mod common;
 
 use serial_test::serial;
+use bytes::Bytes;
 
 use mesh_module_framework::*;
-use common::simulation_module::{SimulationModule, SimulationBehavior};
+use common::simulation_module::{SimulationModule, SimulationBehavior, SimulationModuleConfig};
 
 // MMF uses a global runtime instance.
 // Integration tests must run serially.
@@ -27,10 +28,19 @@ async fn test_module_timeout_init() {
     MMF::init().unwrap();
     MMF::register_module_type::<SimulationModule>().unwrap();
 
-    // Very long init
-    let module_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 5_000, 0, SimulationBehavior::DoNothing, false, None).await.unwrap();
+    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("MAIN".to_string())).unwrap();
 
-    MMFMod::init_module(&module_id).await.unwrap();
+    // Very long init
+    let configuration = SimulationModuleConfig {
+        init_delay_ms: 5_000,
+        close_delay_ms: 0,
+        simulation_behavior: SimulationBehavior::DoNothing,
+        wait_children_close: false,
+        wait_children_close_timeout_ms: None,
+    };
+    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
+
+    MMFMod::init_module(&module_id, lifecycle_data).await.unwrap();
 
     assert!(
         matches!(
@@ -51,14 +61,23 @@ async fn test_module_timeout_close() {
     MMF::init().unwrap();
     MMF::register_module_type::<SimulationModule>().unwrap();
 
-    // Very long close
-    let module_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 0, 5_000, SimulationBehavior::DoNothing, false, None).await.unwrap();
+    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("MAIN".to_string())).unwrap();
 
-    MMFMod::init_module(&module_id).await.unwrap();
+    // Very long close
+    let configuration = SimulationModuleConfig {
+        init_delay_ms: 0,
+        close_delay_ms: 5_000,
+        simulation_behavior: SimulationBehavior::DoNothing,
+        wait_children_close: false,
+        wait_children_close_timeout_ms: None,
+    };
+    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
+
+    MMFMod::init_module(&module_id, lifecycle_data).await.unwrap();
 
     MMFMod::wait_module_init(&module_id, Some(1000)).await.unwrap();
 
-    MMFMod::close_module(&module_id).await.unwrap();
+    MMFMod::close_module(&module_id, Bytes::new()).await.unwrap();
 
     assert!(
         matches!(

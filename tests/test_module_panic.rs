@@ -7,9 +7,10 @@
 mod common;
 
 use serial_test::serial;
+use bytes::Bytes;
 
 use mesh_module_framework::*;
-use common::simulation_module::{SimulationBehavior, SimulationModule};
+use common::simulation_module::{SimulationBehavior, SimulationModule, SimulationModuleConfig};
 
 // MMF uses a global runtime instance.
 // Integration tests must run serially.
@@ -22,9 +23,19 @@ async fn test_module_message_panic() {
 
     MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
 
-    let module_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 0, 0, SimulationBehavior::Message_Panic, false, None).await.unwrap();
+    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("MAIN".to_string())).unwrap();
 
-    MMFMod::init_module(&module_id).await.unwrap();
+    let configuration = SimulationModuleConfig {
+        init_delay_ms: 0,
+        close_delay_ms: 0,
+        simulation_behavior: SimulationBehavior::Message_Panic,
+        wait_children_close: false,
+        wait_children_close_timeout_ms: None,
+    };
+    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
+
+    MMFMod::init_module(&module_id, lifecycle_data).await.unwrap();
+
     MMFMod::wait_module_init(&module_id, Some(1000)).await.unwrap();
 
     // Trigger the panic.

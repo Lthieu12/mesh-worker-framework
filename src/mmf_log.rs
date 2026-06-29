@@ -34,7 +34,7 @@ pub enum LogMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogStatus {
 
-    Started,
+    Start,
     Ok,
     Error,
 }
@@ -48,7 +48,7 @@ pub enum LogAction {
     ModuleClose,
     ModuleAbort,
     ModulePanic,
-    ReceiveMessage {
+    ModuleMessage {
 
         sender_id: EntityID,
         message_id: MessageID,
@@ -83,7 +83,7 @@ mod terminal_log_column {
     pub(crate) const EVENT_LEN: usize = 7;
     pub(crate) const SENDER_ID_LEN: usize = 30;
     pub(crate) const MESSAGE_ID_LEN: usize = 30;
-    pub(crate) const STATUS_LEN: usize = 3;
+    pub(crate) const STATUS_LEN: usize = 6;
     pub(crate) const DURATION_LEN: usize = 8;
 }
 
@@ -117,7 +117,7 @@ impl LogEvent{
             LogAction::ModuleClose => ("CLOSE", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
             LogAction::ModuleAbort => ("ABORT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
             LogAction::ModulePanic => ("PANIC", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
-            LogAction::ReceiveMessage {
+            LogAction::ModuleMessage {
                 sender_id,
                 message_id,
                 priority,
@@ -139,7 +139,7 @@ impl LogEvent{
 
         let status = match self.log_status {
 
-            LogStatus::Started => "OK",
+            LogStatus::Start => "START",
             LogStatus::Ok => "OK",
             LogStatus::Error => "ERR",
         };
@@ -178,7 +178,7 @@ impl LogEvent{
             LogAction::ModuleClose => ("CLOSE", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
             LogAction::ModuleAbort => ("ABORT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
             LogAction::ModulePanic => ("PANIC", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
-            LogAction::ReceiveMessage {
+            LogAction::ModuleMessage {
                 sender_id,
                 message_id,
                 priority,
@@ -200,7 +200,7 @@ impl LogEvent{
 
         let status = match self.log_status {
 
-            LogStatus::Started => "OK",
+            LogStatus::Start => "START",
             LogStatus::Ok => "OK",
             LogStatus::Error => "ERR",
         };
@@ -281,7 +281,7 @@ impl LogList {
                     "Event",
                     "SenderID",
                     "MessageID",
-                    "ST",
+                    "STATUS",
                     "Duration",
                     width_log = terminal_log_column::LOG_ID_LEN,
                     width_time = terminal_log_column::TIME_LEN,
@@ -472,7 +472,7 @@ impl MMFLog {
         let timestamp_rfc3339 = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
         let duration_ms:Option<u128>  = match log_status {
 
-            LogStatus::Started => None,
+            LogStatus::Start => None,
 
             LogStatus::Ok |
             LogStatus::Error => {

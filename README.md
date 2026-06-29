@@ -1,17 +1,29 @@
 # Mesh Module Framework (MMF)
 
-Mesh Module Framework (MMF) is a Rust Tokio/Futures-based modular runtime designed for applications composed of independent communicating modules.
+## 1. Why MMF?
 
-MMF provides:
+Mesh Module Framework (MMF) is a Rust Tokio/Futures-based runtime for building applications composed of long-running software modules that communicate through asynchronous messages.
 
-* Module lifecycle management
-* Module-to-module and external-to-module messaging
-* Message prioritization
-* Parent/child hierarchy management
-* Message completion tracking
-* Centralized error handling
-* Centralized logging and observability
-* Cross-platform support (Windows and Linux)
+Typical applications include:
+
+- Industrial automation
+- Scientific instrumentation
+- Image processing pipelines
+- Robotics
+- Data acquisition systems
+
+Unlike general-purpose actor frameworks, MMF focuses on:
+
+- Deterministic execution
+- Explicit module lifecycle management
+- Module-to-module and external-to-module messaging
+- Message prioritization
+- Parent/child hierarchy management
+- Message completion tracking
+- Centralized logging and diagnostics
+- Cross-platform support (Windows and Linux)
+
+MMF intentionally remains application-agnostic. Business concepts such as workflows, measurements and calculations are left outside the framework.
 
 ```text
                           MMF
@@ -31,11 +43,39 @@ MMF provides:
  +----------------+   +----------------+   +----------------+
 ```
 
-Throughout this documentation, "Module" always refers to an MMF runtime module, not a Rust language module.
+Throughout this documentation, "Module" always refers to an MMF runtime module, not a text language module.
 
 ---
 
-## 1. Core Principles
+## 2. Quick Start
+
+```text
+MMF::init()?;
+
+// Register module types once.
+MMF::register_module_type::<CameraModule>()?;
+MMF::register_module_type::<DisplayModule>()?;
+
+// Create module instances.
+let camera = MMFMod::spawn_module("CameraModule", &EntityID::External("MAIN".into()))?;
+
+let display = MMFMod::spawn_module("DisplayModule", &EntityID::External("MAIN".into()))?;
+
+// Initialize them.
+MMFMod::init_module(camera, camera_config).await?;
+MMFMod::init_module(display, display_config).await?;
+
+// Send messages.
+MMFMod::send_message(&EntityID::External("MAIN".into()), &camera, &"Start".into(), Bytes::new()).await?;
+
+// Shutdown.
+MMFMod::close_module(&camera, Bytes::new()).await?;
+MMF::close()?;
+```
+
+---
+
+## 3. Core Principles
 
 ### One Module = One Message at a Time
 
@@ -97,7 +137,7 @@ This allows runtime debugging in both development and production environments.
 
 ---
 
-## 2. Module Type Registration
+## 4. Module Type Registration
 
 Before any module instance can be spawned,
 its module type must be registered with MMF.
@@ -126,7 +166,7 @@ instantiation, will rely on this information.
 
 ---
 
-## 3. Communication Patterns
+## 5. Communication Patterns
 
 ### Send
 
@@ -152,7 +192,7 @@ The caller receives the processing result.
 
 ---
 
-## 4. Error Handling
+## 6. Error Handling
 
 MMF provides a centralized error collection system.
 
@@ -182,7 +222,7 @@ Each error event contains:
 
 ---
 
-## 5. Logging and Observability
+## 7. Logging and Observability
 
 MMF provides a centralized logging and observability system.
 
@@ -213,7 +253,7 @@ Each log event contains:
 
 ---
 
-## 6. Architecture Overview
+## 8. Architecture Overview
 
 ### Runtime architecture
 
@@ -304,7 +344,7 @@ Parallelism is achieved by running multiple modules concurrently, not by process
 
 ---
 
-## 7. Design Goals
+## 9. Design Goals
 
 * Easy integration
 * Minimal boilerplate
@@ -316,7 +356,7 @@ Parallelism is achieved by running multiple modules concurrently, not by process
 
 ---
 
-## 8. Platform Support
+## 10. Platform Support
 
 * Windows
 * Linux
@@ -325,7 +365,7 @@ No platform-specific application code should be required.
 
 ---
 
-## 9. Quality Requirements
+## 11. Quality Requirements
 
 MMF includes automated tests.
 
@@ -341,26 +381,16 @@ The long-term objective is to validate:
 
 ---
 
-## 10. Project Status
+## 12. Project Status
 
-Core runtime implementation in progress.
+The core runtime is implemented and continuously evolving.
 
-The framework currently includes:
-
-* Runtime initialization and shutdown
-* Module lifecycle management
-* Module-to-module and external-to-module messaging
-* Parent/child hierarchy management
-* Error collection and monitoring
-* Unit and integration tests
-
-Additional features such as centralized logging,
-advanced monitoring and production hardening are
-still under development.
+Current work focuses on additional runtime features,
+workflow support and production hardening.
 
 ---
 
-## 11. Running Tests
+## 13. Running Tests
 
 MMF currently uses a global runtime instance.
 
@@ -395,7 +425,7 @@ For this reason, integration tests using MMF are marked with
 
 ---
 
-## 12. Documentation
+## 14. Documentation
 
 Additional design information is available in:
 

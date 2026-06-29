@@ -14,11 +14,12 @@
 
 mod common;
 
+use bytes::Bytes;
 use serial_test::serial;
 
 use mesh_module_framework::*;
-use common::simulation_module::{SimulationModule, SimulationBehavior};
-use common::print_helper::*;
+use common::simulation_module::{SimulationModule, SimulationBehavior, SimulationModuleConfig};
+use common::helper::*;
 
 // MMF uses a global runtime instance.
 // Integration tests must run serially.
@@ -29,19 +30,46 @@ async fn test_module_hierarchy() {
     MMF::init().unwrap();
     MMF::register_module_type::<SimulationModule>().unwrap();
 
-    let module_a_id = SimulationModule::spawn(&EntityID::External("MAIN".to_string()), 100, 100, SimulationBehavior::DoNothing, true, Some(500)).await.unwrap();
-    println!("module a state = {:?}", MMFMod::get_module_status(&module_a_id).unwrap().module_state);
+    let module_a_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("MAIN".to_string())).unwrap();
 
-    MMFMod::init_module(&module_a_id).await.unwrap();
+    let configuration = SimulationModuleConfig {
+        init_delay_ms: 100,
+        close_delay_ms: 100,
+        simulation_behavior: SimulationBehavior::DoNothing,
+        wait_children_close: true,
+        wait_children_close_timeout_ms: Some(500),
+    };
+    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
+
+    MMFMod::init_module(&module_a_id, lifecycle_data).await.unwrap();
+
     MMFMod::wait_module_init(&module_a_id, Some(500)).await.unwrap();
 
-    let module_b_id = SimulationModule::spawn(&EntityID::Module(module_a_id.clone()), 200, 200, SimulationBehavior::DoNothing, false, None).await.unwrap();
-    println!("module b state = {:?}", MMFMod::get_module_status(&module_b_id).unwrap().module_state);
-    let module_c_id = SimulationModule::spawn(&EntityID::Module(module_a_id.clone()), 300, 300, SimulationBehavior::DoNothing, false, None).await.unwrap();
-    println!("module c state = {:?}", MMFMod::get_module_status(&module_c_id).unwrap().module_state);
-    
-    MMFMod::init_module(&module_b_id).await.unwrap();
-    MMFMod::init_module(&module_c_id).await.unwrap();
+    let module_b_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::Module(module_a_id.clone())).unwrap();
+
+    let configuration = SimulationModuleConfig {
+        init_delay_ms: 200,
+        close_delay_ms: 200,
+        simulation_behavior: SimulationBehavior::DoNothing,
+        wait_children_close: false,
+        wait_children_close_timeout_ms: None,
+    };
+    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
+
+    MMFMod::init_module(&module_b_id, lifecycle_data).await.unwrap();
+
+    let module_c_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::Module(module_a_id.clone())).unwrap();
+
+    let configuration = SimulationModuleConfig {
+        init_delay_ms: 300,
+        close_delay_ms: 300,
+        simulation_behavior: SimulationBehavior::DoNothing,
+        wait_children_close: false,
+        wait_children_close_timeout_ms: None,
+    };
+    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
+
+    MMFMod::init_module(&module_c_id, lifecycle_data).await.unwrap();
 
     MMFMod::wait_module_list_init(&vec![module_b_id.clone(), module_c_id.clone()], Some(1000)).await.unwrap();
 
@@ -100,9 +128,9 @@ async fn test_module_hierarchy() {
     println!("MAIN children(s) = {:?}", MMFMod::get_children_ids(&EntityID::External("MAIN".to_string())));
     println!("module_a children(s) = {:?}", MMFMod::get_children_ids(&EntityID::Module(module_a_id.clone())));
 
-    MMFMod::close_module(&module_a_id).await.unwrap();
-    MMFMod::close_module(&module_b_id).await.unwrap();
-    MMFMod::close_module(&module_c_id).await.unwrap();
+    MMFMod::close_module(&module_a_id, Bytes::new()).await.unwrap();
+    MMFMod::close_module(&module_b_id, Bytes::new()).await.unwrap();
+    MMFMod::close_module(&module_c_id, Bytes::new()).await.unwrap();
 
     MMFMod::wait_children_close(&EntityID::External("MAIN".to_string()), Some(1000)).await.unwrap();
 

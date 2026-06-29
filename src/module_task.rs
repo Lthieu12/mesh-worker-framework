@@ -34,16 +34,20 @@ use crate::MMFErr;
 use crate::MMFLog;
 use crate::mmf_log::{LogAction, LogStatus};
 
+
 /// Spawn the Tokio task associated with a module instance.
+///
+/// Ownership of the module instance is transferred to the
+/// spawned Tokio task.
 ///
 /// After this function returns:
 /// - MMF owns the command Senders and the JoinHandle.
 /// - ModuleTask owns the module instance and the Receiver channels.
 ///
-/// The spawned Tokio task executes the complete module lifecycle,
-/// including initialization, message processing and shutdown.
-pub(crate) fn spawn_module_task<T>(module: T, normal_receiver_channel: ModuleNormalReceiverChannel, priority_receiver_channel: ModulePriorityReceiverChannel, module_id:ModuleID, father_id:EntityID) -> JoinHandle<()>
-where T: Module + Send + 'static {
+/// The spawned Tokio task executes the complete module
+/// lifecycle, including initialization, message processing
+/// and shutdown.
+pub(crate) fn spawn_module_task(module: Box<dyn Module + Send>, normal_receiver_channel: ModuleNormalReceiverChannel, priority_receiver_channel: ModulePriorityReceiverChannel, module_id:ModuleID, father_id:EntityID) -> JoinHandle<()> {
    
     tokio::spawn(async move {
 
@@ -106,8 +110,11 @@ where T: Module + Send + 'static {
 
 /// Execute the complete lifecycle of a module.
 ///
-/// This async function runs inside the Tokio task created by
+/// This async function is executed by the Tokio task created by
 /// spawn_module_task().
+///
+/// The module instance is created by the registered
+/// ModuleConstructor before being transferred to this task.
 ///
 /// Responsibilities:
 /// - Own the module instance.
@@ -116,8 +123,7 @@ where T: Module + Send + 'static {
 /// - Update the Registry.
 /// - Report errors and log module activity.
 /// - Terminate when the module is closed.
-async fn module_task<T>(module: T, normal_receiver_channel: ModuleNormalReceiverChannel, priority_receiver_channel: ModulePriorityReceiverChannel, module_id: ModuleID, father_id: EntityID)
-where T: Module + Send + 'static {
+async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: ModuleNormalReceiverChannel, priority_receiver_channel: ModulePriorityReceiverChannel, module_id: ModuleID, father_id: EntityID) {
 
     // ModuleTask owns the module instance.
     //
@@ -198,12 +204,13 @@ where T: Module + Send + 'static {
             //
             // ModuleTask is responsible for marking the module
             // as Initialized only after on_init() completes.
-            ModuleCommand::Init => {
+            ModuleCommand::Init {lifecycle_data} => {
 
                 let action_start_timer = Instant::now();
-                MMFLog::add_log(action_start_timer.clone(), &module_id, LogAction::ModuleInit, LogStatus::Started).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                MMFLog::add_log(action_start_timer.clone(), &module_id, LogAction::ModuleInit, LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
 
-                let result_init = module.on_init(&module_id, &father_id).await;
+
+                let result_init = module.on_init(module_id.clone(), father_id.clone(), lifecycle_data).await;
 
                 // Publish successful initialization.
                 //
@@ -243,14 +250,14 @@ where T: Module + Send + 'static {
             ModuleCommand::Message {message, priority} => {
 
                 let action_start_timer = Instant::now();
-                let log_action = LogAction::ReceiveMessage {
+                let log_action = LogAction::ModuleMessage {
 
                     sender_id: message.sender_id.clone(),
                     message_id: message.message_id.clone(),
                     priority,
                     wait_completion: false,
                 };
-                MMFLog::add_log(action_start_timer.clone(), &module_id, log_action.clone(), LogStatus::Started).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                MMFLog::add_log(action_start_timer.clone(), &module_id, log_action.clone(), LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
 
                 let result_message = module.on_message(message).await;
                 
@@ -283,14 +290,14 @@ where T: Module + Send + 'static {
             ModuleCommand::MessageAndWaitCompletion {reply_sender, message, priority} => {
 
                 let action_start_timer = Instant::now();
-                let log_action = LogAction::ReceiveMessage {
+                let log_action = LogAction::ModuleMessage {
 
                     sender_id: message.sender_id.clone(),
                     message_id: message.message_id.clone(),
                     priority,
                     wait_completion: true,
                 };
-                MMFLog::add_log(action_start_timer.clone(), &module_id, log_action.clone(), LogStatus::Started).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                MMFLog::add_log(action_start_timer.clone(), &module_id, log_action.clone(), LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
 
                 let result_message = module.on_message(message).await;
 
@@ -318,12 +325,12 @@ where T: Module + Send + 'static {
             //
             // ModuleTask is responsible for removing the module
             // from the Registry only after on_close() completes.
-            ModuleCommand::Close => {
+            ModuleCommand::Close {lifecycle_data} => {
 
                 let action_start_timer = Instant::now();
-                MMFLog::add_log(action_start_timer.clone(), &module_id, LogAction::ModuleClose, LogStatus::Started).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                MMFLog::add_log(action_start_timer.clone(), &module_id, LogAction::ModuleClose, LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
 
-                let result_close = module.on_close().await;
+                let result_close = module.on_close(lifecycle_data).await;
 
                 // Mark the module as Closed.
                 //
