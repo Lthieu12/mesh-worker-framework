@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use mesh_module_framework::*;
 
-use dev_support::helper::*;
+use dev_support::dev_helper::*;
 use dev_support::simulation_module::{SimulationBehavior, SimulationModule, SimulationModuleConfig};
 
 const MESSAGE_NORMAL_1: &str = "NORMAL_1";

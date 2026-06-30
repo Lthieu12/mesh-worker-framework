@@ -17,7 +17,7 @@ use serial_test::serial;
 
 use mesh_module_framework::*;
 use dev_support::simulation_module::{SimulationModule, SimulationBehavior, SimulationModuleConfig};
-use dev_support::helper::*;
+use dev_support::dev_helper::*;
 
 // MMF uses a global runtime instance.
 // Integration tests must run serially.
