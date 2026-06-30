@@ -14,7 +14,10 @@ pub mod mmf_mod;
 pub mod mmf_log;
 pub mod mmf_err;
 
-// only used for tests, examples and debug
+// only used for tests, examples and debug.
+// 
+// It is not considered part of the stable public API
+// and may change between releases.
 #[doc(hidden)]
 pub mod dev_support;
 
