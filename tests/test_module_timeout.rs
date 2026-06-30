@@ -11,13 +11,11 @@
 //! This test validates timeout handling and the ability of MMF
 //! to recover from unresponsive modules.
 
-mod common;
-
 use serial_test::serial;
 use bytes::Bytes;
 
 use mesh_module_framework::*;
-use common::simulation_module::{SimulationModule, SimulationBehavior, SimulationModuleConfig};
+use dev_support::simulation_module::{SimulationModule, SimulationBehavior, SimulationModuleConfig};
 
 // MMF uses a global runtime instance.
 // Integration tests must run serially.

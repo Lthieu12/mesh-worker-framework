@@ -15,7 +15,6 @@
 //! SimulationMessageBehavior.
 //!
 //! Additional test behaviors can be added over time.
-
 #![allow(dead_code)]
 
 use async_trait::async_trait;
@@ -23,7 +22,10 @@ use std::time::Duration;
 use bytes::Bytes;
 use serde::{Serialize, Deserialize};
 
-use mesh_module_framework::*;
+use crate::module::{Module, ModuleTypeID, ModuleID, EntityID, ModuleError};
+use crate::message::{MessageID, ModuleMessage};
+use crate::MMFMod;
+
 
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(non_camel_case_types)]
@@ -135,7 +137,9 @@ impl Module for SimulationModule {
         self.father_id = Some(father_id);
 
         // Simulate init work.
-        tokio::time::sleep(Duration::from_millis(self.init_delay_ms)).await;
+        if self.init_delay_ms > 0 {
+            tokio::time::sleep(Duration::from_millis(self.init_delay_ms)).await;
+        }
 
         match &self.simulation_behavior {
             SimulationBehavior::Init_Fail => {
@@ -158,7 +162,10 @@ impl Module for SimulationModule {
                 timeout_ms,
                 message_delay_ms,
             } => {
-                tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
+                // Simulate message work.
+                if *message_delay_ms > 0 {
+                    tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
+                }
                 let module_id = self.module_id.as_ref().expect("module_id should be initialized");
                 MMFMod::send_message_and_wait(&EntityID::Module(module_id.clone()), target_module_id, message_id, Bytes::new(), *timeout_ms).await.unwrap();
             }
@@ -167,7 +174,9 @@ impl Module for SimulationModule {
                 message_delay_ms,
             } => {
                 // Simulate message work.
-                tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
+                    if *message_delay_ms > 0 {
+                    tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
+                }
             }
 
             SimulationBehavior::Message_Fail => {
@@ -198,7 +207,9 @@ impl Module for SimulationModule {
         }
 
         // Simulate shutdown work.
-        tokio::time::sleep(Duration::from_millis(self.close_delay_ms)).await;
+        if self.close_delay_ms > 0 {
+            tokio::time::sleep(Duration::from_millis(self.close_delay_ms)).await;
+        }
 
         match &self.simulation_behavior {
             SimulationBehavior::Close_Fail => {

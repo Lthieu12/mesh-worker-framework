@@ -9,21 +9,18 @@
 //! The second test verify that MMFErr correctly reports overwritten
 //! error events when the circular buffer capacity is
 //! exceeded.
-mod common;
 
 use bytes::Bytes;
 use serial_test::serial;
 
 use mesh_module_framework::*;
 use crate::mmf::MMFConfiguration;
-use common::simulation_module::{
+use dev_support::simulation_module::{
     SimulationBehavior,
     SimulationModule,
     SimulationModuleConfig,
 };
-
-use common::helper::*;
-
+use dev_support::helper::*;
 
 // MMF uses a global runtime instance.
 // Integration tests must run serially.

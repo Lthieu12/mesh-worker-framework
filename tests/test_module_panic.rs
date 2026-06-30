@@ -4,13 +4,11 @@
 //! the panic must be reported, and the runtime must remain
 //! operational.
 
-mod common;
-
 use serial_test::serial;
 use bytes::Bytes;
 
 use mesh_module_framework::*;
-use common::simulation_module::{SimulationBehavior, SimulationModule, SimulationModuleConfig};
+use dev_support::simulation_module::{SimulationBehavior, SimulationModule, SimulationModuleConfig};
 
 // MMF uses a global runtime instance.
 // Integration tests must run serially.

@@ -14,6 +14,9 @@ pub mod mmf_mod;
 pub mod mmf_log;
 pub mod mmf_err;
 
+// only used for tests, examples and debug
+#[doc(hidden)]
+pub mod dev_support;
 
 // Public MMF API
 pub use mmf::{MMF, MMFConfiguration}; 

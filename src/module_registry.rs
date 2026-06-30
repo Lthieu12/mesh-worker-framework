@@ -226,15 +226,15 @@ impl Registry {
         // child_module_map only stores existing parent/child
         // relationships.
         if let Some(child_module_list) = self.child_module_map.get_mut(&father_id) {
-            // Keep all children except the removed module.
-            child_module_list.retain(|child_id| child_id != module_id);
+
+            if let Some(index) = child_module_list.iter().position(|child_id| child_id == module_id) {
+
+                child_module_list.swap_remove(index);
+            }
 
             // Remove the father entry if it no longer has children.
-            //
-            // child_module_map only stores existing parent/child
-            // relationships.
-            // An entity with no children does not have an entry in the map.
             if child_module_list.is_empty() {
+                
                 self.child_module_map.remove(&father_id);
             }
         }

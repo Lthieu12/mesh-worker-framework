@@ -425,7 +425,57 @@ For this reason, integration tests using MMF are marked with
 
 ---
 
-## 13. Documentation
+## 13. Runtime overhead benchmark
+
+MMF includes a runtime stress test that measures the framework overhead
+without any application-specific processing.
+
+Run it with:
+
+```bash
+cargo run --release --example runtime_overhead_benchmark
+```
+
+The number of modules can optionally be specified:
+
+```bash
+cargo run --release --example runtime_overhead_benchmark -- 100
+cargo run --release --example runtime_overhead_benchmark -- 10000
+```
+
+The stress test measures:
+
+- Module creation
+- Module initialization
+- Parallel `send_message_and_wait()`
+- Module shutdown
+- Overall throughput
+
+Example output:
+
+```text
+====================================================
+            MMF runtime overhead benchmark
+====================================================
+
+Modules : 1000
+
+Spawn                   :  4.138ms (4.14 µs/module)
+Init                    : 863.000µs (0.86 µs/module)
+SendAndWait (parallel)  :  1.377ms (1.38 µs/message)
+Close                   :  3.324ms (3.32 µs/module)
+
+Total                   :  9.703ms
+Throughput              : 726111 msg/s
+```
+
+These measurements represent the runtime overhead of MMF using
+`SimulationModule` with `SimulationBehavior::DoNothing`.
+Actual application performance depends on the work performed by each module.
+
+---
+
+## 14. Documentation
 
 Additional design information is available in:
 

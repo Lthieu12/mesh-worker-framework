@@ -12,14 +12,12 @@
 //! including hierarchy management, initialization, shutdown and
 //! synchronization helpers.
 
-mod common;
-
 use bytes::Bytes;
 use serial_test::serial;
 
 use mesh_module_framework::*;
-use common::simulation_module::{SimulationModule, SimulationBehavior, SimulationModuleConfig};
-use common::helper::*;
+use dev_support::simulation_module::{SimulationModule, SimulationBehavior, SimulationModuleConfig};
+use dev_support::helper::*;
 
 // MMF uses a global runtime instance.
 // Integration tests must run serially.

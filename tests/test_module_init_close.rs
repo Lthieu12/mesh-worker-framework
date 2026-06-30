@@ -4,13 +4,12 @@
 //! - Module types must be registered before spawning.
 //! - Initialization failures are correctly propagated.
 //! - Shutdown failures are correctly propagated.
-mod common;
 
 use serial_test::serial;
 use bytes::Bytes;
 
 use mesh_module_framework::*;
-use common::simulation_module::{SimulationModule, SimulationBehavior, SimulationModuleConfig};
+use dev_support::simulation_module::{SimulationModule, SimulationBehavior, SimulationModuleConfig};
 
 // MMF uses a global runtime instance.
 // Integration tests must run serially.

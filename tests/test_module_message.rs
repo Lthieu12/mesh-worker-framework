@@ -7,16 +7,14 @@
 //! - send_priority_message().
 //! - send_message_and_wait().
 
-mod common;
-
 use bytes::Bytes;
 use serial_test::serial;
 use std::time::Duration;
 
 use mesh_module_framework::*;
 
-use common::helper::*;
-use common::simulation_module::{SimulationBehavior, SimulationModule, SimulationModuleConfig};
+use dev_support::helper::*;
+use dev_support::simulation_module::{SimulationBehavior, SimulationModule, SimulationModuleConfig};
 
 const MESSAGE_NORMAL_1: &str = "NORMAL_1";
 const MESSAGE_NORMAL_2: &str = "NORMAL_2";

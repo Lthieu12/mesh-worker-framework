@@ -28,14 +28,13 @@
 //! - old log events are overwritten when the buffer is full
 //! - missing_log_count is correctly reported
 //! - only the most recent log events are retained
-mod common;
 
 use serial_test::serial;
 use bytes::Bytes;
 
 use mesh_module_framework::*;
-use common::simulation_module::{SimulationModule, SimulationBehavior, SimulationModuleConfig};
-use common::helper::*;
+use dev_support::simulation_module::{SimulationModule, SimulationBehavior, SimulationModuleConfig};
+use dev_support::helper::*;
 
 
 // MMF uses a global runtime instance.
