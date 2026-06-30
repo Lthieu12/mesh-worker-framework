@@ -88,8 +88,8 @@ async fn main() {
 
     let futures = module_ids.iter().map(|module_id| {
 
-                MMFMod::send_message_and_wait(&sender_id, module_id, &message_id, Bytes::new(), Some(TIMEOUT_MS))
-            });
+        MMFMod::send_message_and_wait(&sender_id, module_id, &message_id, Bytes::new(), Some(TIMEOUT_MS))
+    });
 
     let results = join_all(futures).await;
 
@@ -124,9 +124,9 @@ async fn main() {
     let throughput = module_count as f64 / messaging_time.as_secs_f64();
 
     println!();
-    println!("====================================================");
+    println!("=====================================================");
     println!("            MMF runtime overhead benchmark");
-    println!("====================================================");
+    println!("=====================================================");
     println!();
     println!("Modules : {}", module_count);
     println!();

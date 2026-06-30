@@ -454,19 +454,19 @@ The stress test measures:
 Example output:
 
 ```text
-====================================================
-            MMF runtime overhead benchmark
-====================================================
+=====================================================
+            MMF runtime overhead benchmark  
+=====================================================    
+                                              
+Modules : 1000                                             
+                                                
+Spawn                   :  3.775ms (3.77 µs/module)
+Init                    : 662.700µs (0.66 µs/module)
+SendAndWait (parallel)  :  1.307ms (1.31 µs/message)
+Close                   :  3.248ms (3.25 µs/module)
 
-Modules : 1000
-
-Spawn                   :  4.138ms (4.14 µs/module)
-Init                    : 863.000µs (0.86 µs/module)
-SendAndWait (parallel)  :  1.377ms (1.38 µs/message)
-Close                   :  3.324ms (3.32 µs/module)
-
-Total                   :  9.703ms
-Throughput              : 726111 msg/s
+Total                   :  8.992ms
+Throughput              : 765345 msg/s
 ```
 
 These measurements represent the runtime overhead of MMF using
