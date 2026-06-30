@@ -2,9 +2,9 @@
 //!
 //! Run with:
 //!
-//! cargo run --release --example stress_runtime
-//! cargo run --release --example stress_runtime -- 100
-//! cargo run --release --example stress_runtime -- 5000
+//! cargo run --release --example runtime_overhead_benchmark
+//! cargo run --release --example runtime_overhead_benchmark -- 100
+//! cargo run --release --example runtime_overhead_benchmark -- 5000
 //!
 //! If no argument is provided, 1000 modules are used.
 
