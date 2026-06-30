@@ -1,3 +1,10 @@
+//! Development helper functions.
+//!
+//! This module provides utility functions used by
+//! examples, integration tests and runtime stress tests.
+//!
+//! These helpers are intended for development only and
+//! are not part of the MMF runtime itself.
 use crate::MMFLog;
 use crate::MMFErr;
 use crate::MMFMod;
