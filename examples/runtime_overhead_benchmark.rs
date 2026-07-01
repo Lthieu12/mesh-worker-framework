@@ -127,7 +127,6 @@ async fn main() {
     println!("=====================================================");
     println!("            MMF runtime overhead benchmark");
     println!("=====================================================");
-    println!();
     println!("Modules : {}", module_count);
     println!();
 
@@ -159,6 +158,7 @@ async fn main() {
 
     println!("Total                   : {:>8.3?}", total_time);
     println!("Throughput              : {:.0} msg/s", throughput);
+    println!("=====================================================");
     println!();
 
     MMF::close().unwrap();

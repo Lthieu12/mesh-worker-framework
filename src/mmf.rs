@@ -59,6 +59,36 @@ pub(crate) static MMF_LOG_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Notify::ne
 pub(crate) static MMF_LOG_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 
+/// Information about the Mesh Module Framework.
+#[derive(Debug, Clone, Copy)]
+pub struct MMFInfo {
+
+    /// crate name.
+    pub crate_name: &'static str,
+
+    /// crate version.
+    pub crate_version: &'static str,
+
+    /// Git commit used to build the crate.
+    pub crate_git_commit: &'static str,
+
+    /// Build profile ("debug" or "release").
+    pub build_profile: &'static str,
+}
+
+impl std::fmt::Display for MMFInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f)?;
+        writeln!(f, "===============================")?;
+        writeln!(f, "     {}", self.crate_name.to_uppercase())?;
+        writeln!(f, "===============================")?;
+        writeln!(f, "Version : {}", self.crate_version)?;
+        writeln!(f, "Commit  : {}", self.crate_git_commit)?;
+        writeln!(f, "Profile : {}", self.build_profile)?;
+        writeln!(f, "===============================")
+    }
+}
+
 
 /// Internal MMF runtime data.
 #[derive(Debug)]
@@ -111,12 +141,25 @@ impl Default for MMFConfiguration {
 }
 
 
-
-
 /// Public MMF entry point.
 pub struct MMF;
 
 impl MMF {
+
+    /// Returns information about the Mesh Module Framework.
+    pub fn get_info() -> MMFInfo {
+        MMFInfo {
+            crate_name: env!("CARGO_PKG_NAME"),
+            crate_version: env!("CARGO_PKG_VERSION"),
+            crate_git_commit: env!("MMF_GIT_COMMIT"),
+            build_profile: if cfg!(debug_assertions) {
+                "debug"
+            } else {
+                "release"
+            },
+        }
+    }
+
 
     /// Initialize MMF using the default configuration.
     pub fn init() -> Result<(), FrameworkError> {

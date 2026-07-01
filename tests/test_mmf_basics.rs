@@ -13,6 +13,10 @@ mod tests {
 
     #[test]
     fn test_mmf_init_close() {
+
+        let info = MMF::get_info();
+        println!("{}", info);
+
         assert!(!MMF::is_initialized());
 
         assert!(MMF::init().is_ok());
