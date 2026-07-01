@@ -143,9 +143,8 @@ impl fmt::Display for FrameworkError {
             FrameworkError::Module_NotInitialized =>
                 write!(f, "The requested module has not been initialized."),
 
-            FrameworkError::Module_Panicked(panic_message) => {
-                write!(f, "A module has panicked: {}", panic_message)
-            },
+            FrameworkError::Module_Panicked(panic_message) =>
+                write!(f, "A module has panicked: {}", panic_message),
 
             FrameworkError::Module_MessageError(error) =>
                 write!(f, "Module message processing failed: {}", error),
