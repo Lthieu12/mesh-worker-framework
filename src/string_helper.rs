@@ -20,7 +20,7 @@ pub(crate) fn csv_escape(value: &str) -> String {
 }
 
 /// Converts an error source list into a human-readable string.
-pub(crate) fn error_source_list_to_string(error_source_list: &[String]) -> String {
+pub(crate) fn error_context_list_to_string(error_source_list: &[String]) -> String {
 
     if error_source_list.is_empty() {
         return "-".to_string();
@@ -29,7 +29,7 @@ pub(crate) fn error_source_list_to_string(error_source_list: &[String]) -> Strin
 }
 
 /// Returns the root error source.
-pub(crate) fn error_root_source(error_source_list: &[String]) -> String {
+pub(crate) fn error_root_context(error_source_list: &[String]) -> String {
 
     match error_source_list.last() {
         Some(error_source) => error_source.clone(),

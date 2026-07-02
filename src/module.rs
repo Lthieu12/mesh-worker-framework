@@ -55,6 +55,23 @@ pub enum EntityID {
     External(String),
 }
 
+impl std::fmt::Display for EntityID {
+
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+
+        match self {
+
+            EntityID::Module(module_id) => {
+                write!(f, "{module_id}")
+            }
+
+            EntityID::External(external_id) => {
+                write!(f, "External:{external_id}")
+            }
+        }
+    }
+}
+
 impl EntityID {
 
     /// Returns a human-readable representation of the entity.

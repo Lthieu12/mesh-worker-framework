@@ -10,7 +10,6 @@ use chrono::{Utc, SecondsFormat};
 use crate::module::EntityID;
 use crate::framework_error::{FrameworkError, MMFPanic};
 use crate::mmf::{MMF_ERR_DATA, MMF_ERR_NOTIFY, MMF_ERR_INSTANCE_COUNTER};
-use crate::ModuleError;
 use crate::string_helper;
 
 /// Unique identifier assigned to each error event.
@@ -21,9 +20,9 @@ mod terminal_error_column {
 
     pub const ERROR_ID_LEN: usize = 12;
     pub const TIME_LEN: usize = 12;
-    pub const SENDER_ID_LEN: usize = 30;
-    pub const MESSAGE_LEN: usize = 50;
-    pub const SOURCE_LEN: usize = 50;
+    pub const ERROR_SOURCE_ENTITY_ID_LEN: usize = 30;
+    pub const ERROR_DESCRIPTION_LEN: usize = 50;
+    pub const ERROR_CONTEXT_LEN: usize = 80;
 }
 
 /// Error event recorded by MMFErr.
@@ -44,13 +43,13 @@ pub struct ErrorEvent {
     pub timestamp_rfc3339: String,
 
     /// Origin of the error.
-    pub sender_id: EntityID,
+    pub entity_id: EntityID,
 
-    /// Main error message returned by the module.
-    pub error_message: String,
+    /// Main error description returned by the module.
+    pub error_description: String,
 
     /// Chain of underlying error causes.
-    pub error_source_list: Vec<String>,
+    pub error_context_list: Vec<String>,
 }
 
 impl ErrorEvent {
@@ -58,19 +57,19 @@ impl ErrorEvent {
     /// Converts the error event into a human-readable terminal string.
     fn to_terminal_string(&self) -> String {
 
-        let root_error_source = string_helper::error_root_source(&self.error_source_list);
+        let root_error_context = string_helper::error_root_context(&self.error_context_list);
         format!(
-            "{:0width_id$} | {:width_time$} | {:width_sender$} | {:width_message$} | {:width_source$}",
+            "{:0width_id$} | {:width_time$} | {:width_entity_id$} | {:width_description$} | {:width_context$}",
             self.error_instance_id,
             &self.timestamp_rfc3339[11..23],
-            self.sender_id.to_short_string(terminal_error_column::SENDER_ID_LEN),
-            string_helper::to_short_string(&self.error_message, terminal_error_column::MESSAGE_LEN),
-            string_helper::to_short_string(&root_error_source, terminal_error_column::SOURCE_LEN),
+            self.entity_id.to_short_string(terminal_error_column::ERROR_SOURCE_ENTITY_ID_LEN),
+            string_helper::to_short_string(&self.error_description, terminal_error_column::ERROR_DESCRIPTION_LEN),
+            string_helper::to_short_string(&root_error_context, terminal_error_column::ERROR_CONTEXT_LEN),
             width_id = terminal_error_column::ERROR_ID_LEN,
             width_time = terminal_error_column::TIME_LEN,
-            width_sender = terminal_error_column::SENDER_ID_LEN,
-            width_message = terminal_error_column::MESSAGE_LEN,
-            width_source = terminal_error_column::SOURCE_LEN,
+            width_entity_id = terminal_error_column::ERROR_SOURCE_ENTITY_ID_LEN,
+            width_description = terminal_error_column::ERROR_DESCRIPTION_LEN,
+            width_context = terminal_error_column::ERROR_CONTEXT_LEN,
         )
     }
 
@@ -78,14 +77,14 @@ impl ErrorEvent {
     /// Converts the error event into a CSV row.
     fn to_csv_string(&self) -> String {
 
-        let error_source_list = string_helper::error_source_list_to_string(&self.error_source_list);
+        let error_context_list = string_helper::error_context_list_to_string(&self.error_context_list);
         format!(
             "{},{},{},{},{}",
             self.error_instance_id,
             string_helper::csv_escape(&self.timestamp_rfc3339),
-            string_helper::csv_escape(&self.sender_id.to_string()),
-            string_helper::csv_escape(&self.error_message),
-            string_helper::csv_escape(&error_source_list),
+            string_helper::csv_escape(&self.entity_id.to_string()),
+            string_helper::csv_escape(&self.error_description),
+            string_helper::csv_escape(&error_context_list),
         )
     }
 }
@@ -155,17 +154,17 @@ impl ErrorList {
             ErrorOutputFormat::Terminal => {
                 
                 let header = format!(
-                    "{:<width_id$} | {:<width_time$} | {:<width_sender$} | {:<width_message$} | {:<width_source$}",
+                    "{:<width_id$} | {:<width_time$} | {:<width_entity_id$} | {:<width_description$} | {:<width_context$}",
                     "ErrorID",
                     "Time",
-                    "SenderID",
-                    "Message",
-                    "Source",
+                    "ErrorSource/EntityID",
+                    "ErrorDescription",
+                    "ErrorContext",
                     width_id = terminal_error_column::ERROR_ID_LEN,
                     width_time = terminal_error_column::TIME_LEN,
-                    width_sender = terminal_error_column::SENDER_ID_LEN,
-                    width_message = terminal_error_column::MESSAGE_LEN,
-                    width_source = terminal_error_column::SOURCE_LEN,
+                    width_entity_id = terminal_error_column::ERROR_SOURCE_ENTITY_ID_LEN,
+                    width_description = terminal_error_column::ERROR_DESCRIPTION_LEN,
+                    width_context = terminal_error_column::ERROR_CONTEXT_LEN,
                 );
 
                 let separator = "-".repeat(header.len());
@@ -174,7 +173,7 @@ impl ErrorList {
 
             ErrorOutputFormat::CSV => {
                 
-                String::from("ErrorID,Time,SenderID,Message,Source")
+                String::from("ErrorID,Time,ErrorSource/EntityID,ErrorDescription,ErrorContext")
             }
         }
     }
@@ -226,23 +225,23 @@ impl MMFErr {
     ///
     /// Error events are stored in a circular buffer and
     /// notify all MMFErr waiters.
-    pub(crate) fn add_error_internal(sender_id: &EntityID, callback_name: Option<&'static str>, error: &ModuleError) -> Result<(), FrameworkError> {
+    pub(crate) fn add_error_internal(entity_id: &EntityID, callback_name: Option<String>, error: &anyhow::Error) -> Result<(), FrameworkError> {
 
         let error_instance_id = MMFErr::generate_error_instance_id()?;
         let error_message = error.to_string();
 
-        let mut error_source_list = Vec::new();
+        let mut error_context_list = Vec::new();
 
         // Record the MMF callback that generated the error.
         if let Some(callback_name) = callback_name {
-            error_source_list.push(callback_name.to_string());
+            error_context_list.push(callback_name.to_string());
         }
 
-        let mut source = error.source();
-        while let Some(error_source) = source {
+        let mut context = error.source();
+        while let Some(error_context) = context {
 
-            error_source_list.push(error_source.to_string());
-            source = error_source.source();
+            error_context_list.push(error_context.to_string());
+            context = error_context.source();
         }
         
         let timestamp_rfc3339 = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
@@ -251,9 +250,9 @@ impl MMFErr {
 
             error_instance_id,
             timestamp_rfc3339,
-            sender_id: sender_id.clone(),
-            error_message,
-            error_source_list,
+            entity_id: entity_id.clone(),
+            error_description: error_message,
+            error_context_list,
         };
 
         // Maintain the error circular buffer.
@@ -291,9 +290,9 @@ impl MMFErr {
     ///
     /// Error events are stored in a circular buffer and
     /// notify all MMFErr waiters.
-    pub fn add_error(sender_id: &EntityID, error: &ModuleError) -> Result<(), FrameworkError> {
+    pub fn add_error(entity_id: &EntityID, error: &anyhow::Error) -> Result<(), FrameworkError> {
 
-        MMFErr::add_error_internal(&sender_id, None, error)
+        MMFErr::add_error_internal(&entity_id, None, error)
     }
 
 

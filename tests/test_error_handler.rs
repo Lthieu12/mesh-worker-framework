@@ -12,6 +12,7 @@
 
 use bytes::Bytes;
 use serial_test::serial;
+use anyhow::{Context, Result};
 
 use mesh_module_framework::*;
 use crate::mmf::MMFConfiguration;
@@ -22,6 +23,11 @@ use dev_support::simulation_module::{
 };
 use dev_support::dev_helper::*;
 
+fn generate_application_error() -> Result<()> {
+
+    Err(anyhow::anyhow!("config.toml not found")).context("Failed to load configuration")
+}
+
 // MMF uses a global runtime instance.
 // Integration tests must run serially.
 #[tokio::test]
@@ -30,6 +36,11 @@ async fn test_mmf_err_module_failures() {
 
     MMF::init().unwrap();
     MMF::register_module_type::<SimulationModule>().unwrap();
+
+    // Generale application error (external error, not related to a module).
+    let application_error = generate_application_error().unwrap_err();
+
+    MMFErr::add_error(&EntityID::External("Application".to_string()), &application_error).unwrap();
 
     // Simulation module with error on message
     let module_a_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("Test".to_string())).unwrap();
@@ -103,13 +114,13 @@ async fn test_mmf_err_module_failures() {
 
     assert_eq!(error_list.missing_error_count, 0);
 
-    assert_eq!(error_list.error_event_list.len(), 5);
+    assert_eq!(error_list.error_event_list.len(), 6);
 
     assert!(error_list.first_error_instance_id.is_some());
  
     assert!(error_list.last_error_instance_id.is_some());
 
-    let error_messages: Vec<&str> = error_list.error_event_list.iter().map(|error_event| error_event.error_message.as_str()).collect();
+    let error_messages: Vec<&str> = error_list.error_event_list.iter().map(|error_event| error_event.error_description.as_str()).collect();
 
     assert_eq!(error_messages.iter().filter(|message| **message == "Simulation message failure").count(), 3);
 
@@ -117,14 +128,26 @@ async fn test_mmf_err_module_failures() {
 
     assert_eq!(error_messages.iter().filter(|message| **message == "Simulation close failure").count(), 1);
     
+    let application_error = error_list.error_event_list.iter().find(|error_event| {
+        error_event.entity_id == EntityID::External("Application".to_string())
+    })
+    .unwrap();
+
+    assert_eq!(application_error.error_description, "Failed to load configuration");
+
+    assert_eq!(application_error.error_context_list[0], "config.toml not found");
+
     for error_event in &error_list.error_event_list {
 
-        assert!(
-            matches!(
-                error_event.sender_id,
-                EntityID::Module(_)
-            )
-        );
+        match &error_event.entity_id {
+
+            EntityID::External(entity_id) => {
+
+                assert_eq!(entity_id, "Application");
+            }
+
+            EntityID::Module(_) => {}
+        }
 
         assert!(!error_event.timestamp_rfc3339.is_empty());
     }

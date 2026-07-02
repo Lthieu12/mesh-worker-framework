@@ -50,7 +50,7 @@ async fn test_module_message_panic() {
 
     assert_eq!(error_list.error_event_list.len(), 1);
 
-    assert!(error_list.error_event_list[0].error_message.contains("Simulation message panic"));
+    assert!(error_list.error_event_list[0].error_description.contains("Simulation message panic"));
 
     // One panic event must be present in the log buffer.
     let log_list = MMFLog::wait_log(None).await.unwrap();

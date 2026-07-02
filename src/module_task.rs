@@ -83,7 +83,7 @@ pub(crate) fn spawn_module_task(module: Box<dyn Module + Send>, normal_receiver_
                     };
 
                 // Store the panic in MMFErr.
-                MMFErr::add_error_internal(&EntityID::Module(task_module_id.clone()), Some("on_init"), &panic_error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
+                MMFErr::add_error_internal(&EntityID::Module(task_module_id.clone()), Some("on_init".to_string()), &panic_error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
                 // Log the panic in MMFLog
                 MMFLog::add_log(Instant::now(), &task_module_id, LogAction::ModulePanic, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
     
@@ -226,7 +226,7 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
                     }
                     Err(error) => {
 
-                        MMFErr::add_error_internal(&EntityID::Module(module_id.clone()), Some("on_init"), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
+                                                MMFErr::add_error_internal(&EntityID::Module(module_id.clone()), Some("on_init".to_string()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
                         mmf_data.module_registry.set_module_state(&module_id, ModuleState::InitFailed).expect(MMFPanic::Registry_ModuleMissing.message());
                         MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleInit, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                     }
@@ -257,6 +257,9 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
                     priority,
                     wait_completion: false,
                 };
+                let sender_id = message.sender_id.clone();
+                let message_id = message.message_id.clone();
+
                 MMFLog::add_log(action_start_timer.clone(), &module_id, log_action.clone(), LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
 
                 let result_message = module.on_message(message).await;
@@ -270,7 +273,8 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
 
                     Err(error) => {
 
-                        MMFErr::add_error_internal(&EntityID::Module(module_id.clone()), Some("on_message"), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
+                        let error_context = format!("on_message -> MessageID={}, SenderID={}", message_id, sender_id);
+                        MMFErr::add_error_internal(&EntityID::Module(module_id.clone()), Some(error_context.to_string()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
                         MMFLog::add_log(action_start_timer, &module_id, log_action, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                     }
                 }
@@ -297,6 +301,9 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
                     priority,
                     wait_completion: true,
                 };
+                let sender_id = message.sender_id.clone();
+                let message_id = message.message_id.clone();
+
                 MMFLog::add_log(action_start_timer.clone(), &module_id, log_action.clone(), LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
 
                 let result_message = module.on_message(message).await;
@@ -310,7 +317,8 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
 
                     Err(error) => {
 
-                        MMFErr::add_error_internal(&EntityID::Module(module_id.clone()), Some("on_message"), &error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
+                        let error_context = format!("on_message -> MessageID={}, SenderID={}", message_id, sender_id);
+                        MMFErr::add_error_internal(&EntityID::Module(module_id.clone()), Some(error_context.to_string()), &error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
                         MMFLog::add_log(action_start_timer, &module_id, log_action, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                     }
                 }
@@ -352,7 +360,7 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
                     }
                     Err(error) => {
 
-                        MMFErr::add_error_internal(&EntityID::Module(module_id.clone()), Some("on_close"), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
+                        MMFErr::add_error_internal(&EntityID::Module(module_id.clone()), Some("on_close".to_string()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
                         mmf_data.module_registry.set_module_state(&module_id, ModuleState::CloseFailed).expect(MMFPanic::Registry_ModuleMissing.message());
                         MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleClose, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                     }
