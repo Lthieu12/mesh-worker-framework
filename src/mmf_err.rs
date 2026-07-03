@@ -214,7 +214,6 @@ impl MMFErr {
     }
 
 
-    
     /// Record a new error event.
     ///
     /// This internal function is used by MMF to enrich error
