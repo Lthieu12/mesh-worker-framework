@@ -1,0 +1,4 @@
+# Personal preference.
+# This value may be adjusted locally without affecting MMF behavior.
+max_width = 300
+use_small_heuristics = "Max"

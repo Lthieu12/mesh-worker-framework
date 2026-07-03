@@ -19,31 +19,22 @@
 #![allow(dead_code)]
 
 use async_trait::async_trait;
-use std::time::Duration;
 use bytes::Bytes;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
-use crate::module::{Module, ModuleTypeID, ModuleID, EntityID, ModuleError};
-use crate::message::{MessageID, ModuleMessage};
 use crate::MMFMod;
-
+use crate::message::{MessageID, ModuleMessage};
+use crate::module::{EntityID, Module, ModuleError, ModuleID, ModuleTypeID};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(non_camel_case_types)]
 pub enum SimulationBehavior {
-
     DoNothing,
 
-    Message_Wait{
-        message_delay_ms: u64,
-    },
+    Message_Wait { message_delay_ms: u64 },
 
-    Message_SendAndWait {
-        target_module_id: ModuleID,
-        message_id: MessageID,
-        timeout_ms: Option<u64>,
-        message_delay_ms: u64,
-    },
+    Message_SendAndWait { target_module_id: ModuleID, message_id: MessageID, timeout_ms: Option<u64>, message_delay_ms: u64 },
 
     Init_Fail,
 
@@ -54,10 +45,8 @@ pub enum SimulationBehavior {
     Message_Panic,
 }
 
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SimulationModuleConfig {
-
     pub init_delay_ms: u64,
 
     pub close_delay_ms: u64,
@@ -69,9 +58,7 @@ pub struct SimulationModuleConfig {
     pub wait_children_close_timeout_ms: Option<u64>,
 }
 
-
 pub struct SimulationModule {
-
     /// Runtime ModuleID assigned by MMF during on_init().
     module_id: Option<ModuleID>,
 
@@ -93,7 +80,6 @@ pub struct SimulationModule {
     pub wait_children_close_timeout_ms: Option<u64>,
 }
 
-
 /// Defines the unique behavior simulated by this module.
 ///
 /// A SimulationModule always simulates exactly one runtime
@@ -104,26 +90,15 @@ pub struct SimulationModule {
 /// to understand.
 #[async_trait]
 impl Module for SimulationModule {
-
     fn module_type_id() -> ModuleTypeID {
         "SimulationModule"
     }
 
     fn new() -> Self {
-
-        Self {
-            module_id: None,
-            father_id: None,
-            init_delay_ms: 0,
-            close_delay_ms: 0,
-            simulation_behavior: SimulationBehavior::DoNothing,
-            wait_children_close: false,
-            wait_children_close_timeout_ms: None,
-        }
+        Self { module_id: None, father_id: None, init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None }
     }
 
     async fn on_init(&mut self, module_id: ModuleID, father_id: EntityID, lifecycle_data: Bytes) -> Result<(), ModuleError> {
-
         // Deserialize the simulation module configuration.
         let configuration: SimulationModuleConfig = bincode::deserialize(lifecycle_data.as_ref())?;
 
@@ -132,7 +107,7 @@ impl Module for SimulationModule {
         self.simulation_behavior = configuration.simulation_behavior;
         self.wait_children_close = configuration.wait_children_close;
         self.wait_children_close_timeout_ms = configuration.wait_children_close_timeout_ms;
-        
+
         // Store runtime identifiers provided by MMF.
         self.module_id = Some(module_id);
         self.father_id = Some(father_id);
@@ -144,25 +119,17 @@ impl Module for SimulationModule {
 
         match &self.simulation_behavior {
             SimulationBehavior::Init_Fail => {
-
                 return Err(anyhow::anyhow!("Simulation init failure"));
             }
 
-            _ => {} 
+            _ => {}
         }
         Ok(())
     }
 
     async fn on_message(&mut self, _message: ModuleMessage) -> Result<(), ModuleError> {
-        
         match &self.simulation_behavior {
-
-            SimulationBehavior::Message_SendAndWait {
-                target_module_id,
-                message_id,
-                timeout_ms,
-                message_delay_ms,
-            } => {
+            SimulationBehavior::Message_SendAndWait { target_module_id, message_id, timeout_ms, message_delay_ms } => {
                 // Simulate message work.
                 if *message_delay_ms > 0 {
                     tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
@@ -171,37 +138,31 @@ impl Module for SimulationModule {
                 MMFMod::send_message_and_wait(&EntityID::Module(module_id.clone()), target_module_id, message_id, Bytes::new(), *timeout_ms).await.unwrap();
             }
 
-            SimulationBehavior::Message_Wait {
-                message_delay_ms,
-            } => {
+            SimulationBehavior::Message_Wait { message_delay_ms } => {
                 // Simulate message work.
-                    if *message_delay_ms > 0 {
+                if *message_delay_ms > 0 {
                     tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
                 }
             }
 
             SimulationBehavior::Message_Fail => {
-                
                 return Err(anyhow::anyhow!("Simulation message failure"));
             }
 
             SimulationBehavior::Message_Panic => {
-                
                 panic!("Simulation message panic");
             }
 
-            _ => {} 
+            _ => {}
         }
 
         Ok(())
     }
 
     async fn on_close(&mut self, _lifecycle_data: Bytes) -> Result<(), ModuleError> {
-
         // Optionally wait until all direct children
         // have been removed from the Registry.
         if self.wait_children_close {
-
             let module_id = self.module_id.as_ref().expect("module_id should be initialized");
 
             MMFMod::wait_children_close(&EntityID::Module(module_id.clone()), self.wait_children_close_timeout_ms).await.unwrap();
@@ -214,11 +175,10 @@ impl Module for SimulationModule {
 
         match &self.simulation_behavior {
             SimulationBehavior::Close_Fail => {
-
                 return Err(anyhow::anyhow!("Simulation close failure"));
             }
 
-            _ => {} 
+            _ => {}
         }
 
         Ok(())

@@ -13,7 +13,6 @@ mod tests {
 
     #[test]
     fn test_mmf_init_close() {
-
         let info = MMF::get_info();
         println!("{}", info);
 
@@ -32,23 +31,13 @@ mod tests {
     fn test_mmf_double_init() {
         assert!(MMF::init().is_ok());
 
-        assert!(
-            matches!(
-                MMF::init(),
-                Err(FrameworkError::Framework_AlreadyInitialized)
-            )
-        );
+        assert!(matches!(MMF::init(), Err(FrameworkError::Framework_AlreadyInitialized)));
 
         assert!(MMF::close().is_ok());
     }
 
     #[test]
     fn test_mmf_double_close() {
-        assert!(
-            matches!(
-                MMF::close(),
-                Err(FrameworkError::Framework_NotInitialized)
-            )
-        );
+        assert!(matches!(MMF::close(), Err(FrameworkError::Framework_NotInitialized)));
     }
 }

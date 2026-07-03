@@ -3,23 +3,21 @@
 //! This API exposes the framework entry points used to
 //! initialize and shutdown the API global runtime.
 
-use std::sync::{LazyLock, RwLock};
-use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
 use std::collections::VecDeque;
+use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
+use std::sync::{LazyLock, RwLock};
 use tokio::sync::Notify;
 
 use crate::framework_error::{FrameworkError, MMFPanic};
-use crate::module_type_registry::{ModuleTypeRegistry};
-use crate::module::{Module, ModuleConstructor};
-use crate::mmf_mod::{ModuleData};
-use crate::mmf_err::{ErrorData};
+use crate::mmf_err::ErrorData;
 use crate::mmf_log::{LogMode, LoggingData};
-
+use crate::mmf_mod::ModuleData;
+use crate::module::{Module, ModuleConstructor};
+use crate::module_type_registry::ModuleTypeRegistry;
 
 /// Global MMF runtime storage shared by all
 /// framework components.
 pub(crate) static MMF_DATA: LazyLock<RwLock<Option<MMFData>>> = LazyLock::new(|| RwLock::new(None));
-
 
 /// Global MMF module runtime storage.
 pub(crate) static MMF_MOD_DATA: LazyLock<RwLock<Option<ModuleData>>> = LazyLock::new(|| RwLock::new(None));
@@ -33,7 +31,6 @@ pub(crate) static MMF_MOD_CLOSE_NOTIFY: LazyLock<Notify> = LazyLock::new(Notify:
 /// Global MMF message instance counter used to identify messages sent to modules.
 pub(crate) static MMF_MOD_MESSAGE_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
 
-
 /// Global MMF error event storage.
 pub(crate) static MMF_ERR_DATA: LazyLock<RwLock<Option<ErrorData>>> = LazyLock::new(|| RwLock::new(None));
 
@@ -43,7 +40,6 @@ pub(crate) static MMF_ERR_NOTIFY: LazyLock<Notify> = LazyLock::new(Notify::new);
 
 /// Global MMF error instance counter.
 pub(crate) static MMF_ERR_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
-
 
 /// Global logging storage.
 pub(crate) static MMF_LOG_DATA: LazyLock<RwLock<Option<LoggingData>>> = LazyLock::new(|| RwLock::new(None));
@@ -58,11 +54,9 @@ pub(crate) static MMF_LOG_NOTIFY: LazyLock<Notify> = LazyLock::new(Notify::new);
 /// Global log event counter.
 pub(crate) static MMF_LOG_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
 
-
 /// Information about the Mesh Module Framework.
 #[derive(Debug, Clone, Copy)]
 pub struct MMFInfo {
-
     /// crate name.
     pub crate_name: &'static str,
 
@@ -89,30 +83,22 @@ impl std::fmt::Display for MMFInfo {
     }
 }
 
-
 /// Internal MMF runtime data.
 #[derive(Debug)]
 pub(crate) struct MMFData {
-
     /// Registered module types.
     pub(crate) module_type_registry: ModuleTypeRegistry,
 }
 
 impl MMFData {
-
     pub(crate) fn new() -> Self {
-
-        Self {
-            module_type_registry: ModuleTypeRegistry::new(),
-        }
+        Self { module_type_registry: ModuleTypeRegistry::new() }
     }
 }
-
 
 /// MMF startup configuration.
 #[derive(Debug, Clone)]
 pub struct MMFConfiguration {
-
     /// Capacity of normal module event queues.
     pub module_normal_channel_capacity: usize,
 
@@ -127,49 +113,27 @@ pub struct MMFConfiguration {
 }
 
 impl Default for MMFConfiguration {
-
     fn default() -> Self {
-
-        Self {
-
-            module_normal_channel_capacity: 50,
-            module_priority_channel_capacity: 10,
-            error_event_buffer_capacity: 100,
-            log_event_buffer_capacity: 100,
-        }
+        Self { module_normal_channel_capacity: 50, module_priority_channel_capacity: 10, error_event_buffer_capacity: 100, log_event_buffer_capacity: 100 }
     }
 }
-
 
 /// Public MMF entry point.
 pub struct MMF;
 
 impl MMF {
-
     /// Returns information about the Mesh Module Framework.
     pub fn get_info() -> MMFInfo {
-        MMFInfo {
-            crate_name: env!("CARGO_PKG_NAME"),
-            crate_version: env!("CARGO_PKG_VERSION"),
-            crate_git_commit: env!("MMF_GIT_COMMIT"),
-            build_profile: if cfg!(debug_assertions) {
-                "debug"
-            } else {
-                "release"
-            },
-        }
+        MMFInfo { crate_name: env!("CARGO_PKG_NAME"), crate_version: env!("CARGO_PKG_VERSION"), crate_git_commit: env!("MMF_GIT_COMMIT"), build_profile: if cfg!(debug_assertions) { "debug" } else { "release" } }
     }
-
 
     /// Initialize MMF using the default configuration.
     pub fn init() -> Result<(), FrameworkError> {
-
         Self::init_with_configuration(MMFConfiguration::default())
     }
 
     /// Initialize the MMF framework with custom configuration.
     pub fn init_with_configuration(mmf_configuration: MMFConfiguration) -> Result<(), FrameworkError> {
-        
         let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
         if mmf_data_guard.is_some() {
             return Err(FrameworkError::Framework_AlreadyInitialized);
@@ -186,25 +150,15 @@ impl MMF {
         drop(mmf_mod_data_guard);
 
         let mut mmf_err_data_guard = MMF_ERR_DATA.write().expect(MMFPanic::MMFErrData_WriteLockPoisoned.message());
-        *mmf_err_data_guard = Some(ErrorData {
-            
-            error_event_buffer_capacity:mmf_configuration.error_event_buffer_capacity,
-            error_event_list: VecDeque::new(),
-        });
+        *mmf_err_data_guard = Some(ErrorData { error_event_buffer_capacity: mmf_configuration.error_event_buffer_capacity, error_event_list: VecDeque::new() });
         drop(mmf_err_data_guard);
 
         let mut mmf_log_data_guard = MMF_LOG_DATA.write().expect(MMFPanic::MMFLogData_WriteLockPoisoned.message());
-        *mmf_log_data_guard = Some(LoggingData {
-            
-            log_event_buffer_capacity:mmf_configuration.log_event_buffer_capacity,
-            logged_module_list: Vec::new(),
-            log_event_list: VecDeque::new(),
-        });
+        *mmf_log_data_guard = Some(LoggingData { log_event_buffer_capacity: mmf_configuration.log_event_buffer_capacity, logged_module_list: Vec::new(), log_event_list: VecDeque::new() });
         drop(mmf_log_data_guard);
 
         Ok(())
     }
-
 
     /// Shutdown the MMF framework and release all resources.
     ///
@@ -217,7 +171,6 @@ impl MMF {
     /// gracefully, or MMFMod::abort_module() as a last
     /// resort if a module becomes unresponsive.
     pub fn close() -> Result<(), FrameworkError> {
-
         // Check that MMF has been initialized.
         let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
         if mmf_data_guard.is_none() {
@@ -250,13 +203,10 @@ impl MMF {
         Ok(())
     }
 
-
     /// Check whether the framework is initialized.
     pub fn is_initialized() -> bool {
-        
         MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message()).is_some()
     }
-
 
     /// Register a module type.
     ///
@@ -266,7 +216,7 @@ impl MMF {
     /// Registration associates the module's ModuleTypeID
     /// with:
     /// - its Rust type name, used for diagnostics;
-    /// - a constructor function used by MMF to create new 
+    /// - a constructor function used by MMF to create new
     ///   module instances dynamically.
     ///
     /// The registered constructor creates a new default
@@ -279,16 +229,15 @@ impl MMF {
     /// - Module_DuplicateModuleTypeID if the ModuleTypeID is
     ///   already associated with a different Rust module type.
     pub fn register_module_type<T>() -> Result<(), FrameworkError>
-    where T: Module + Send + 'static {
-
+    where
+        T: Module + Send + 'static,
+    {
         let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
         let rust_type_name = std::any::type_name::<T>();
-        
-        match mmf_data.module_type_registry.get_module_rust_type_name(T::module_type_id())
-        {
-            Ok(registered_rust_type_name) => {
 
+        match mmf_data.module_type_registry.get_module_rust_type_name(T::module_type_id()) {
+            Ok(registered_rust_type_name) => {
                 if registered_rust_type_name == rust_type_name {
                     return Err(FrameworkError::ModuleType_AlreadyRegistered);
                 }
@@ -297,7 +246,6 @@ impl MMF {
             }
 
             Err(FrameworkError::ModuleType_NotFound) => {
-
                 // Create the constructor associated with this module type.
                 //
                 // The constructor is stored in the ModuleTypeRegistry and
@@ -316,6 +264,4 @@ impl MMF {
 
         Ok(())
     }
-
 }
-

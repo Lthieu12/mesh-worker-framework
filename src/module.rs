@@ -56,11 +56,8 @@ pub enum EntityID {
 }
 
 impl std::fmt::Display for EntityID {
-
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-
         match self {
-
             EntityID::Module(module_id) => {
                 write!(f, "{module_id}")
             }
@@ -73,17 +70,13 @@ impl std::fmt::Display for EntityID {
 }
 
 impl EntityID {
-
     /// Returns a shortened human-readable representation of the entity.
     ///
     /// Module entities preserve the instance suffix whenever possible.
     /// External entities are truncated at the end.
     pub(crate) fn to_short_string(&self, max_len: usize) -> String {
-
         match self {
-
             EntityID::Module(module_id) => {
-
                 if module_id.len() <= max_len {
                     return module_id.clone();
                 }
@@ -100,14 +93,10 @@ impl EntityID {
                 format!("{}...{}", &module_id[..prefix_len], &module_id[module_id.len() - SUFFIX_LEN..])
             }
 
-            EntityID::External(text) => {
-
-                string_helper::to_short_string(text, max_len)
-            }
+            EntityID::External(text) => string_helper::to_short_string(text, max_len),
         }
     }
 }
-
 
 /// Current state of a module within the framework.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -131,12 +120,9 @@ pub enum ModuleState {
 }
 
 impl ModuleState {
-
     /// Returns a human-readable representation of the module state.
     fn as_str(&self) -> &'static str {
-
         match self {
-
             ModuleState::Created => "Created",
             ModuleState::Initializing => "Initializing",
             ModuleState::InitFailed => "InitFailed",
@@ -149,11 +135,9 @@ impl ModuleState {
     }
 }
 
-
 /// Current status of a module within the framework.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ModuleStatus {
-
     pub module_state: ModuleState,
 
     pub normal_channel_size: usize,
@@ -162,7 +146,6 @@ pub struct ModuleStatus {
     pub priority_channel_size: usize,
     pub priority_channel_capacity: usize,
 }
-
 
 /// Information describing a currently registered module.
 ///
@@ -176,25 +159,18 @@ pub struct ModuleStatus {
 /// - Logging configuration tools.
 #[derive(Debug, Clone)]
 pub struct ModuleInfo {
-
     pub module_id: ModuleID,
     pub father_id: EntityID,
     pub module_state: ModuleState,
 }
 
 impl ModuleInfo {
-
     /// Converts the module information into a human-readable terminal string.
     fn to_terminal_string(&self) -> String {
-
         format!(
             "{:width_module$} | {:width_father$} | {:width_state$}",
-            EntityID::Module(self.module_id.clone()).to_short_string(
-                terminal_module_column::MODULE_ID_LEN,
-            ),
-            self.father_id.to_short_string(
-                terminal_module_column::FATHER_ID_LEN,
-            ),
+            EntityID::Module(self.module_id.clone()).to_short_string(terminal_module_column::MODULE_ID_LEN,),
+            self.father_id.to_short_string(terminal_module_column::FATHER_ID_LEN,),
             self.module_state.as_str(),
             width_module = terminal_module_column::MODULE_ID_LEN,
             width_father = terminal_module_column::FATHER_ID_LEN,
@@ -204,21 +180,13 @@ impl ModuleInfo {
 
     /// Converts the module information into a CSV row.
     fn to_csv_string(&self) -> String {
-
-        format!(
-            "{},{},{}",
-            string_helper::csv_escape(&self.module_id),
-            string_helper::csv_escape(&self.father_id.to_string()),
-            string_helper::csv_escape(self.module_state.as_str()),
-        )
+        format!("{},{},{}", string_helper::csv_escape(&self.module_id), string_helper::csv_escape(&self.father_id.to_string()), string_helper::csv_escape(self.module_state.as_str()),)
     }
-
 }
 
 /// Output format used to represent module information.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ModuleOutputFormat {
-
     Terminal,
     CSV,
 }
@@ -231,17 +199,14 @@ mod terminal_module_column {
     pub(crate) const STATE_LEN: usize = 12;
 }
 
-
 /// List of module information returned by MMFMod.
 #[derive(Debug, Clone)]
 pub struct ModuleList {
-
     pub module_info_list: Vec<ModuleInfo>,
 }
 
 impl std::fmt::Display for ModuleList {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-
         writeln!(f)?;
         writeln!(f, "{}", Self::get_header(ModuleOutputFormat::Terminal))?;
 
@@ -253,57 +218,33 @@ impl std::fmt::Display for ModuleList {
 }
 
 impl ModuleList {
-
     /// Returns the column header corresponding to the requested format.
     pub fn get_header(format: ModuleOutputFormat) -> String {
-
         match format {
-
             ModuleOutputFormat::Terminal => {
-
-                let header = format!(
-                    "{:<width_module$} | {:<width_father$} | {:<width_state$}",
-                    "ModuleID",
-                    "FatherID",
-                    "State",
-                    width_module = terminal_module_column::MODULE_ID_LEN,
-                    width_father = terminal_module_column::FATHER_ID_LEN,
-                    width_state = terminal_module_column::STATE_LEN,
-                );
+                let header = format!("{:<width_module$} | {:<width_father$} | {:<width_state$}", "ModuleID", "FatherID", "State", width_module = terminal_module_column::MODULE_ID_LEN, width_father = terminal_module_column::FATHER_ID_LEN, width_state = terminal_module_column::STATE_LEN,);
 
                 let separator = "-".repeat(header.len());
 
                 format!("{header}\n{separator}")
             }
 
-            ModuleOutputFormat::CSV => {
-
-                String::from("ModuleID,FatherID,State")
-            }
+            ModuleOutputFormat::CSV => String::from("ModuleID,FatherID,State"),
         }
     }
 
     /// Converts a module information list into strings.
     pub fn to_string_list(&self, format: ModuleOutputFormat) -> Vec<String> {
-
         let mut module_info_list = self.module_info_list.clone();
         module_info_list.sort_by(|a, b| a.module_id.cmp(&b.module_id));
 
         match format {
+            ModuleOutputFormat::Terminal => module_info_list.iter().map(|module_info| module_info.to_terminal_string()).collect(),
 
-            ModuleOutputFormat::Terminal => {
-
-                module_info_list.iter().map(|module_info| module_info.to_terminal_string()).collect()
-            }
-
-            ModuleOutputFormat::CSV => {
-
-                module_info_list.iter().map(|module_info| module_info.to_csv_string()).collect()
-            }
+            ModuleOutputFormat::CSV => module_info_list.iter().map(|module_info| module_info.to_csv_string()).collect(),
         }
     }
 }
-
 
 /// Interface implemented by all MMF modules.
 ///
@@ -311,7 +252,6 @@ impl ModuleList {
 /// `Module::new()` on the registered module type.
 #[async_trait]
 pub trait Module {
-
     /// Returns the unique identifier of this module type.
     ///
     /// Every module implementation must provide a unique ModuleTypeID.
@@ -321,7 +261,8 @@ pub trait Module {
     /// objects (`dyn Module`) so that MMF can store modules behind
     /// `Box<dyn Module>`.
     fn module_type_id() -> ModuleTypeID
-    where Self: Sized;
+    where
+        Self: Sized;
 
     /// Creates a new module instance.
     ///
@@ -333,7 +274,8 @@ pub trait Module {
     /// Runtime resources should be acquired later during
     /// on_init().
     fn new() -> Self
-    where Self: Sized;
+    where
+        Self: Sized;
 
     /// Called once when the module is initialized.
     async fn on_init(&mut self, module_id: ModuleID, father_id: EntityID, lifecycle_data: Bytes) -> Result<(), ModuleError>;

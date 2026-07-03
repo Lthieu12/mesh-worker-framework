@@ -15,28 +15,21 @@
 use bytes::Bytes;
 use serial_test::serial;
 
-use mesh_module_framework::*;
-use dev_support::simulation_module::{SimulationModule, SimulationBehavior, SimulationModuleConfig};
 use dev_support::dev_helper::*;
+use dev_support::simulation_module::{SimulationBehavior, SimulationModule, SimulationModuleConfig};
+use mesh_module_framework::*;
 
 // MMF uses a global runtime instance.
 // Integration tests must run serially.
 #[tokio::test]
 #[serial]
 async fn test_module_hierarchy() {
-
     MMF::init().unwrap();
     MMF::register_module_type::<SimulationModule>().unwrap();
 
     let module_a_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("MAIN".to_string())).unwrap();
 
-    let configuration = SimulationModuleConfig {
-        init_delay_ms: 100,
-        close_delay_ms: 100,
-        simulation_behavior: SimulationBehavior::DoNothing,
-        wait_children_close: true,
-        wait_children_close_timeout_ms: Some(500),
-    };
+    let configuration = SimulationModuleConfig { init_delay_ms: 100, close_delay_ms: 100, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: true, wait_children_close_timeout_ms: Some(500) };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
     MMFMod::init_module(&module_a_id, lifecycle_data).await.unwrap();
@@ -45,26 +38,14 @@ async fn test_module_hierarchy() {
 
     let module_b_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::Module(module_a_id.clone())).unwrap();
 
-    let configuration = SimulationModuleConfig {
-        init_delay_ms: 200,
-        close_delay_ms: 200,
-        simulation_behavior: SimulationBehavior::DoNothing,
-        wait_children_close: false,
-        wait_children_close_timeout_ms: None,
-    };
+    let configuration = SimulationModuleConfig { init_delay_ms: 200, close_delay_ms: 200, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
     MMFMod::init_module(&module_b_id, lifecycle_data).await.unwrap();
 
     let module_c_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::Module(module_a_id.clone())).unwrap();
 
-    let configuration = SimulationModuleConfig {
-        init_delay_ms: 300,
-        close_delay_ms: 300,
-        simulation_behavior: SimulationBehavior::DoNothing,
-        wait_children_close: false,
-        wait_children_close_timeout_ms: None,
-    };
+    let configuration = SimulationModuleConfig { init_delay_ms: 300, close_delay_ms: 300, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
     MMFMod::init_module(&module_c_id, lifecycle_data).await.unwrap();
@@ -75,50 +56,29 @@ async fn test_module_hierarchy() {
 
     // Verify father relationships.
 
-    assert_eq!(
-        MMFMod::get_father_id(&module_a_id).unwrap(),
-        EntityID::External("MAIN".to_string())
-    );
+    assert_eq!(MMFMod::get_father_id(&module_a_id).unwrap(), EntityID::External("MAIN".to_string()));
 
-    assert_eq!(
-        MMFMod::get_father_id(&module_b_id).unwrap(),
-        EntityID::Module(module_a_id.clone())
-    );
+    assert_eq!(MMFMod::get_father_id(&module_b_id).unwrap(), EntityID::Module(module_a_id.clone()));
 
-    assert_eq!(
-        MMFMod::get_father_id(&module_c_id).unwrap(),
-        EntityID::Module(module_a_id.clone())
-    );
+    assert_eq!(MMFMod::get_father_id(&module_c_id).unwrap(), EntityID::Module(module_a_id.clone()));
 
     // Verify children relationships.
 
-    let children_ids =
-        MMFMod::get_children_ids(
-            &EntityID::Module(module_a_id.clone())
-        ).unwrap();
+    let children_ids = MMFMod::get_children_ids(&EntityID::Module(module_a_id.clone())).unwrap();
 
     assert_eq!(children_ids.len(), 2);
     assert!(children_ids.contains(&module_b_id));
     assert!(children_ids.contains(&module_c_id));
 
-    let children_ids =
-        MMFMod::get_children_ids(
-            &EntityID::Module(module_b_id.clone())
-        ).unwrap();
+    let children_ids = MMFMod::get_children_ids(&EntityID::Module(module_b_id.clone())).unwrap();
 
     assert!(children_ids.is_empty());
 
-    let children_ids =
-        MMFMod::get_children_ids(
-            &EntityID::Module(module_c_id.clone())
-        ).unwrap();
+    let children_ids = MMFMod::get_children_ids(&EntityID::Module(module_c_id.clone())).unwrap();
 
     assert!(children_ids.is_empty());
 
-    let children_ids =
-        MMFMod::get_children_ids(
-            &EntityID::External("MAIN".to_string())
-        ).unwrap();
+    let children_ids = MMFMod::get_children_ids(&EntityID::External("MAIN".to_string())).unwrap();
 
     assert_eq!(children_ids.len(), 1);
     assert!(children_ids.contains(&module_a_id));

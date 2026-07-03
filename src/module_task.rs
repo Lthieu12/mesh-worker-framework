@@ -5,7 +5,7 @@
 //! After a module is spawned:
 //! - MMF owns the Senders and the JoinHandle.
 //! - ModuleTask owns the module instance and the Receivers.
-//! 
+//!
 //! Responsibilities:
 //! - Own the module instance.
 //! - Receive commands and messages sent by MMF.
@@ -21,19 +21,18 @@
 //! These callbacks are executed inside the module task because
 //! the module instance is owned by Tokio after spawn_module().
 
-use tokio::task::JoinHandle;
-use std::time::Instant;
-use std::panic::AssertUnwindSafe;
 use futures::FutureExt;
+use std::panic::AssertUnwindSafe;
+use std::time::Instant;
+use tokio::task::JoinHandle;
 
-use crate::mmf::{MMF_MOD_DATA, MMF_MOD_INIT_NOTIFY, MMF_MOD_CLOSE_NOTIFY};
-use crate::channel::{ModuleCommand, ModuleNormalReceiverChannel, ModulePriorityReceiverChannel};
-use crate::module::{Module, ModuleID, EntityID, ModuleState};
-use crate::framework_error::MMFPanic;
 use crate::MMFErr;
 use crate::MMFLog;
+use crate::channel::{ModuleCommand, ModuleNormalReceiverChannel, ModulePriorityReceiverChannel};
+use crate::framework_error::MMFPanic;
+use crate::mmf::{MMF_MOD_CLOSE_NOTIFY, MMF_MOD_DATA, MMF_MOD_INIT_NOTIFY};
 use crate::mmf_log::{LogAction, LogStatus};
-
+use crate::module::{EntityID, Module, ModuleID, ModuleState};
 
 /// Spawn the Tokio task associated with a module instance.
 ///
@@ -47,10 +46,8 @@ use crate::mmf_log::{LogAction, LogStatus};
 /// The spawned Tokio task executes the complete module
 /// lifecycle, including initialization, message processing
 /// and shutdown.
-pub(crate) fn spawn_module_task(module: Box<dyn Module + Send>, normal_receiver_channel: ModuleNormalReceiverChannel, priority_receiver_channel: ModulePriorityReceiverChannel, module_id:ModuleID, father_id:EntityID) -> JoinHandle<()> {
-   
+pub(crate) fn spawn_module_task(module: Box<dyn Module + Send>, normal_receiver_channel: ModuleNormalReceiverChannel, priority_receiver_channel: ModulePriorityReceiverChannel, module_id: ModuleID, father_id: EntityID) -> JoinHandle<()> {
     tokio::spawn(async move {
-
         let task_module_id = module_id.clone();
         // Execute the module task while catching Rust panics.
         //
@@ -61,32 +58,24 @@ pub(crate) fn spawn_module_task(module: Box<dyn Module + Send>, normal_receiver_
         let result = AssertUnwindSafe(module_task(module, normal_receiver_channel, priority_receiver_channel, module_id, father_id)).catch_unwind().await;
 
         match result {
-
             Ok(()) => {
                 // Nothing to do.
             }
 
             Err(payload) => {
-
-                let panic_error =
-                    if let Some(message) = payload.downcast_ref::<&str>() {
-
-                        anyhow::anyhow!("{}", message)
-                    } 
-                    else if let Some(message) = payload.downcast_ref::<String>() {
-
-                        anyhow::anyhow!("{}", message)
-                    } 
-                    else {
-
-                        anyhow::anyhow!("Unknown panic")
-                    };
+                let panic_error = if let Some(message) = payload.downcast_ref::<&str>() {
+                    anyhow::anyhow!("{}", message)
+                } else if let Some(message) = payload.downcast_ref::<String>() {
+                    anyhow::anyhow!("{}", message)
+                } else {
+                    anyhow::anyhow!("Unknown panic")
+                };
 
                 // Store the panic in MMFErr.
                 MMFErr::add_error_internal(&EntityID::Module(task_module_id.clone()), Some("on_init".to_string()), &panic_error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
                 // Log the panic in MMFLog
                 MMFLog::add_log(Instant::now(), &task_module_id, LogAction::ModulePanic, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
-    
+
                 let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
                 let mmf_data = mmf_data_guard.as_mut().expect(MMFPanic::MMFModData_Missing.message());
 
@@ -103,10 +92,8 @@ pub(crate) fn spawn_module_task(module: Box<dyn Module + Send>, normal_receiver_
                 MMF_MOD_CLOSE_NOTIFY.notify_waiters();
             }
         }
-
-    })    
+    })
 }
-
 
 /// Execute the complete lifecycle of a module.
 ///
@@ -124,7 +111,6 @@ pub(crate) fn spawn_module_task(module: Box<dyn Module + Send>, normal_receiver_
 /// - Report errors and log module activity.
 /// - Terminate when the module is closed.
 async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: ModuleNormalReceiverChannel, priority_receiver_channel: ModulePriorityReceiverChannel, module_id: ModuleID, father_id: EntityID) {
-
     // ModuleTask owns the module instance.
     //
     // All module callbacks are executed
@@ -149,7 +135,6 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
     let mut priority_stack: Vec<ModuleCommand> = Vec::new();
 
     loop {
-
         // Drain all currently pending priority commands.
         //
         // Tokio channels are FIFO. Moving all available priority
@@ -164,36 +149,31 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
         //
         // If the stack is not empty, process the most recently
         // received priority command immediately.
-        let command =
-            if let Some(command) = priority_stack.pop() {
-
-                command
-            } 
-            else {
-
-                // No priority command is currently pending.
-                //
-                // Wait for the next command from either channel.
-                //
-                // Tokio wakes this task automatically when a message
-                // arrives on the normal or priority channel.
-                //
-                // Receiver channels are expected to remain valid
-                // until the module task terminates.
-                //
-                // A closed channel indicates an internal framework error.
-                tokio::select! {
-                    command = priority_receiver_channel.recv() => {
-                        command.expect(MMFPanic::Module_PriorityChannelClosed.message())
-                    }
-                    command = normal_receiver_channel.recv() => {
-                        command.expect(MMFPanic::Module_NormalChannelClosed.message())
-                    }
+        let command = if let Some(command) = priority_stack.pop() {
+            command
+        } else {
+            // No priority command is currently pending.
+            //
+            // Wait for the next command from either channel.
+            //
+            // Tokio wakes this task automatically when a message
+            // arrives on the normal or priority channel.
+            //
+            // Receiver channels are expected to remain valid
+            // until the module task terminates.
+            //
+            // A closed channel indicates an internal framework error.
+            tokio::select! {
+                command = priority_receiver_channel.recv() => {
+                    command.expect(MMFPanic::Module_PriorityChannelClosed.message())
                 }
-            };          
+                command = normal_receiver_channel.recv() => {
+                    command.expect(MMFPanic::Module_NormalChannelClosed.message())
+                }
+            }
+        };
 
         match command {
-
             // Execute module initialization.
             //
             // MMF has already changed the module state from
@@ -201,11 +181,9 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
             //
             // ModuleTask is responsible for marking the module
             // as Initialized only after on_init() completes.
-            ModuleCommand::Init {lifecycle_data} => {
-
+            ModuleCommand::Init { lifecycle_data } => {
                 let action_start_timer = Instant::now();
                 MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleInit, LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
-
 
                 let result_init = module.on_init(module_id.clone(), father_id.clone(), lifecycle_data).await;
 
@@ -217,17 +195,14 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
                 let mmf_data = mmf_data_guard.as_mut().expect(MMFPanic::MMFModData_Missing.message());
                 match &result_init {
                     Ok(()) => {
-
                         mmf_data.module_registry.set_module_state(&module_id, ModuleState::Initialized).expect(MMFPanic::Registry_ModuleMissing.message());
                         MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleInit, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                     }
                     Err(error) => {
-
-                                                MMFErr::add_error_internal(&EntityID::Module(module_id.clone()), Some("on_init".to_string()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
+                        MMFErr::add_error_internal(&EntityID::Module(module_id.clone()), Some("on_init".to_string()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
                         mmf_data.module_registry.set_module_state(&module_id, ModuleState::InitFailed).expect(MMFPanic::Registry_ModuleMissing.message());
                         MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleInit, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                     }
-
                 }
                 drop(mmf_data_guard);
 
@@ -244,32 +219,22 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
             // This guarantees that a message accepted before a
             // Close command is always processed before module
             // shutdown begins.
-            ModuleCommand::Message {message, priority} => {
-
+            ModuleCommand::Message { message, priority } => {
                 let action_start_timer = Instant::now();
-                let log_action = LogAction::ModuleMessage {
-
-                    sender_id: message.sender_id.clone(),
-                    message_id: message.message_id.clone(),
-                    priority,
-                    wait_completion: false,
-                };
+                let log_action = LogAction::ModuleMessage { sender_id: message.sender_id.clone(), message_id: message.message_id.clone(), priority, wait_completion: false };
                 let sender_id = message.sender_id.clone();
                 let message_id = message.message_id.clone();
 
                 MMFLog::add_log(action_start_timer, &module_id, log_action.clone(), LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
 
                 let result_message = module.on_message(message).await;
-                
+
                 match &result_message {
-
                     Ok(()) => {
-
                         MMFLog::add_log(action_start_timer, &module_id, log_action, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                     }
 
                     Err(error) => {
-
                         let error_context = format!("on_message -> MessageID={}, SenderID={}", message_id, sender_id);
                         MMFErr::add_error_internal(&EntityID::Module(module_id.clone()), Some(error_context.to_string()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
                         MMFLog::add_log(action_start_timer, &module_id, log_action, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
@@ -288,16 +253,9 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
             // This guarantees that a message accepted before a
             // Close command is always processed before module
             // shutdown begins.
-            ModuleCommand::MessageAndWaitCompletion {reply_sender, message, priority} => {
-
+            ModuleCommand::MessageAndWaitCompletion { reply_sender, message, priority } => {
                 let action_start_timer = Instant::now();
-                let log_action = LogAction::ModuleMessage {
-
-                    sender_id: message.sender_id.clone(),
-                    message_id: message.message_id.clone(),
-                    priority,
-                    wait_completion: true,
-                };
+                let log_action = LogAction::ModuleMessage { sender_id: message.sender_id.clone(), message_id: message.message_id.clone(), priority, wait_completion: true };
                 let sender_id = message.sender_id.clone();
                 let message_id = message.message_id.clone();
 
@@ -306,20 +264,17 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
                 let result_message = module.on_message(message).await;
 
                 match &result_message {
-
                     Ok(()) => {
-
                         MMFLog::add_log(action_start_timer, &module_id, log_action, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                     }
 
                     Err(error) => {
-
                         let error_context = format!("on_message -> MessageID={}, SenderID={}", message_id, sender_id);
                         MMFErr::add_error_internal(&EntityID::Module(module_id.clone()), Some(error_context.to_string()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
                         MMFLog::add_log(action_start_timer, &module_id, log_action, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                     }
                 }
-                
+
                 let _ = reply_sender.send(result_message);
             }
 
@@ -330,8 +285,7 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
             //
             // ModuleTask is responsible for removing the module
             // from the Registry only after on_close() completes.
-            ModuleCommand::Close {lifecycle_data} => {
-
+            ModuleCommand::Close { lifecycle_data } => {
                 let action_start_timer = Instant::now();
                 MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleClose, LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
 
@@ -345,7 +299,6 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
                 let mmf_data = mmf_data_guard.as_mut().expect(MMFPanic::MMFModData_Missing.message());
                 match &result_close {
                     Ok(()) => {
-
                         mmf_data.module_registry.set_module_state(&module_id, ModuleState::Closed).expect(MMFPanic::Registry_ModuleMissing.message());
                         MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleClose, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                         // Remove the module from the Registry.
@@ -356,7 +309,6 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
                         let _ = MMFLog::remove_logged_module(&module_id);
                     }
                     Err(error) => {
-
                         MMFErr::add_error_internal(&EntityID::Module(module_id.clone()), Some("on_close".to_string()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
                         mmf_data.module_registry.set_module_state(&module_id, ModuleState::CloseFailed).expect(MMFPanic::Registry_ModuleMissing.message());
                         MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleClose, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
@@ -374,6 +326,5 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
                 break;
             }
         }
-        
     }
 }

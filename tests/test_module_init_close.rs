@@ -5,18 +5,17 @@
 //! - Initialization failures are correctly propagated.
 //! - Shutdown failures are correctly propagated.
 
-use serial_test::serial;
 use bytes::Bytes;
+use serial_test::serial;
 
+use dev_support::simulation_module::{SimulationBehavior, SimulationModule, SimulationModuleConfig};
 use mesh_module_framework::*;
-use dev_support::simulation_module::{SimulationModule, SimulationBehavior, SimulationModuleConfig};
 
 // MMF uses a global runtime instance.
 // Integration tests must run serially.
 #[tokio::test]
 #[serial]
 async fn test_module_init_failed() {
-
     MMF::init().unwrap();
 
     let result = MMFMod::spawn_module("SimulationModule", &EntityID::External("MAIN".to_string()));
@@ -27,13 +26,7 @@ async fn test_module_init_failed() {
 
     let module_id = MMFMod::spawn_module("SimulationModule", &EntityID::External("MAIN".to_string())).unwrap();
 
-    let configuration = SimulationModuleConfig {
-        init_delay_ms: 0,
-        close_delay_ms: 0,
-        simulation_behavior: SimulationBehavior::Init_Fail,
-        wait_children_close: false,
-        wait_children_close_timeout_ms: None,
-    };
+    let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Init_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
     MMFMod::init_module(&module_id, lifecycle_data).await.unwrap();
@@ -52,20 +45,13 @@ async fn test_module_init_failed() {
 #[tokio::test]
 #[serial]
 async fn test_module_close_failed() {
-
     MMF::init().unwrap();
 
     MMF::register_module_type::<SimulationModule>().unwrap();
 
     let module_id = MMFMod::spawn_module("SimulationModule", &EntityID::External("MAIN".to_string())).unwrap();
 
-    let configuration = SimulationModuleConfig {
-        init_delay_ms: 0,
-        close_delay_ms: 0,
-        simulation_behavior: SimulationBehavior::Close_Fail,
-        wait_children_close: false,
-        wait_children_close_timeout_ms: None,
-    };
+    let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Close_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
     MMFMod::init_module(&module_id, lifecycle_data).await.unwrap();

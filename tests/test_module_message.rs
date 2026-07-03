@@ -23,30 +23,20 @@ const MESSAGE_PRIORITY_2: &str = "PRIORITY_2";
 
 const MESSAGE_CHAIN: &str = "CHAIN";
 
-
 // MMF uses a global runtime instance.
 // Integration tests must run serially.
 #[tokio::test]
 #[serial]
 async fn test_message_priority_order() {
-
     MMF::init().unwrap();
-    
+
     MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
 
     MMF::register_module_type::<SimulationModule>().unwrap();
 
     let module_a_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("MAIN".to_string())).unwrap();
 
-    let configuration = SimulationModuleConfig {
-        init_delay_ms: 0,
-        close_delay_ms: 0,
-        simulation_behavior: SimulationBehavior::Message_Wait {
-                message_delay_ms: 100,
-            },
-        wait_children_close: false,
-        wait_children_close_timeout_ms: None,
-    };
+    let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Wait { message_delay_ms: 100 }, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
     MMFMod::init_module(&module_a_id, lifecycle_data).await.unwrap();
@@ -71,7 +61,6 @@ async fn test_message_priority_order() {
     let log_list = MMFLog::wait_log(None).await.unwrap();
 
     let messages = filter_messages(&log_list, &module_a_id);
-
 
     print_log_list().await;
 
@@ -128,13 +117,11 @@ async fn test_message_priority_order() {
     MMF::close().unwrap();
 }
 
-
 // MMF uses a global runtime instance.
 // Integration tests must run serially.
 #[tokio::test]
 #[serial]
 async fn test_send_message_and_wait() {
-
     MMF::init().unwrap();
 
     MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
@@ -146,15 +133,7 @@ async fn test_send_message_and_wait() {
     //
     let module_b_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("MAIN".to_string())).unwrap();
 
-    let configuration = SimulationModuleConfig {
-        init_delay_ms: 0,
-        close_delay_ms: 0,
-        simulation_behavior: SimulationBehavior::Message_Wait {
-            message_delay_ms: 100,
-        },
-        wait_children_close: false,
-        wait_children_close_timeout_ms: None,
-    };
+    let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Wait { message_delay_ms: 100 }, wait_children_close: false, wait_children_close_timeout_ms: None };
 
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
@@ -170,12 +149,7 @@ async fn test_send_message_and_wait() {
     let configuration = SimulationModuleConfig {
         init_delay_ms: 0,
         close_delay_ms: 0,
-        simulation_behavior: SimulationBehavior::Message_SendAndWait {
-            target_module_id: module_b_id.clone(),
-            message_id: MESSAGE_CHAIN.to_string(),
-            timeout_ms: Some(1000),
-            message_delay_ms: 0,
-        },
+        simulation_behavior: SimulationBehavior::Message_SendAndWait { target_module_id: module_b_id.clone(), message_id: MESSAGE_CHAIN.to_string(), timeout_ms: Some(1000), message_delay_ms: 0 },
         wait_children_close: false,
         wait_children_close_timeout_ms: None,
     };

@@ -5,5 +5,5 @@
 //!
 //! It is not part of the stable MMF public API.
 
-pub mod simulation_module;
 pub mod dev_helper;
+pub mod simulation_module;
