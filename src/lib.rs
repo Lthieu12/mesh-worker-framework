@@ -1,5 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
+#![allow(clippy::expect_fun_call)] // `expect()` keeps MMFPanic messages concise and readable.
+#![allow(clippy::single_match)] // Keep match statements ready for future behavior extensions.
 mod module_registry;
 mod module_type_registry;
 mod channel;
@@ -13,6 +15,7 @@ pub mod mmf;
 pub mod mmf_mod;
 pub mod mmf_log;
 pub mod mmf_err;
+
 
 // only used for tests, examples and debug.
 // 

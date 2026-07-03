@@ -74,17 +74,6 @@ impl std::fmt::Display for EntityID {
 
 impl EntityID {
 
-    /// Returns a human-readable representation of the entity.
-    pub(crate) fn to_string(&self) -> String {
-
-        match self {
-
-            EntityID::Module(module_id) => module_id.to_string(),
-            EntityID::External(name) => name.clone(),
-        }
-    }
-
-
     /// Returns a shortened human-readable representation of the entity.
     ///
     /// Module entities preserve the instance suffix whenever possible.
@@ -144,7 +133,7 @@ pub enum ModuleState {
 impl ModuleState {
 
     /// Returns a human-readable representation of the module state.
-    fn to_string(&self) -> &'static str {
+    fn as_str(&self) -> &'static str {
 
         match self {
 
@@ -206,7 +195,7 @@ impl ModuleInfo {
             self.father_id.to_short_string(
                 terminal_module_column::FATHER_ID_LEN,
             ),
-            self.module_state.to_string(),
+            self.module_state.as_str(),
             width_module = terminal_module_column::MODULE_ID_LEN,
             width_father = terminal_module_column::FATHER_ID_LEN,
             width_state = terminal_module_column::STATE_LEN,
@@ -220,7 +209,7 @@ impl ModuleInfo {
             "{},{},{}",
             string_helper::csv_escape(&self.module_id),
             string_helper::csv_escape(&self.father_id.to_string()),
-            string_helper::csv_escape(self.module_state.to_string()),
+            string_helper::csv_escape(self.module_state.as_str()),
         )
     }
 

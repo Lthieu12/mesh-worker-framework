@@ -185,7 +185,7 @@ impl Registry {
         // cannot be validated.
         match father_id {
             EntityID::Module(father_id_ref) => {
-                if !Registry::contains_module(&self, father_id_ref) {
+                if !Registry::contains_module(self, father_id_ref) {
                     return Err((FrameworkError::FatherModule_NotFound, join_handle));
                 }
             }
@@ -202,7 +202,7 @@ impl Registry {
         // child_module_map only stores existing relationships.
         //
         // Modules without children do not have an entry in this map.
-        self.child_module_map.entry(father_id.clone()).or_insert(Vec::new()).push(module_id.clone());
+        self.child_module_map.entry(father_id.clone()).or_default().push(module_id.clone());
 
         Ok(())
     }
@@ -281,7 +281,7 @@ impl Registry {
         // External entities are not managed by MMF and therefore
         // cannot be validated.
         if let EntityID::Module(module_id) = entity_id {
-            if !Registry::contains_module(&self, module_id) {
+            if !Registry::contains_module(self, module_id) {
                 return Err(FrameworkError::Module_NotFound);
             }
         }
@@ -305,7 +305,7 @@ impl Registry {
         // External entities are not managed by MMF and therefore
         // cannot be validated.
         if let EntityID::Module(module_id) = entity_id {
-            if !Registry::contains_module(&self, module_id) {
+            if !Registry::contains_module(self, module_id) {
                 return Err(FrameworkError::Module_NotFound);
             }
         }

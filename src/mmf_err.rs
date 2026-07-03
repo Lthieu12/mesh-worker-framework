@@ -291,7 +291,7 @@ impl MMFErr {
     /// notify all MMFErr waiters.
     pub fn add_error(entity_id: &EntityID, error: &anyhow::Error) -> Result<(), FrameworkError> {
 
-        MMFErr::add_error_internal(&entity_id, None, error)
+        MMFErr::add_error_internal(entity_id, None, error)
     }
 
 
@@ -418,7 +418,7 @@ impl MMFErr {
             }
         };
 
-        return Ok(
+        Ok(
             ErrorList {
 
                 first_error_instance_id: Some(first_buffer_error_instance_id),
@@ -426,7 +426,7 @@ impl MMFErr {
                 missing_error_count,
                 error_event_list,
             }
-        );
+        )
     }
 
 }

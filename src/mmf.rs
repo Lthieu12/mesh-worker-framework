@@ -25,10 +25,10 @@ pub(crate) static MMF_DATA: LazyLock<RwLock<Option<MMFData>>> = LazyLock::new(||
 pub(crate) static MMF_MOD_DATA: LazyLock<RwLock<Option<ModuleData>>> = LazyLock::new(|| RwLock::new(None));
 
 /// Global MMF notifier used to signal child module initialized.
-pub(crate) static MMF_MOD_INIT_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Notify::new());
+pub(crate) static MMF_MOD_INIT_NOTIFY: LazyLock<Notify> = LazyLock::new(Notify::new);
 
 /// Global MMF notifier used to signal child module closures.
-pub(crate) static MMF_MOD_CLOSE_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Notify::new());
+pub(crate) static MMF_MOD_CLOSE_NOTIFY: LazyLock<Notify> = LazyLock::new(Notify::new);
 
 /// Global MMF message instance counter used to identify messages sent to modules.
 pub(crate) static MMF_MOD_MESSAGE_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
@@ -39,7 +39,7 @@ pub(crate) static MMF_ERR_DATA: LazyLock<RwLock<Option<ErrorData>>> = LazyLock::
 
 /// MMF error notification emitted whenever a new error event
 /// is added to MMFErr.
-pub(crate) static MMF_ERR_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Notify::new());
+pub(crate) static MMF_ERR_NOTIFY: LazyLock<Notify> = LazyLock::new(Notify::new);
 
 /// Global MMF error instance counter.
 pub(crate) static MMF_ERR_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
@@ -53,7 +53,7 @@ pub(crate) static MMF_LOG_MODE: AtomicU8 = AtomicU8::new(LogMode::NoLog as u8);
 
 /// MMF error notification emitted whenever a new error event
 /// is added to MMFErr.
-pub(crate) static MMF_LOG_NOTIFY: LazyLock<Notify> = LazyLock::new(|| Notify::new());
+pub(crate) static MMF_LOG_NOTIFY: LazyLock<Notify> = LazyLock::new(Notify::new);
 
 /// Global log event counter.
 pub(crate) static MMF_LOG_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);

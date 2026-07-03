@@ -210,12 +210,12 @@ impl LogEvent{
             self.log_instance_id,
             string_helper::csv_escape(&self.timestamp_rfc3339),
             string_helper::csv_escape(&self.module_id),
-            string_helper::csv_escape(&event),
+            string_helper::csv_escape(event),
             string_helper::csv_escape(&sender_id),
             string_helper::csv_escape(&message_id),
             string_helper::csv_escape(&priority),
             string_helper::csv_escape(&wait),
-            string_helper::csv_escape(&status),
+            string_helper::csv_escape(status),
             string_helper::csv_escape(&duration),
         )
     }
@@ -464,7 +464,7 @@ impl MMFLog {
 
         // Skip immediately if logging is disabled
         // for this module.
-        if !Self::must_log_module(&module_id)? {
+        if !Self::must_log_module(module_id)? {
             return Ok(());
         }
 
@@ -487,7 +487,7 @@ impl MMFLog {
             module_id: module_id.clone(),
             log_action,
             log_status,
-            duration_ms: duration_ms,
+            duration_ms,
         };
 
         let mut mmf_log_data_guard = MMF_LOG_DATA.write().expect(MMFPanic::MMFLogData_WriteLockPoisoned.message());

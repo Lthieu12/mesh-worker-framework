@@ -118,7 +118,7 @@ impl MMFMod {
         //
         // This prevents creating new hierarchy branches
         // while the parent is starting up or shutting down.
-        match &father_id {
+        match father_id {
 
             EntityID::Module(father_id_ref) => {
 
@@ -156,7 +156,7 @@ impl MMFMod {
         // - Module state. 
         // - Communication channels.
         // - JoinHandle associated with the Tokio task.
-        match mmf_data.module_registry.add_module(&module_id, module_type_id, &father_id, normal_sender_channel, priority_sender_channel, join_handle) {
+        match mmf_data.module_registry.add_module(&module_id, module_type_id, father_id, normal_sender_channel, priority_sender_channel, join_handle) {
 
             Ok(()) => {}
 
@@ -283,15 +283,18 @@ impl MMFMod {
         // associated with the target module.
         //
         // Only modules in the Created state can be initialized.
-        let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
-        let module_state = mmf_data.module_registry.get_module_state(module_id)?;
-        if module_state != ModuleState::Created {
-            return Err(FrameworkError::Module_AlreadyInitialized);
-        }
-        mmf_data.module_registry.set_module_state(module_id, ModuleState::Initializing)?;
-        let normal_sender_channel = mmf_data.module_registry.get_module_normal_channel(module_id)?;
-        drop(mmf_data_guard);
+        let normal_sender_channel = {
+        
+            let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
+            let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
+            let module_state = mmf_data.module_registry.get_module_state(module_id)?;
+            if module_state != ModuleState::Created {
+                return Err(FrameworkError::Module_AlreadyInitialized);
+            }
+            mmf_data.module_registry.set_module_state(module_id, ModuleState::Initializing)?;
+            
+            mmf_data.module_registry.get_module_normal_channel(module_id)?
+        };
 
         // Send the Init command to ModuleTask.
         normal_sender_channel.send(ModuleCommand::Init {lifecycle_data}).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
@@ -312,15 +315,17 @@ impl MMFMod {
         // associated with the target module.
         //
         // Only modules in the Initialized state can be closed.
-        let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
-        let module_state = mmf_data.module_registry.get_module_state(module_id)?;
-        if module_state != ModuleState::Initialized {
-            return Err(FrameworkError::Module_NotInitialized);
-        }
-        mmf_data.module_registry.set_module_state(module_id, ModuleState::Closing)?;
-        let normal_sender_channel = mmf_data.module_registry.get_module_normal_channel(module_id)?;
-        drop(mmf_data_guard);
+        let normal_sender_channel = {
+        
+            let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
+            let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
+            let module_state = mmf_data.module_registry.get_module_state(module_id)?;
+            if module_state != ModuleState::Initialized {
+                return Err(FrameworkError::Module_NotInitialized);
+            }
+            mmf_data.module_registry.set_module_state(module_id, ModuleState::Closing)?;
+            mmf_data.module_registry.get_module_normal_channel(module_id)?
+        };
 
         // Send the Close command to ModuleTask.
         normal_sender_channel.send(ModuleCommand::Close {lifecycle_data}).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
@@ -608,7 +613,7 @@ impl MMFMod {
             }
 
             MMFLog::add_log(action_start_timer, module_id, LogAction::ModuleAbort, LogStatus::Ok)?;
-            let _ = MMFLog::remove_logged_module(&module_id);
+            let _ = MMFLog::remove_logged_module(module_id);
         }
 
         drop(mmf_data_guard);

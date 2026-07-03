@@ -133,9 +133,6 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
     let mut normal_receiver_channel = normal_receiver_channel;
     let mut priority_receiver_channel = priority_receiver_channel;
 
-    let module_id = module_id;
-    let father_id = father_id;
-
     // Local LIFO stack used to store priority commands.
     //
     // Priority commands are first received through a Tokio FIFO
@@ -207,7 +204,7 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
             ModuleCommand::Init {lifecycle_data} => {
 
                 let action_start_timer = Instant::now();
-                MMFLog::add_log(action_start_timer.clone(), &module_id, LogAction::ModuleInit, LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleInit, LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
 
 
                 let result_init = module.on_init(module_id.clone(), father_id.clone(), lifecycle_data).await;
@@ -260,7 +257,7 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
                 let sender_id = message.sender_id.clone();
                 let message_id = message.message_id.clone();
 
-                MMFLog::add_log(action_start_timer.clone(), &module_id, log_action.clone(), LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                MMFLog::add_log(action_start_timer, &module_id, log_action.clone(), LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
 
                 let result_message = module.on_message(message).await;
                 
@@ -304,7 +301,7 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
                 let sender_id = message.sender_id.clone();
                 let message_id = message.message_id.clone();
 
-                MMFLog::add_log(action_start_timer.clone(), &module_id, log_action.clone(), LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                MMFLog::add_log(action_start_timer, &module_id, log_action.clone(), LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
 
                 let result_message = module.on_message(message).await;
 
@@ -318,7 +315,7 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
                     Err(error) => {
 
                         let error_context = format!("on_message -> MessageID={}, SenderID={}", message_id, sender_id);
-                        MMFErr::add_error_internal(&EntityID::Module(module_id.clone()), Some(error_context.to_string()), &error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
+                        MMFErr::add_error_internal(&EntityID::Module(module_id.clone()), Some(error_context.to_string()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
                         MMFLog::add_log(action_start_timer, &module_id, log_action, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                     }
                 }
@@ -336,7 +333,7 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
             ModuleCommand::Close {lifecycle_data} => {
 
                 let action_start_timer = Instant::now();
-                MMFLog::add_log(action_start_timer.clone(), &module_id, LogAction::ModuleClose, LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleClose, LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
 
                 let result_close = module.on_close(lifecycle_data).await;
 
