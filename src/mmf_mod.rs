@@ -5,7 +5,7 @@
 
 use bytes::Bytes;
 use std::sync::atomic::Ordering;
-use std::time::Instant;
+use std::time::{Instant, Duration};
 
 use crate::MMFLog;
 use crate::mmf::{MMFConfiguration, MMF_DATA, MMF_MOD_DATA, MMF_MOD_MESSAGE_INSTANCE_COUNTER, MMF_MOD_INIT_NOTIFY, MMF_MOD_CLOSE_NOTIFY};
@@ -177,6 +177,30 @@ impl MMFMod {
         drop(mmf_data_guard);
 
         Ok(module_id)
+    }
+
+
+    /// Execute blocking work without blocking the MMF runtime.
+    ///
+    /// Typical uses include native DLL calls and CPU-intensive
+    /// computations.
+    ///
+    /// While the blocking work is running, other MMF modules
+    /// continue executing.
+    pub async fn spawn_blocking<F, R>(f: F) -> Result<R, FrameworkError>
+    where F: FnOnce() -> R + Send + 'static, R: Send + 'static {
+
+        tokio::task::spawn_blocking(f).await.map_err(|e| FrameworkError::BlockingTask_Failed(anyhow::anyhow!(e)))
+    }
+
+
+    /// Suspend the current module for the specified duration.
+    ///
+    /// Other MMF modules continue executing while this module
+    /// is suspended.
+    pub async fn sleep(duration: Duration) {
+
+        tokio::time::sleep(duration).await;
     }
 
 

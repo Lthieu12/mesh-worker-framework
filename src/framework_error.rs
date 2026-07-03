@@ -89,6 +89,9 @@ pub enum FrameworkError {
     /// The LoggingInstanceID counter has reached its maximum value
     /// and can no longer generate unique identifiers.
     Logging_InstanceIDExhausted,
+
+    /// Blocking task execution failed.
+    BlockingTask_Failed(anyhow::Error),
 }
 
 /// Human-readable representation of FrameworkError.
@@ -160,6 +163,9 @@ impl fmt::Display for FrameworkError {
 
             FrameworkError::Logging_InstanceIDExhausted =>
                 write!(f, "LoggingInstanceID counter exhausted."),
+
+            FrameworkError::BlockingTask_Failed(error) =>
+                write!(f, "Blocking task execution failed: {}", error),
 
         }
     }
