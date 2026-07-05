@@ -1,3 +1,7 @@
+//! Verifies persistent file logging, including file creation,
+//! log writing and automatic shutdown when the maximum file
+//! size is reached.
+
 use serial_test::serial;
 
 use dev_support::simulation_module::{SimulationBehavior, SimulationModule, SimulationModuleConfig};
