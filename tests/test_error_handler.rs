@@ -13,6 +13,7 @@
 use anyhow::{Context, Result};
 use bytes::Bytes;
 use serial_test::serial;
+use std::path::PathBuf;
 
 use crate::mmf::MMFConfiguration;
 use dev_support::dev_helper::*;
@@ -128,7 +129,7 @@ async fn test_mmf_err_module_failures() {
 #[tokio::test]
 #[serial]
 async fn test_mmf_err_buffer_overflow() {
-    MMF::init_with_configuration(MMFConfiguration { module_normal_channel_capacity: 50, module_priority_channel_capacity: 10, error_event_buffer_capacity: 10, log_event_buffer_capacity: 10 }).unwrap();
+    MMF::init_with_configuration(MMFConfiguration { module_normal_channel_capacity: 50, module_priority_channel_capacity: 10, error_event_buffer_capacity: 10, log_event_buffer_capacity: 10, log_file_enabled_at_start: false, log_file_path: PathBuf::new(), log_file_max_size_bytes: 1024 }).unwrap();
     MMF::register_module_type::<SimulationModule>().unwrap();
 
     let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("Test".to_string())).unwrap();

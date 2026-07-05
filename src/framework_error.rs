@@ -87,6 +87,12 @@ pub enum FrameworkError {
     /// and can no longer generate unique identifiers.
     Logging_InstanceIDExhausted,
 
+    /// Invalid log file path.
+    Logging_LogFileInvalidPath,
+
+    /// Failed to access to log file.
+    Logging_LogFileAccessFailed(anyhow::Error),
+
     /// Blocking task execution failed.
     BlockingTask_Failed(anyhow::Error),
 }
@@ -171,6 +177,14 @@ impl fmt::Display for FrameworkError {
 
             FrameworkError::Logging_InstanceIDExhausted => {
                 write!(f, "LoggingInstanceID counter exhausted.")
+            }
+
+            FrameworkError::Logging_LogFileInvalidPath => {
+                write!(f, "Invalid log file path.")
+            }
+
+            FrameworkError::Logging_LogFileAccessFailed(error) => {
+                write!(f, "Failed to access to log file: {}", error)
             }
 
             FrameworkError::BlockingTask_Failed(error) => {

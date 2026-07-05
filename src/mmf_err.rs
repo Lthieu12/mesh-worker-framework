@@ -53,7 +53,7 @@ pub struct ErrorEvent {
 
 impl ErrorEvent {
     /// Converts the error event into a human-readable terminal string.
-    fn to_terminal_string(&self) -> String {
+    pub(crate) fn to_terminal_string(&self) -> String {
         let root_error_context = string_helper::error_root_context(&self.error_context_list);
         format!(
             "{:0width_id$} | {:width_time$} | {:width_entity_id$} | {:width_description$} | {:width_context$}",
@@ -71,7 +71,7 @@ impl ErrorEvent {
     }
 
     /// Converts the error event into a CSV row.
-    fn to_csv_string(&self) -> String {
+    pub(crate) fn to_csv_string(&self) -> String {
         let error_context_list = string_helper::error_context_list_to_string(&self.error_context_list);
         format!("{},{},{},{},{}", self.error_instance_id, string_helper::csv_escape(&self.timestamp_rfc3339), string_helper::csv_escape(&self.entity_id.to_string()), string_helper::csv_escape(&self.error_description), string_helper::csv_escape(&error_context_list),)
     }

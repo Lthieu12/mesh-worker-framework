@@ -4,11 +4,13 @@
 //! initialize and shutdown the API global runtime.
 
 use std::collections::VecDeque;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use std::sync::{LazyLock, RwLock};
 use tokio::sync::Notify;
 
 use crate::framework_error::{FrameworkError, MMFPanic};
+use crate::log_file;
 use crate::mmf_err::ErrorData;
 use crate::mmf_log::{LogMode, LoggingData};
 use crate::mmf_mod::ModuleData;
@@ -110,11 +112,22 @@ pub struct MMFConfiguration {
 
     /// Capacity of the MMFLog circular buffer.
     pub log_event_buffer_capacity: usize,
+
+    /// Log file activation when MMF starts,
+    pub log_file_enabled_at_start: bool,
+
+    /// Log file path.
+    pub log_file_path: PathBuf,
+
+    /// Maximum log file size in bytes.
+    pub log_file_max_size_bytes: u64,
 }
 
 impl Default for MMFConfiguration {
     fn default() -> Self {
-        Self { module_normal_channel_capacity: 50, module_priority_channel_capacity: 10, error_event_buffer_capacity: 100, log_event_buffer_capacity: 100 }
+        let log_file_path = PathBuf::new();
+        let log_file_max_size_bytes = 10 * 1024 * 1024;
+        Self { module_normal_channel_capacity: 50, module_priority_channel_capacity: 10, error_event_buffer_capacity: 100, log_event_buffer_capacity: 100, log_file_enabled_at_start: false, log_file_path, log_file_max_size_bytes }
     }
 }
 
@@ -133,7 +146,7 @@ impl MMF {
     }
 
     /// Initialize the MMF framework with custom configuration.
-    pub fn init_with_configuration(mmf_configuration: MMFConfiguration) -> Result<(), FrameworkError> {
+    pub fn init_with_configuration(mut mmf_configuration: MMFConfiguration) -> Result<(), FrameworkError> {
         let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
         if mmf_data_guard.is_some() {
             return Err(FrameworkError::Framework_AlreadyInitialized);
@@ -153,8 +166,19 @@ impl MMF {
         *mmf_err_data_guard = Some(ErrorData { error_event_buffer_capacity: mmf_configuration.error_event_buffer_capacity, error_event_list: VecDeque::new() });
         drop(mmf_err_data_guard);
 
+        // Initialize the MMF log file.
+        let log_file = log_file::init_log_file(&mut mmf_configuration)?;
         let mut mmf_log_data_guard = MMF_LOG_DATA.write().expect(MMFPanic::MMFLogData_WriteLockPoisoned.message());
-        *mmf_log_data_guard = Some(LoggingData { log_event_buffer_capacity: mmf_configuration.log_event_buffer_capacity, logged_module_list: Vec::new(), log_event_list: VecDeque::new() });
+        *mmf_log_data_guard = Some(LoggingData {
+            log_event_buffer_capacity: mmf_configuration.log_event_buffer_capacity,
+            logged_module_list: Vec::new(),
+            log_event_list: VecDeque::new(),
+            log_file_enabled: mmf_configuration.log_file_enabled_at_start,
+            log_file_path: mmf_configuration.log_file_path,
+            log_file: Some(log_file),
+            log_file_max_size_bytes: mmf_configuration.log_file_max_size_bytes,
+            log_file_current_size_bytes: 0,
+        });
         drop(mmf_log_data_guard);
 
         Ok(())
@@ -197,6 +221,9 @@ impl MMF {
         let mut mmf_err_data_guard = MMF_ERR_DATA.write().expect(MMFPanic::MMFErrData_WriteLockPoisoned.message());
         *mmf_err_data_guard = None;
 
+        // Destroy MMF logging data.
+        //
+        // Dropping LoggingData also closes the MMF log file.
         let mut mmf_log_data_guard = MMF_LOG_DATA.write().expect(MMFPanic::MMFLogData_WriteLockPoisoned.message());
         *mmf_log_data_guard = None;
 

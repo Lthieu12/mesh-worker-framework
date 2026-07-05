@@ -4,6 +4,7 @@
 #![allow(clippy::single_match)] // Keep match statements ready for future behavior extensions.
 mod channel;
 mod framework_error;
+mod log_file;
 mod message;
 mod module;
 mod module_registry;
