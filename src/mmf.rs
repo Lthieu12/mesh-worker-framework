@@ -113,7 +113,7 @@ pub struct MMFConfiguration {
     /// Capacity of the MMFLog circular buffer.
     pub log_event_buffer_capacity: usize,
 
-    /// Log file activation when MMF starts,
+    /// Enables file logging when MMF is initialized.
     pub log_file_enabled_at_start: bool,
 
     /// Log file path.
@@ -125,8 +125,11 @@ pub struct MMFConfiguration {
 
 impl Default for MMFConfiguration {
     fn default() -> Self {
-        let log_file_path = PathBuf::new();
+        let mut log_file_path = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("mmf.exe"));
+        log_file_path.set_file_name("mmf.log");
+
         let log_file_max_size_bytes = 10 * 1024 * 1024;
+
         Self { module_normal_channel_capacity: 50, module_priority_channel_capacity: 10, error_event_buffer_capacity: 100, log_event_buffer_capacity: 100, log_file_enabled_at_start: false, log_file_path, log_file_max_size_bytes }
     }
 }

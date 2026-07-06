@@ -31,15 +31,6 @@ const LOG_FILE_FULL_MESSAGE: &str = "Maximum log file size reached.\n\
 /// Existing MMF log files are truncated.
 /// Existing non-MMF files are never modified.
 pub(crate) fn init_log_file(configuration: &mut MMFConfiguration) -> Result<File, FrameworkError> {
-    // Build the default log file path.
-    if configuration.log_file_path.as_os_str().is_empty() {
-        let mut log_file_path = std::env::current_exe().map_err(|_| FrameworkError::Logging_LogFileInvalidPath)?;
-
-        log_file_path.set_file_name("mmf.log");
-
-        configuration.log_file_path = log_file_path;
-    }
-
     // Find a reusable MMF log file.
     configuration.log_file_path = find_log_file_path(&configuration.log_file_path)?;
 

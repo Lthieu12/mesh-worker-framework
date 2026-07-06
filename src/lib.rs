@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 #![allow(clippy::expect_fun_call)] // `expect()` keeps MMFPanic messages concise and readable.
 #![allow(clippy::single_match)] // Keep match statements ready for future behavior extensions.
+#![allow(clippy::collapsible_if)] // Preserve explicit multi-step control flow for readability.
 mod channel;
 mod framework_error;
 mod log_file;
