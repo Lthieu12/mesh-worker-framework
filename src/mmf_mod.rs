@@ -160,11 +160,10 @@ impl MMFMod {
 
     /// Execute blocking work without blocking the MMF runtime.
     ///
-    /// Typical uses include native DLL calls and CPU-intensive
-    /// computations.
+    /// Typical uses include native DLL calls and CPU-intensive computations.
     ///
-    /// While the blocking work is running, other MMF modules
-    /// continue executing.
+    /// The blocking work is executed on Tokio's blocking thread pool,
+    /// allowing the Tokio runtime to continue executing other MMF modules.
     pub async fn spawn_blocking<F, R>(f: F) -> Result<R, FrameworkError>
     where
         F: FnOnce() -> R + Send + 'static,
@@ -175,8 +174,8 @@ impl MMFMod {
 
     /// Suspend the current module for the specified duration.
     ///
-    /// Other MMF modules continue executing while this module
-    /// is suspended.
+    /// While this module is suspended, the Tokio runtime can continue
+    /// executing other MMF modules.
     pub async fn sleep(duration: Duration) {
         tokio::time::sleep(duration).await;
     }
