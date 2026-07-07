@@ -216,12 +216,18 @@ impl MMFMod {
         Ok(ModuleList { module_info_list: mmf_data.module_registry.get_module_info_list() })
     }
 
-    /// Get the Rust type name associated with a module.
+    /// Returns the fully qualified Rust type path associated with a module.
+    ///
+    /// This function is intended for diagnostics and debugging. It can help
+    /// locate the module implementation in the application's source code.
+    ///
+    /// The returned path is an implementation detail and should not be used
+    /// for application logic.
     ///
     /// Returns:
     /// - Framework_NotInitialized if MMF has not been initialized.
     /// - Module_NotFound if the module does not exist.
-    pub fn get_module_rust_type_name(module_id: &ModuleID) -> Result<&'static str, FrameworkError> {
+    pub fn get_module_type_rust_path(module_id: &ModuleID) -> Result<&'static str, FrameworkError> {
         // Get the ModuleTypeID associated with the module.
         let mmf_mod_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
         let mmf_mod_data = mmf_mod_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
