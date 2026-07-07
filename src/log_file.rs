@@ -25,9 +25,6 @@ const LOG_FILE_FULL_MESSAGE: &str = "Maximum log file size reached.\n\
 
 /// Initializes the MMF log file.
 ///
-/// If no path is specified, a `mmf.log` file is created
-/// next to the executable.
-///
 /// Existing MMF log files are truncated.
 /// Existing non-MMF files are never modified.
 pub(crate) fn init_log_file(configuration: &mut MMFConfiguration) -> Result<File, FrameworkError> {
