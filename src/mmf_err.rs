@@ -3,7 +3,6 @@
 //! This API exposes the framework error handling
 //! features.
 
-use chrono::{SecondsFormat, Utc};
 use std::collections::VecDeque;
 use std::sync::atomic::Ordering;
 
@@ -11,6 +10,7 @@ use crate::framework_error::{FrameworkError, MMFPanic};
 use crate::mmf::{MMF_ERR_DATA, MMF_ERR_INSTANCE_COUNTER, MMF_ERR_NOTIFY};
 use crate::module::EntityID;
 use crate::string_helper;
+use crate::MMF;
 
 /// Unique identifier assigned to each error event.
 pub type ErrorInstanceID = u64;
@@ -206,7 +206,7 @@ impl MMFErr {
             context = error_context.source();
         }
 
-        let timestamp_rfc3339 = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
+        let timestamp_rfc3339 = MMF::get_timestamp_rfc3339();
 
         let error_event = ErrorEvent { error_instance_id, timestamp_rfc3339, entity_id: entity_id.clone(), error_description: error_message, error_context_list };
 

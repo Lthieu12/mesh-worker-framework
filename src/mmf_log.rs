@@ -3,7 +3,6 @@
 //! This API exposes the framework logging and observability
 //! features.
 
-use chrono::{SecondsFormat, Utc};
 use std::collections::VecDeque;
 use std::fs::File;
 use std::path::PathBuf;
@@ -16,6 +15,7 @@ use crate::message::MessageID;
 use crate::mmf::{MMF_LOG_DATA, MMF_LOG_INSTANCE_COUNTER, MMF_LOG_MODE, MMF_LOG_NOTIFY};
 use crate::module::{EntityID, ModuleID};
 use crate::string_helper;
+use crate::MMF;
 
 /// Unique identifier assigned to each log event.
 pub type LogInstanceID = u64;
@@ -402,7 +402,7 @@ impl MMFLog {
         }
 
         let log_instance_id = MMFLog::generate_log_instance_id()?;
-        let timestamp_rfc3339 = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
+        let timestamp_rfc3339 = MMF::get_timestamp_rfc3339();
         let duration_ms: Option<u128> = match log_status {
             LogStatus::Start => None,
 

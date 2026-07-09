@@ -8,9 +8,11 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use std::sync::{LazyLock, RwLock};
 use tokio::sync::Notify;
+use chrono::{Local, SecondsFormat, Utc};
 
 use crate::framework_error::{FrameworkError, MMFPanic};
 use crate::log_file;
+use crate::mmf::TimestampFormat::LocalTime;
 use crate::mmf_err::ErrorData;
 use crate::mmf_log::{LogMode, LoggingData};
 use crate::mmf_mod::ModuleData;
@@ -55,6 +57,17 @@ pub(crate) static MMF_LOG_NOTIFY: LazyLock<Notify> = LazyLock::new(Notify::new);
 
 /// Global log event counter.
 pub(crate) static MMF_LOG_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
+
+/// Current timestamp format used by the framework.
+pub(crate) static MMF_TIMESTAMP_FORMAT: AtomicU8 = AtomicU8::new(TimestampFormat::LocalTime as u8);
+
+/// Timestamp format used by MMF.
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimestampFormat {
+    LocalTime = 0,
+    UtcTime = 1,
+}
 
 /// Information about the Mesh Module Framework.
 #[derive(Debug, Clone, Copy)]
@@ -107,6 +120,9 @@ pub struct MMFConfiguration {
     /// Capacity of priority module event queues.
     pub module_priority_channel_capacity: usize,
 
+    /// Timestamp format used by MMF.
+    pub timestamp_format: TimestampFormat,
+
     /// Capacity of the MMFErr circular buffer.
     pub error_event_buffer_capacity: usize,
 
@@ -127,7 +143,7 @@ impl Default for MMFConfiguration {
 
         let log_file_max_size_bytes = 10 * 1024 * 1024;
 
-        Self { module_normal_channel_capacity: 50, module_priority_channel_capacity: 10, error_event_buffer_capacity: 100, log_event_buffer_capacity: 100, log_file_path, log_file_max_size_bytes }
+        Self { module_normal_channel_capacity: 50, module_priority_channel_capacity: 10, timestamp_format: LocalTime, error_event_buffer_capacity: 100, log_event_buffer_capacity: 100, log_file_path, log_file_max_size_bytes }
     }
 }
 
@@ -157,6 +173,7 @@ impl MMF {
         MMF_MOD_MESSAGE_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
         MMF_ERR_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
         MMF_LOG_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
+        MMF_TIMESTAMP_FORMAT.store(mmf_configuration.timestamp_format as u8, Ordering::Relaxed);
 
         let mut mmf_mod_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
         *mmf_mod_data_guard = Some(ModuleData::new(&mmf_configuration));
@@ -291,4 +308,19 @@ impl MMF {
 
         Ok(())
     }
+
+    /// Returns the current timestamp formatted as RFC3339.
+    pub(crate) fn get_timestamp_rfc3339() -> String {
+    match MMF_TIMESTAMP_FORMAT.load(Ordering::Relaxed) {
+        x if x == TimestampFormat::LocalTime as u8 => {
+            Local::now().to_rfc3339_opts(SecondsFormat::Millis, false)
+        }
+        x if x == TimestampFormat::UtcTime as u8 => {
+            Utc::now().to_rfc3339_opts(SecondsFormat::Millis, false)
+        }
+        _ => {
+            Local::now().to_rfc3339_opts(SecondsFormat::Millis, false)
+        }
+    }
+}
 }
