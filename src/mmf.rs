@@ -113,9 +113,6 @@ pub struct MMFConfiguration {
     /// Capacity of the MMFLog circular buffer.
     pub log_event_buffer_capacity: usize,
 
-    /// Enables file logging when MMF is initialized.
-    pub log_file_enabled_at_start: bool,
-
     /// Log file path.
     pub log_file_path: PathBuf,
 
@@ -130,7 +127,7 @@ impl Default for MMFConfiguration {
 
         let log_file_max_size_bytes = 10 * 1024 * 1024;
 
-        Self { module_normal_channel_capacity: 50, module_priority_channel_capacity: 10, error_event_buffer_capacity: 100, log_event_buffer_capacity: 100, log_file_enabled_at_start: false, log_file_path, log_file_max_size_bytes }
+        Self { module_normal_channel_capacity: 50, module_priority_channel_capacity: 10, error_event_buffer_capacity: 100, log_event_buffer_capacity: 100, log_file_path, log_file_max_size_bytes }
     }
 }
 
@@ -176,7 +173,7 @@ impl MMF {
             log_event_buffer_capacity: mmf_configuration.log_event_buffer_capacity,
             logged_module_list: Vec::new(),
             log_event_list: VecDeque::new(),
-            log_file_enabled: mmf_configuration.log_file_enabled_at_start,
+            log_file_enabled: false,
             log_file_path: mmf_configuration.log_file_path,
             log_file: Some(log_file),
             log_file_max_size_bytes: mmf_configuration.log_file_max_size_bytes,

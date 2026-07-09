@@ -17,7 +17,6 @@ async fn test_file_logging() {
 
     // Configure MMF.
     let mut configuration = MMFConfiguration::default();
-    configuration.log_file_enabled_at_start = true;
     configuration.log_file_max_size_bytes = 4096;
 
     MMF::init_with_configuration(configuration).unwrap();
@@ -27,6 +26,7 @@ async fn test_file_logging() {
     MMF::register_module_type::<SimulationModule>().unwrap();
 
     MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
+    MMFLog::set_log_file_enabled(true).unwrap();
 
     let simulation_configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
 
