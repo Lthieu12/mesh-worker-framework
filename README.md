@@ -168,6 +168,11 @@ instantiation, will rely on this information.
 
 ## 4. Communication Patterns
 
+MMF uses asynchronous backpressure.
+When a module queue reaches its configured capacity, message senders are suspended asynchronously until space becomes available. 
+This prevents message loss while allowing the Tokio runtime to continue executing other modules.
+Backpressure is transparent to the application and never blocks a Tokio worker thread.
+
 ### Send
 
 Fire-and-forget message.
