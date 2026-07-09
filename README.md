@@ -183,7 +183,7 @@ Fire-and-forget message.
 
 Fire-and-forget message processed before normal messages.
 
-Priority messages are handled using a Last-In First-Out
+Priority messages are handled using a Last-In, First-Out
 (LIFO) policy.
 
 ---
