@@ -196,7 +196,7 @@ mod terminal_module_column {
 
     pub(crate) const MODULE_ID_LEN: usize = 30;
     pub(crate) const FATHER_ID_LEN: usize = 30;
-    pub(crate) const STATE_LEN: usize = 12;
+    pub(crate) const STATE_LEN: usize = 14;
 }
 
 /// List of module information returned by MMFMod.
