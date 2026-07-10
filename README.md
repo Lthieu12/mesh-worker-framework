@@ -363,10 +363,14 @@ Parallelism is achieved by running multiple modules concurrently, not by process
 
 ## 9. Platform Support
 
+MMF is designed to be fully cross-platform and currently supports:
+
 * Windows
 * Linux
 
-No platform-specific application code should be required.
+No platform-specific application code should be required when developing modules with MMF.
+
+To help guarantee cross-platform compatibility, the repository includes a verification script (scripts/verify.ps1) that automatically validates the framework on both Windows and Linux (WSL2). The script performs formatting, linting, testing, example compilation, and documentation generation on each supported platform.
 
 ---
 

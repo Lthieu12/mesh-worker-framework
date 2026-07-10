@@ -9,13 +9,13 @@ use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::time::Instant;
 
+use crate::MMF;
 use crate::framework_error::{FrameworkError, MMFPanic};
 use crate::log_file::write_log_event;
 use crate::message::MessageID;
 use crate::mmf::{MMF_LOG_DATA, MMF_LOG_INSTANCE_COUNTER, MMF_LOG_MODE, MMF_LOG_NOTIFY};
 use crate::module::{EntityID, ModuleID};
 use crate::string_helper;
-use crate::MMF;
 
 /// Unique identifier assigned to each log event.
 pub type LogInstanceID = u64;

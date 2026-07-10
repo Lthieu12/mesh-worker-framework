@@ -6,11 +6,11 @@
 use std::collections::VecDeque;
 use std::sync::atomic::Ordering;
 
+use crate::MMF;
 use crate::framework_error::{FrameworkError, MMFPanic};
 use crate::mmf::{MMF_ERR_DATA, MMF_ERR_INSTANCE_COUNTER, MMF_ERR_NOTIFY};
 use crate::module::EntityID;
 use crate::string_helper;
-use crate::MMF;
 
 /// Unique identifier assigned to each error event.
 pub type ErrorInstanceID = u64;
