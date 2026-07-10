@@ -4,6 +4,9 @@
 
 $ErrorActionPreference = "Stop"
 
+Remove-Item target-windows -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item target-linux -Recurse -Force -ErrorAction SilentlyContinue
+
 # Execute a verification step.
 function InvokeVerificationStep {
     param(
@@ -16,10 +19,11 @@ function InvokeVerificationStep {
     Write-Host "[RUN ] $Description"
 
     if ($Platform -eq "Windows") {
+        $env:CARGO_TARGET_DIR = $windows_target_dir
         Invoke-Expression $Command
     }
     else {
-        wsl bash -lc "cd '$project_path_linux' && $Command"
+        wsl bash -lc "cd '$project_path_linux' && export CARGO_TARGET_DIR='$linux_target_dir' && $Command"
     }
 
     if ($LASTEXITCODE -ne 0) {
@@ -34,6 +38,10 @@ try {
     # Get the Linux project path.
     $project_path_windows = (Get-Location).Path
     $project_path_linux = (wsl wslpath "$project_path_windows").Trim()
+
+    # Define platform-specific target directories.
+    $windows_target_dir = "target-windows"
+    $linux_target_dir = "target-linux"
 
     Write-Host ""
     Write-Host "========================================"
