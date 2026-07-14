@@ -197,6 +197,19 @@ The caller receives the processing result.
 
 ---
 
+### Other Messaging Patterns
+
+MMF also provides additional messaging patterns for more
+specialized use cases:
+
+* SendPriorityAndWait
+* SendUnique
+
+See the `MMFMod` API documentation for the complete semantics
+and usage of these messaging functions.
+
+---
+
 ## 5. Error Handling
 
 MMF provides a centralized error collection system.

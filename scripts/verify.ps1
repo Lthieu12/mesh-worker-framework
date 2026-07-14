@@ -33,6 +33,10 @@ function InvokeVerificationStep {
     Write-Host "[ OK ]"
 }
 
+# Save the current Cargo target directory, if any.
+$had_cargo_target_dir = Test-Path Env:CARGO_TARGET_DIR
+$previous_cargo_target_dir = $env:CARGO_TARGET_DIR
+
 try {
 
     # Get the Linux project path.
@@ -95,6 +99,14 @@ catch {
     exit 1
 }
 finally {
+
+    # Restore the previous Cargo target directory.
+    if ($had_cargo_target_dir) {
+        $env:CARGO_TARGET_DIR = $previous_cargo_target_dir
+    }
+    else {
+        Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
+    }
 
     Write-Host ""
 

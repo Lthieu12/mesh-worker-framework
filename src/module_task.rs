@@ -76,9 +76,9 @@ impl PendingCommands {
 
     /// Insert a unique message.
     ///
-    /// If another unique message with the same MessageID is already
-    /// pending, its content is replaced while preserving its
-    /// position in the FIFO queue.
+    /// If another unique message with the same MessageID, regardless
+    /// of sender, is already pending, its content is replaced while
+    /// preserving its position in the FIFO queue.
     ///
     /// Otherwise, the message is inserted using the normal FIFO
     /// policy.
