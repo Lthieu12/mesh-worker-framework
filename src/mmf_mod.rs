@@ -8,7 +8,7 @@ use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
 use crate::MMFLog;
-use crate::channel::{ModuleCommand, ModuleNormalSenderChannel, ModulePrioritySenderChannel, ModuleChannel, get_sender_channel};
+use crate::channel::{ModuleChannel, ModuleCommand, ModuleNormalSenderChannel, ModulePrioritySenderChannel, get_sender_channel};
 use crate::framework_error::{FrameworkError, MMFPanic};
 use crate::message::{MessageID, MessageInstanceID, ModuleMessage};
 use crate::mmf::{MMF_DATA, MMF_MOD_CLOSE_NOTIFY, MMF_MOD_DATA, MMF_MOD_INIT_NOTIFY, MMF_MOD_MESSAGE_INSTANCE_COUNTER, MMFConfiguration};
@@ -570,11 +570,7 @@ impl MMFMod {
 
     /// Send a message to a module.
     pub async fn send_message(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes) -> Result<(), FrameworkError> {
-        let normal_sender_channel = get_sender_channel(
-            sender_id,
-            receiver_id,
-            ModuleChannel::Normal,
-        )?;
+        let normal_sender_channel = get_sender_channel(sender_id, receiver_id, ModuleChannel::Normal)?;
 
         // Generate the unique id and build the message
         let message_instance_id = MMFMod::generate_message_instance_id()?;
@@ -594,11 +590,7 @@ impl MMFMod {
     /// - ModuleError if on_message() returned an error.
     /// - Operation_Timeout if the timeout expires.
     pub async fn send_message_and_wait(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
-        let normal_sender_channel = get_sender_channel(
-            sender_id,
-            receiver_id,
-            ModuleChannel::Normal,
-        )?;
+        let normal_sender_channel = get_sender_channel(sender_id, receiver_id, ModuleChannel::Normal)?;
 
         // Generate the unique id and build the message
         let message_instance_id = MMFMod::generate_message_instance_id()?;
@@ -677,11 +669,7 @@ impl MMFMod {
 
     /// Send a priority message to a module.
     pub async fn send_priority_message(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes) -> Result<(), FrameworkError> {
-        let priority_sender_channel = get_sender_channel(
-            sender_id,
-            receiver_id,
-            ModuleChannel::Priority,
-        )?;
+        let priority_sender_channel = get_sender_channel(sender_id, receiver_id, ModuleChannel::Priority)?;
 
         // Generate the unique id and build the message
         let message_instance_id = MMFMod::generate_message_instance_id()?;
@@ -701,11 +689,7 @@ impl MMFMod {
     /// - ModuleError if on_message() returned an error.
     /// - Operation_Timeout if the timeout expires.
     pub async fn send_priority_message_and_wait(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
-        let priority_sender_channel = get_sender_channel(
-            sender_id,
-            receiver_id,
-            ModuleChannel::Priority,
-        )?;
+        let priority_sender_channel = get_sender_channel(sender_id, receiver_id, ModuleChannel::Priority)?;
 
         // Generate the unique id and build the message
         let message_instance_id = MMFMod::generate_message_instance_id()?;

@@ -18,9 +18,9 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-use crate::mmf::MMF_MOD_DATA;
-use crate::framework_error::{FrameworkError, ModuleError, MMFPanic};
+use crate::framework_error::{FrameworkError, MMFPanic, ModuleError};
 use crate::message::{MessageID, ModuleMessage};
+use crate::mmf::MMF_MOD_DATA;
 use crate::module::{EntityID, ModuleID, ModuleState};
 
 pub(crate) type ModuleSenderChannel = Sender<ModuleCommand>;
@@ -68,12 +68,7 @@ impl ModuleCommand {
 ///
 /// The sender and receiver states are validated before the
 /// channel is returned.
-pub(crate) fn get_sender_channel(
-    sender_id: &EntityID,
-    receiver_id: &ModuleID,
-    channel: ModuleChannel,
-) -> Result<ModuleSenderChannel, FrameworkError> {
-
+pub(crate) fn get_sender_channel(sender_id: &EntityID, receiver_id: &ModuleID, channel: ModuleChannel) -> Result<ModuleSenderChannel, FrameworkError> {
     let sender_channel: ModuleNormalSenderChannel = {
         // Read MMF data.
         //
@@ -114,12 +109,8 @@ pub(crate) fn get_sender_channel(
         // under the same lock to avoid race conditions with
         // close_module().
         match channel {
-            ModuleChannel::Normal => {
-                mmf_data.module_registry.get_module_normal_channel(receiver_id)
-            }
-            ModuleChannel::Priority => {
-                mmf_data.module_registry.get_module_priority_channel(receiver_id)
-            }
+            ModuleChannel::Normal => mmf_data.module_registry.get_module_normal_channel(receiver_id),
+            ModuleChannel::Priority => mmf_data.module_registry.get_module_priority_channel(receiver_id),
         }?
     };
     Ok(sender_channel)
