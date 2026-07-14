@@ -25,6 +25,7 @@
 //! the module instance is owned by Tokio after spawn_module().
 
 use futures::FutureExt;
+use std::collections::VecDeque;
 use std::panic::AssertUnwindSafe;
 use std::time::Instant;
 use tokio::task::JoinHandle;
@@ -46,20 +47,20 @@ use crate::module::{EntityID, Module, ModuleError, ModuleID, ModuleState};
 /// The queue is responsible for preserving the execution policy
 /// of each command type (FIFO, LIFO, unique filtering, ...).
 pub(crate) struct PendingCommands {
-    commands: Vec<ModuleCommand>,
+    commands: VecDeque<ModuleCommand>,
 }
 
 impl PendingCommands {
     /// Create an empty pending command queue.
     pub fn new() -> Self {
-        Self { commands: Vec::new() }
+        Self { commands: VecDeque::new() }
     }
 
     /// Insert a priority command.
     ///
     /// Priority commands are stored using a LIFO policy.
     pub fn push_priority(&mut self, command: ModuleCommand) {
-        self.commands.push(command);
+        self.commands.push_back(command);
     }
 
     /// Insert a normal command.
@@ -69,7 +70,7 @@ impl PendingCommands {
         if command.is_unique_message() {
             self.push_unique(command);
         } else {
-            self.commands.insert(0, command);
+            self.commands.push_front(command);
         }
     }
 
@@ -94,43 +95,17 @@ impl PendingCommands {
         // No equivalent unique message was found.
         //
         // Insert the message using the normal FIFO policy.
-        self.commands.insert(0, command);
+        self.commands.push_front(command);
     }
 
     /// Return the next command to execute.
     pub fn pop_next(&mut self) -> Option<ModuleCommand> {
-        self.commands.pop()
+        self.commands.pop_back()
     }
 
     /// Return whether the queue is empty.
     pub fn is_empty(&self) -> bool {
         self.commands.is_empty()
-    }
-
-    /// Replace an already queued unique message.
-    ///
-    /// If no equivalent unique message exists, the command is
-    /// inserted using the normal FIFO policy.
-    fn replace_unique_message_or_enqueue(&mut self, command: ModuleCommand) {
-        let ModuleCommand::Message { message, .. } = &command else {
-            unreachable!();
-        };
-
-        let new_message_id = &message.message_id;
-
-        for queued_command in &mut self.commands {
-            match queued_command {
-                ModuleCommand::Message { message, unique: true, .. } => {
-                    if message.message_id == *new_message_id {
-                        // TODO
-
-                        return;
-                    }
-                }
-
-                _ => {}
-            }
-        }
     }
 }
 
@@ -199,25 +174,25 @@ pub(crate) fn spawn_module_task(module: Box<dyn Module + Send>, normal_receiver_
 ///
 /// This helper executes the message callback, reports errors and
 /// logs the complete message lifecycle.
-async fn execute_message(module: &mut Box<dyn Module + Send>, module_id: &ModuleID, message: ModuleMessage, priority: bool, wait_completion: bool, unique: bool) -> Result<(), ModuleError> {
+async fn execute_message(module: &mut Box<dyn Module + Send>, module_id: &ModuleID, message: ModuleMessage, priority: bool, wait_completion: bool) -> Result<(), ModuleError> {
     let action_start_timer = Instant::now();
     let log_action = LogAction::ModuleMessage { sender_id: message.sender_id.clone(), message_id: message.message_id.clone(), priority, wait_completion };
     let sender_id = message.sender_id.clone();
     let message_id = message.message_id.clone();
 
-    MMFLog::add_log(action_start_timer, &module_id, log_action.clone(), LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+    MMFLog::add_log(action_start_timer, module_id, log_action.clone(), LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
 
     let result = module.on_message(message).await;
 
     match &result {
         Ok(()) => {
-            MMFLog::add_log(action_start_timer, &module_id, log_action, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+            MMFLog::add_log(action_start_timer, module_id, log_action, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
         }
 
         Err(error) => {
             let error_context = format!("on_message -> MessageID={}, SenderID={}", message_id, sender_id);
             MMFErr::add_error_internal(&EntityID::Module(module_id.clone()), Some(error_context.to_string()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
-            MMFLog::add_log(action_start_timer, &module_id, log_action, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+            MMFLog::add_log(action_start_timer, module_id, log_action, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
         }
     }
     result
@@ -340,8 +315,8 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
             // This guarantees that a message accepted before a
             // Close command is always processed before module
             // shutdown begins.
-            ModuleCommand::Message { message, priority, unique } => {
-                let _ = execute_message(&mut module, &module_id, message, priority, false, unique).await;
+            ModuleCommand::Message { message, priority, unique: _ } => {
+                let _ = execute_message(&mut module, &module_id, message, priority, false).await;
             }
 
             // Execute a business message.
@@ -355,8 +330,8 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
             // This guarantees that a message accepted before a
             // Close command is always processed before module
             // shutdown begins.
-            ModuleCommand::MessageAndWaitCompletion { reply_sender, message, priority, unique } => {
-                let result_message = execute_message(&mut module, &module_id, message, priority, true, unique).await;
+            ModuleCommand::MessageAndWaitCompletion { reply_sender, message, priority } => {
+                let result_message = execute_message(&mut module, &module_id, message, priority, true).await;
 
                 let _ = reply_sender.send(result_message);
             }

@@ -41,7 +41,7 @@ pub(crate) enum ModuleChannel {
 pub(crate) enum ModuleCommand {
     Init { lifecycle_data: Bytes },
     Message { message: ModuleMessage, priority: bool, unique: bool },
-    MessageAndWaitCompletion { reply_sender: oneshot::Sender<Result<(), ModuleError>>, message: ModuleMessage, priority: bool, unique: bool },
+    MessageAndWaitCompletion { reply_sender: oneshot::Sender<Result<(), ModuleError>>, message: ModuleMessage, priority: bool },
     Close { lifecycle_data: Bytes },
 }
 

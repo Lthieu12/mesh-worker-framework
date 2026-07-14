@@ -8,7 +8,7 @@ use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
 use crate::MMFLog;
-use crate::channel::{ModuleChannel, ModuleCommand, ModuleNormalSenderChannel, ModulePrioritySenderChannel, get_sender_channel};
+use crate::channel::{ModuleChannel, ModuleCommand, get_sender_channel};
 use crate::framework_error::{FrameworkError, MMFPanic};
 use crate::message::{MessageID, MessageInstanceID, ModuleMessage};
 use crate::mmf::{MMF_DATA, MMF_MOD_CLOSE_NOTIFY, MMF_MOD_DATA, MMF_MOD_INIT_NOTIFY, MMF_MOD_MESSAGE_INSTANCE_COUNTER, MMFConfiguration};
@@ -601,7 +601,7 @@ impl MMFMod {
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<Result<(), ModuleError>>();
 
         // Send the message to the receiver module.
-        normal_sender_channel.send(ModuleCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority: false, unique: false }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        normal_sender_channel.send(ModuleCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority: false }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         // Wait for completion or timeout.
         //
@@ -668,6 +668,9 @@ impl MMFMod {
     }
 
     /// Send a priority message to a module.
+    ///
+    /// Priority messages are always processed before pending
+    /// normal messages.
     pub async fn send_priority_message(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes) -> Result<(), FrameworkError> {
         let priority_sender_channel = get_sender_channel(sender_id, receiver_id, ModuleChannel::Priority)?;
 
@@ -683,6 +686,9 @@ impl MMFMod {
 
     /// Send a priority message and wait until the receiver has finished
     /// processing it.
+    ///
+    /// Priority messages are always processed before pending
+    /// normal messages.
     ///
     /// Returns:
     /// - Ok(()) if on_message() completed successfully.
@@ -700,7 +706,7 @@ impl MMFMod {
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel();
 
         // Send the message to the receiver module.
-        priority_sender_channel.send(ModuleCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority: true, unique: false }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        priority_sender_channel.send(ModuleCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority: true }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         // Wait for completion or timeout.
         //
@@ -762,6 +768,26 @@ impl MMFMod {
                 return Err(FrameworkError::Module_MessageError(module_error));
             }
         }
+
+        Ok(())
+    }
+
+    /// Send a unique message to a module.
+    ///
+    /// At most one pending unique message with the same MessageID
+    /// can exist in the receiver queue.
+    ///
+    /// Sending a new unique message replaces the pending one while
+    /// preserving its FIFO position.
+    pub async fn send_unique_message(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes) -> Result<(), FrameworkError> {
+        let normal_sender_channel = get_sender_channel(sender_id, receiver_id, ModuleChannel::Normal)?;
+
+        // Generate the unique id and build the message
+        let message_instance_id = MMFMod::generate_message_instance_id()?;
+        let framework_message = ModuleMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
+
+        // Send the message to the target module.
+        normal_sender_channel.send(ModuleCommand::Message { message: framework_message, priority: false, unique: true }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         Ok(())
     }
