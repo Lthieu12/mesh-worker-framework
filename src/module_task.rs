@@ -257,7 +257,7 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
             // This guarantees that a message accepted before a
             // Close command is always processed before module
             // shutdown begins.
-            ModuleCommand::Message { message, priority } => {
+            ModuleCommand::Message { message, priority, unique } => {
                 let action_start_timer = Instant::now();
                 let log_action = LogAction::ModuleMessage { sender_id: message.sender_id.clone(), message_id: message.message_id.clone(), priority, wait_completion: false };
                 let sender_id = message.sender_id.clone();
@@ -291,7 +291,7 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
             // This guarantees that a message accepted before a
             // Close command is always processed before module
             // shutdown begins.
-            ModuleCommand::MessageAndWaitCompletion { reply_sender, message, priority } => {
+            ModuleCommand::MessageAndWaitCompletion { reply_sender, message, priority, unique } => {
                 let action_start_timer = Instant::now();
                 let log_action = LogAction::ModuleMessage { sender_id: message.sender_id.clone(), message_id: message.message_id.clone(), priority, wait_completion: true };
                 let sender_id = message.sender_id.clone();

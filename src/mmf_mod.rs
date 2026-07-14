@@ -617,7 +617,7 @@ impl MMFMod {
         let framework_message = ModuleMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
 
         // Send the message to the target module.
-        normal_sender_channel.send(ModuleCommand::Message { message: framework_message, priority: false }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        normal_sender_channel.send(ModuleCommand::Message { message: framework_message, priority: false, unique: false }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         Ok(())
     }
@@ -681,7 +681,7 @@ impl MMFMod {
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<Result<(), ModuleError>>();
 
         // Send the message to the receiver module.
-        normal_sender_channel.send(ModuleCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority: false }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        normal_sender_channel.send(ModuleCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority: false, unique: false }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         // Wait for completion or timeout.
         //
@@ -796,7 +796,7 @@ impl MMFMod {
         let framework_message = ModuleMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
 
         // Send the priority message to the target module.
-        priority_sender_channel.send(ModuleCommand::Message { message: framework_message, priority: true }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        priority_sender_channel.send(ModuleCommand::Message { message: framework_message, priority: true, unique: false }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         Ok(())
     }
@@ -860,7 +860,7 @@ impl MMFMod {
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel();
 
         // Send the message to the receiver module.
-        priority_sender_channel.send(ModuleCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority: true }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        priority_sender_channel.send(ModuleCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority: true, unique: false }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
 
         // Wait for completion or timeout.
         //

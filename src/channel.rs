@@ -25,8 +25,8 @@ use crate::message::ModuleMessage;
 #[derive(Debug)]
 pub(crate) enum ModuleCommand {
     Init { lifecycle_data: Bytes },
-    Message { message: ModuleMessage, priority: bool },
-    MessageAndWaitCompletion { reply_sender: oneshot::Sender<Result<(), ModuleError>>, message: ModuleMessage, priority: bool },
+    Message { message: ModuleMessage, priority: bool, unique: bool },
+    MessageAndWaitCompletion { reply_sender: oneshot::Sender<Result<(), ModuleError>>, message: ModuleMessage, priority: bool, unique: bool },
     Close { lifecycle_data: Bytes },
 }
 
