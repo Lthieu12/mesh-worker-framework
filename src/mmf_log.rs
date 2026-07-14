@@ -48,7 +48,7 @@ pub enum LogAction {
     ModuleClose,
     ModuleAbort,
     ModulePanic,
-    ModuleMessage { sender_id: EntityID, message_id: MessageID, priority: bool, wait_completion: bool, unique: bool },
+    ModuleMessage { sender_id: EntityID, message_id: MessageID, priority: bool, wait_completion: bool },
 }
 
 /// Internal MMFLog storage.
@@ -121,7 +121,7 @@ impl LogEvent {
             LogAction::ModuleClose => ("CLOSE", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
             LogAction::ModuleAbort => ("ABORT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
             LogAction::ModulePanic => ("PANIC", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
-            LogAction::ModuleMessage { sender_id, message_id, priority, wait_completion, unique } => {
+            LogAction::ModuleMessage { sender_id, message_id, priority, wait_completion } => {
                 ("MESSAGE", sender_id.to_short_string(terminal_log_column::SENDER_ID_LEN), string_helper::to_short_string(&message_id.clone(), terminal_log_column::MESSAGE_ID_LEN), if *priority { "Y" } else { "N" }.to_string(), if *wait_completion { "Y" } else { "N" }.to_string())
             }
         };
@@ -168,7 +168,7 @@ impl LogEvent {
             LogAction::ModuleClose => ("CLOSE", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
             LogAction::ModuleAbort => ("ABORT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
             LogAction::ModulePanic => ("PANIC", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
-            LogAction::ModuleMessage { sender_id, message_id, priority, wait_completion, unique } => ("MESSAGE", sender_id.to_string(), message_id.clone(), if *priority { "Y" } else { "N" }.to_string(), if *wait_completion { "Y" } else { "N" }.to_string()),
+            LogAction::ModuleMessage { sender_id, message_id, priority, wait_completion } => ("MESSAGE", sender_id.to_string(), message_id.clone(), if *priority { "Y" } else { "N" }.to_string(), if *wait_completion { "Y" } else { "N" }.to_string()),
         };
 
         let duration = match self.duration_ms {

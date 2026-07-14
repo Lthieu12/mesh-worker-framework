@@ -201,7 +201,7 @@ pub(crate) fn spawn_module_task(module: Box<dyn Module + Send>, normal_receiver_
 /// logs the complete message lifecycle.
 async fn execute_message(module: &mut Box<dyn Module + Send>, module_id: &ModuleID, message: ModuleMessage, priority: bool, wait_completion: bool, unique: bool) -> Result<(), ModuleError> {
     let action_start_timer = Instant::now();
-    let log_action = LogAction::ModuleMessage { sender_id: message.sender_id.clone(), message_id: message.message_id.clone(), priority, wait_completion, unique };
+    let log_action = LogAction::ModuleMessage { sender_id: message.sender_id.clone(), message_id: message.message_id.clone(), priority, wait_completion };
     let sender_id = message.sender_id.clone();
     let message_id = message.message_id.clone();
 

@@ -8,7 +8,7 @@ use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
 use crate::MMFLog;
-use crate::channel::{ModuleCommand, ModuleNormalSenderChannel, ModulePrioritySenderChannel};
+use crate::channel::{ModuleCommand, ModuleNormalSenderChannel, ModulePrioritySenderChannel, ModuleChannel, get_sender_channel};
 use crate::framework_error::{FrameworkError, MMFPanic};
 use crate::message::{MessageID, MessageInstanceID, ModuleMessage};
 use crate::mmf::{MMF_DATA, MMF_MOD_CLOSE_NOTIFY, MMF_MOD_DATA, MMF_MOD_INIT_NOTIFY, MMF_MOD_MESSAGE_INSTANCE_COUNTER, MMFConfiguration};
@@ -570,47 +570,11 @@ impl MMFMod {
 
     /// Send a message to a module.
     pub async fn send_message(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes) -> Result<(), FrameworkError> {
-        let normal_sender_channel: ModuleNormalSenderChannel = {
-            // Read MMF data.
-            //
-            // send_message() only requires a read lock because it does
-            // not modify the Registry or ModuleState.
-            let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
-
-            let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
-
-            // Validate the sender.
-            //
-            // MMF modules must be initialized before they can
-            // send messages through MMF.
-            //
-            // External senders are not validated.
-            match sender_id {
-                EntityID::Module(module_id) => {
-                    let module_state = mmf_data.module_registry.get_module_state(module_id)?;
-                    if module_state != ModuleState::Initialized {
-                        return Err(FrameworkError::Module_NotInitialized);
-                    }
-                }
-                EntityID::External(_) => {}
-            }
-
-            // Validate the receiver module state.
-            //
-            // Messages can only be sent to initialized modules.
-            let module_state = mmf_data.module_registry.get_module_state(receiver_id)?;
-            if module_state != ModuleState::Initialized {
-                return Err(FrameworkError::Module_NotInitialized);
-            }
-
-            // Retrieve the communication channel associated with
-            // the receiver module.
-            //
-            // State validation and channel retrieval are performed
-            // under the same lock to avoid race conditions with
-            // close_module().
-            mmf_data.module_registry.get_module_normal_channel(receiver_id)?
-        };
+        let normal_sender_channel = get_sender_channel(
+            sender_id,
+            receiver_id,
+            ModuleChannel::Normal,
+        )?;
 
         // Generate the unique id and build the message
         let message_instance_id = MMFMod::generate_message_instance_id()?;
@@ -630,47 +594,11 @@ impl MMFMod {
     /// - ModuleError if on_message() returned an error.
     /// - Operation_Timeout if the timeout expires.
     pub async fn send_message_and_wait(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
-        let normal_sender_channel: ModuleNormalSenderChannel = {
-            // Read MMF data.
-            //
-            // send_message() only requires a read lock because it does
-            // not modify the Registry or ModuleState.
-            let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
-
-            let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
-
-            // Validate the sender.
-            //
-            // MMF modules must be initialized before they can
-            // send messages through MMF.
-            //
-            // External senders are not validated.
-            match sender_id {
-                EntityID::Module(module_id) => {
-                    let module_state = mmf_data.module_registry.get_module_state(module_id)?;
-                    if module_state != ModuleState::Initialized {
-                        return Err(FrameworkError::Module_NotInitialized);
-                    }
-                }
-                EntityID::External(_) => {}
-            }
-
-            // Validate the receiver module state.
-            //
-            // Messages can only be sent to initialized modules.
-            let module_state = mmf_data.module_registry.get_module_state(receiver_id)?;
-            if module_state != ModuleState::Initialized {
-                return Err(FrameworkError::Module_NotInitialized);
-            }
-
-            // Retrieve the communication channel associated with
-            // the receiver module.
-            //
-            // State validation and channel retrieval are performed
-            // under the same lock to avoid race conditions with
-            // close_module().
-            mmf_data.module_registry.get_module_normal_channel(receiver_id)?
-        };
+        let normal_sender_channel = get_sender_channel(
+            sender_id,
+            receiver_id,
+            ModuleChannel::Normal,
+        )?;
 
         // Generate the unique id and build the message
         let message_instance_id = MMFMod::generate_message_instance_id()?;
@@ -749,47 +677,11 @@ impl MMFMod {
 
     /// Send a priority message to a module.
     pub async fn send_priority_message(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes) -> Result<(), FrameworkError> {
-        let priority_sender_channel: ModulePrioritySenderChannel = {
-            // Read MMF data.
-            //
-            // send_message() only requires a read lock because it does
-            // not modify the Registry or ModuleState.
-            let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
-
-            let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
-
-            // Validate the sender.
-            //
-            // MMF modules must be initialized before they can
-            // send messages through MMF.
-            //
-            // External senders are not validated.
-            match sender_id {
-                EntityID::Module(module_id) => {
-                    let module_state = mmf_data.module_registry.get_module_state(module_id)?;
-                    if module_state != ModuleState::Initialized {
-                        return Err(FrameworkError::Module_NotInitialized);
-                    }
-                }
-                EntityID::External(_) => {}
-            }
-
-            // Validate the receiver module state.
-            //
-            // Messages can only be sent to initialized modules.
-            let module_state = mmf_data.module_registry.get_module_state(receiver_id)?;
-            if module_state != ModuleState::Initialized {
-                return Err(FrameworkError::Module_NotInitialized);
-            }
-
-            // Retrieve the communication channel associated with
-            // the receiver module.
-            //
-            // State validation and channel retrieval are performed
-            // under the same lock to avoid race conditions with
-            // close_module().
-            mmf_data.module_registry.get_module_priority_channel(receiver_id)?
-        };
+        let priority_sender_channel = get_sender_channel(
+            sender_id,
+            receiver_id,
+            ModuleChannel::Priority,
+        )?;
 
         // Generate the unique id and build the message
         let message_instance_id = MMFMod::generate_message_instance_id()?;
@@ -809,47 +701,11 @@ impl MMFMod {
     /// - ModuleError if on_message() returned an error.
     /// - Operation_Timeout if the timeout expires.
     pub async fn send_priority_message_and_wait(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &MessageID, message_data: Bytes, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
-        let priority_sender_channel: ModulePrioritySenderChannel = {
-            // Read MMF data.
-            //
-            // send_message() only requires a read lock because it does
-            // not modify the Registry or ModuleState.
-            let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
-
-            let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
-
-            // Validate the sender.
-            //
-            // MMF modules must be initialized before they can
-            // send messages through MMF.
-            //
-            // External senders are not validated.
-            match sender_id {
-                EntityID::Module(module_id) => {
-                    let module_state = mmf_data.module_registry.get_module_state(module_id)?;
-                    if module_state != ModuleState::Initialized {
-                        return Err(FrameworkError::Module_NotInitialized);
-                    }
-                }
-                EntityID::External(_) => {}
-            }
-
-            // Validate the receiver module state.
-            //
-            // Messages can only be sent to initialized modules.
-            let module_state = mmf_data.module_registry.get_module_state(receiver_id)?;
-            if module_state != ModuleState::Initialized {
-                return Err(FrameworkError::Module_NotInitialized);
-            }
-
-            // Retrieve the communication channel associated with
-            // the receiver module.
-            //
-            // State validation and channel retrieval are performed
-            // under the same lock to avoid race conditions with
-            // close_module().
-            mmf_data.module_registry.get_module_priority_channel(receiver_id)?
-        };
+        let priority_sender_channel = get_sender_channel(
+            sender_id,
+            receiver_id,
+            ModuleChannel::Priority,
+        )?;
 
         // Generate the unique id and build the message
         let message_instance_id = MMFMod::generate_message_instance_id()?;
