@@ -54,9 +54,21 @@ impl PendingCommands {
         self.commands.push(command);
     }
 
+    /// Insert a normal command.
+    ///
+    /// Normal commands are stored using a FIFO policy.
+    pub fn push_normal(&mut self, command: ModuleCommand) {
+        self.commands.insert(0, command);
+    }
+
     /// Return the next command to execute.
     pub fn pop_next(&mut self) -> Option<ModuleCommand> {
         self.commands.pop()
+    }
+
+    /// Return whether the queue is empty.
+    pub fn is_empty(&self) -> bool {
+        self.commands.is_empty()
     }
 }
 
@@ -161,43 +173,38 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
     let mut pending_commands = PendingCommands::new();
 
     loop {
-        // Drain all currently pending priority commands.
-        //
-        // Tokio channels are FIFO. Moving all available priority
-        // commands into a local stack allows ModuleTask to process
-        // them in LIFO order.
-        while let Ok(command) = priority_receiver_channel.try_recv() {
-            pending_commands.push_priority(command);
-        }
 
-        // Priority commands always take precedence over normal
-        // commands.
-        //
-        // If the stack is not empty, process the most recently
-        // received priority command immediately.
-        let command = if let Some(command) = pending_commands.pop_next() {
-            command
-        } else {
-            // No priority command is currently pending.
-            //
-            // Wait for the next command from either channel.
-            //
-            // Tokio wakes this task automatically when a message
-            // arrives on the normal or priority channel.
-            //
-            // Receiver channels are expected to remain valid
-            // until the module task terminates.
-            //
-            // A closed channel indicates an internal framework error.
+        if pending_commands.is_empty() {
+
             tokio::select! {
+
                 command = priority_receiver_channel.recv() => {
-                    command.expect(MMFPanic::Module_PriorityChannelClosed.message())
+                    pending_commands.push_priority(
+                        command.expect(MMFPanic::Module_PriorityChannelClosed.message())
+                    );
                 }
+
                 command = normal_receiver_channel.recv() => {
-                    command.expect(MMFPanic::Module_NormalChannelClosed.message())
+                    pending_commands.push_normal(
+                        command.expect(MMFPanic::Module_NormalChannelClosed.message())
+                    );
                 }
             }
-        };
+
+            // Drain all currently pending priority commands.
+            while let Ok(command) = priority_receiver_channel.try_recv() {
+                pending_commands.push_priority(command);
+            }
+
+            // Drain all currently pending normal commands.
+            while let Ok(command) = normal_receiver_channel.try_recv() {
+                pending_commands.push_normal(command);
+            }
+        }
+
+        let command = pending_commands
+            .pop_next()
+            .expect("PendingCommands cannot be empty");
 
         match command {
             // Execute module initialization.
