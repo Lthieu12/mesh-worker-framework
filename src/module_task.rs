@@ -34,6 +34,32 @@ use crate::mmf::{MMF_MOD_CLOSE_NOTIFY, MMF_MOD_DATA, MMF_MOD_INIT_NOTIFY};
 use crate::mmf_log::{LogAction, LogStatus};
 use crate::module::{EntityID, Module, ModuleID, ModuleState};
 
+pub(crate) struct PendingCommands {
+    commands: Vec<ModuleCommand>,
+}
+
+impl PendingCommands {
+
+    /// Create an empty pending command queue.
+    pub fn new() -> Self {
+        Self {
+            commands: Vec::new(),
+        }
+    }
+
+    /// Insert a priority command.
+    ///
+    /// Priority commands are stored using a LIFO policy.
+    pub fn push_priority(&mut self, command: ModuleCommand) {
+        self.commands.push(command);
+    }
+
+    /// Return the next command to execute.
+    pub fn pop_next(&mut self) -> Option<ModuleCommand> {
+        self.commands.pop()
+    }
+}
+
 /// Spawn the Tokio task associated with a module instance.
 ///
 /// Ownership of the module instance is transferred to the
@@ -132,7 +158,7 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
     //
     // Processing order:
     // P3 -> P2 -> P1
-    let mut priority_stack: Vec<ModuleCommand> = Vec::new();
+    let mut pending_commands = PendingCommands::new();
 
     loop {
         // Drain all currently pending priority commands.
@@ -141,7 +167,7 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
         // commands into a local stack allows ModuleTask to process
         // them in LIFO order.
         while let Ok(command) = priority_receiver_channel.try_recv() {
-            priority_stack.push(command);
+            pending_commands.push_priority(command);
         }
 
         // Priority commands always take precedence over normal
@@ -149,7 +175,7 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
         //
         // If the stack is not empty, process the most recently
         // received priority command immediately.
-        let command = if let Some(command) = priority_stack.pop() {
+        let command = if let Some(command) = pending_commands.pop_next() {
             command
         } else {
             // No priority command is currently pending.
