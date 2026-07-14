@@ -33,10 +33,10 @@ use crate::MMFErr;
 use crate::MMFLog;
 use crate::channel::{ModuleCommand, ModuleNormalReceiverChannel, ModulePriorityReceiverChannel};
 use crate::framework_error::MMFPanic;
+use crate::message::ModuleMessage;
 use crate::mmf::{MMF_MOD_CLOSE_NOTIFY, MMF_MOD_DATA, MMF_MOD_INIT_NOTIFY};
 use crate::mmf_log::{LogAction, LogStatus};
-use crate::module::{EntityID, Module, ModuleID, ModuleState, ModuleError};
-use crate::message::ModuleMessage;
+use crate::module::{EntityID, Module, ModuleError, ModuleID, ModuleState};
 
 /// Internal command queue owned by ModuleTask.
 ///
@@ -66,11 +66,49 @@ impl PendingCommands {
     ///
     /// Normal commands are stored using a FIFO policy.
     pub fn push_normal(&mut self, command: ModuleCommand) {
-
         if command.is_unique() {
-            self.replace_unique_message_or_enqueue(command);
-            return;
+            self.push_unique(command);
+        } else {
+            self.commands.insert(0, command);
         }
+    }
+
+    /// Insert a unique message.
+    ///
+    /// If another unique message with the same MessageID is already
+    /// pending, its content is replaced while preserving its
+    /// position in the FIFO queue.
+    ///
+    /// Otherwise, the message is inserted using the normal FIFO
+    /// policy.
+    fn push_unique(&mut self, command: ModuleCommand) {
+        // Search for an already queued unique message with the
+        // same MessageID.
+        for queued_command in &mut self.commands {
+            match queued_command {
+                ModuleCommand::Message { message: queued_message, unique: true, .. } => {
+                    match &command {
+                        ModuleCommand::Message { message, .. } => {
+                            if queued_message.message_id == message.message_id {
+                                // Replace the queued message while
+                                // preserving its current position in
+                                // the FIFO queue.
+                                *queued_command = command;
+                                return;
+                            }
+                        }
+
+                        _ => {}
+                    }
+                }
+
+                _ => {}
+            }
+        }
+
+        // No equivalent unique message was found.
+        //
+        // Insert the message using the normal FIFO policy.
         self.commands.insert(0, command);
     }
 
@@ -84,17 +122,30 @@ impl PendingCommands {
         self.commands.is_empty()
     }
 
-
     /// Replace an already queued unique message.
     ///
     /// If no equivalent unique message exists, the command is
     /// inserted using the normal FIFO policy.
-    fn replace_unique_message_or_enqueue(
-        &mut self,
-        command: ModuleCommand,
-    ) {
+    fn replace_unique_message_or_enqueue(&mut self, command: ModuleCommand) {
+        let ModuleCommand::Message { message, .. } = &command else {
+            unreachable!();
+        };
 
-        todo!()
+        let new_message_id = &message.message_id;
+
+        for queued_command in &mut self.commands {
+            match queued_command {
+                ModuleCommand::Message { message, unique: true, .. } => {
+                    if message.message_id == *new_message_id {
+                        // TODO
+
+                        return;
+                    }
+                }
+
+                _ => {}
+            }
+        }
     }
 }
 
@@ -163,15 +214,7 @@ pub(crate) fn spawn_module_task(module: Box<dyn Module + Send>, normal_receiver_
 ///
 /// This helper executes the message callback, reports errors and
 /// logs the complete message lifecycle.
-async fn execute_message(
-    module: &mut Box<dyn Module + Send>,
-    module_id: &ModuleID,
-    message: ModuleMessage,
-    priority: bool,
-    wait_completion: bool,
-    unique: bool,
-) -> Result<(), ModuleError> {
-
+async fn execute_message(module: &mut Box<dyn Module + Send>, module_id: &ModuleID, message: ModuleMessage, priority: bool, wait_completion: bool, unique: bool) -> Result<(), ModuleError> {
     let action_start_timer = Instant::now();
     let log_action = LogAction::ModuleMessage { sender_id: message.sender_id.clone(), message_id: message.message_id.clone(), priority, wait_completion, unique };
     let sender_id = message.sender_id.clone();
@@ -313,14 +356,7 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
             // Close command is always processed before module
             // shutdown begins.
             ModuleCommand::Message { message, priority, unique } => {
-                let _ = execute_message(
-                        &mut module,
-                        &module_id,
-                        message,
-                        priority,
-                        false,
-                        unique,
-                    ).await;
+                let _ = execute_message(&mut module, &module_id, message, priority, false, unique).await;
             }
 
             // Execute a business message.
@@ -335,14 +371,7 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
             // Close command is always processed before module
             // shutdown begins.
             ModuleCommand::MessageAndWaitCompletion { reply_sender, message, priority, unique } => {
-                let result_message = execute_message(
-                    &mut module,
-                    &module_id,
-                    message,
-                    priority,
-                    true,
-                    unique,
-                ).await;
+                let result_message = execute_message(&mut module, &module_id, message, priority, true, unique).await;
 
                 let _ = reply_sender.send(result_message);
             }

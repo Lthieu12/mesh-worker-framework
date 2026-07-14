@@ -31,12 +31,9 @@ pub(crate) enum ModuleCommand {
 }
 
 impl ModuleCommand {
-
     /// Return whether this command is unique.
     pub(crate) fn is_unique(&self) -> bool {
-
         match self {
-
             ModuleCommand::Message { unique, .. } => *unique,
 
             _ => false,
