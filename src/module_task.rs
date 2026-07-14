@@ -13,9 +13,12 @@
 //! - Terminate the module task when requested.
 //! - Process all module commands sequentially.
 //!
-//! Normal commands are processed FIFO.
-//! Priority commands are processed before normal commands
-//! using a LIFO policy.
+//! Module commands are first collected into an internal queue.
+//!
+//! Priority commands are inserted using a LIFO policy.
+//! Normal commands are inserted using a FIFO policy.
+//!
+//! Commands are then executed sequentially from this queue.
 //!
 //! MMF never directly calls on_init(), on_message() or on_close().
 //! These callbacks are executed inside the module task because
@@ -34,17 +37,21 @@ use crate::mmf::{MMF_MOD_CLOSE_NOTIFY, MMF_MOD_DATA, MMF_MOD_INIT_NOTIFY};
 use crate::mmf_log::{LogAction, LogStatus};
 use crate::module::{EntityID, Module, ModuleID, ModuleState};
 
+/// Internal command queue owned by ModuleTask.
+///
+/// Commands received from the Tokio channels are first inserted
+/// into this queue before being executed.
+///
+/// The queue is responsible for preserving the execution policy
+/// of each command type (FIFO, LIFO, unique filtering, ...).
 pub(crate) struct PendingCommands {
     commands: Vec<ModuleCommand>,
 }
 
 impl PendingCommands {
-
     /// Create an empty pending command queue.
     pub fn new() -> Self {
-        Self {
-            commands: Vec::new(),
-        }
+        Self { commands: Vec::new() }
     }
 
     /// Insert a priority command.
@@ -145,6 +152,8 @@ pub(crate) fn spawn_module_task(module: Box<dyn Module + Send>, normal_receiver_
 /// - Own the module instance.
 /// - Receive lifecycle commands and business messages.
 /// - Execute module callbacks.
+/// - Collect commands from the Tokio channels.
+/// - Schedule command execution through PendingCommands.
 /// - Update the Registry.
 /// - Report errors and log module activity.
 /// - Terminate when the module is closed.
@@ -157,25 +166,22 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
     let mut normal_receiver_channel = normal_receiver_channel;
     let mut priority_receiver_channel = priority_receiver_channel;
 
-    // Local LIFO stack used to store priority commands.
+    // Local command queue.
     //
-    // Priority commands are first received through a Tokio FIFO
-    // channel, then moved into this stack.
+    // Commands received from the Tokio channels are first
+    // collected into this queue before being executed.
     //
-    // This reproduces the behavior:
-    //
-    // send_priority_message(P1)
-    // send_priority_message(P2)
-    // send_priority_message(P3)
-    //
-    // Processing order:
-    // P3 -> P2 -> P1
+    // The queue preserves the scheduling policy of each
+    // command type (FIFO, LIFO, ...).
     let mut pending_commands = PendingCommands::new();
 
     loop {
-
+        // Wait until at least one command is available.
+        //
+        // Once awakened, drain both Tokio channels so every
+        // currently pending command is collected into the
+        // internal queue before execution.
         if pending_commands.is_empty() {
-
             tokio::select! {
 
                 command = priority_receiver_channel.recv() => {
@@ -191,20 +197,19 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
                 }
             }
 
-            // Drain all currently pending priority commands.
+            // Collect all remaining priority commands.
             while let Ok(command) = priority_receiver_channel.try_recv() {
                 pending_commands.push_priority(command);
             }
 
-            // Drain all currently pending normal commands.
+            // Collect all remaining normal commands.
             while let Ok(command) = normal_receiver_channel.try_recv() {
                 pending_commands.push_normal(command);
             }
         }
 
-        let command = pending_commands
-            .pop_next()
-            .expect("PendingCommands cannot be empty");
+        // Execute the next scheduled command.
+        let command = pending_commands.pop_next().expect(MMFPanic::Module_PendingCommandsEmpty.message());
 
         match command {
             // Execute module initialization.

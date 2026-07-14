@@ -203,6 +203,7 @@ impl Error for FrameworkError {}
 pub(crate) enum MMFPanic {
     Module_PriorityChannelClosed,
     Module_NormalChannelClosed,
+    Module_PendingCommandsEmpty,
 
     MMFData_ReadLockPoisoned,
     MMFData_WriteLockPoisoned,
@@ -234,6 +235,8 @@ impl MMFPanic {
             MMFPanic::Module_PriorityChannelClosed => "Internal MMF error: module priority command channel unexpectedly closed.",
 
             MMFPanic::Module_NormalChannelClosed => "Internal MMF error: module normal command channel unexpectedly closed.",
+
+            MMFPanic::Module_PendingCommandsEmpty => "Internal MMF error: module pending commands cannot be empty.",
 
             MMFPanic::MMFData_ReadLockPoisoned => "Internal MMF error: MMF_DATA read lock poisoned.",
 
