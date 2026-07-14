@@ -66,7 +66,7 @@ impl PendingCommands {
     ///
     /// Normal commands are stored using a FIFO policy.
     pub fn push_normal(&mut self, command: ModuleCommand) {
-        if command.is_unique() {
+        if command.is_unique_message() {
             self.push_unique(command);
         } else {
             self.commands.insert(0, command);
@@ -85,24 +85,9 @@ impl PendingCommands {
         // Search for an already queued unique message with the
         // same MessageID.
         for queued_command in &mut self.commands {
-            match queued_command {
-                ModuleCommand::Message { message: queued_message, unique: true, .. } => {
-                    match &command {
-                        ModuleCommand::Message { message, .. } => {
-                            if queued_message.message_id == message.message_id {
-                                // Replace the queued message while
-                                // preserving its current position in
-                                // the FIFO queue.
-                                *queued_command = command;
-                                return;
-                            }
-                        }
-
-                        _ => {}
-                    }
-                }
-
-                _ => {}
+            if queued_command.is_unique_message() && queued_command.message_id() == command.message_id() {
+                *queued_command = command;
+                return;
             }
         }
 

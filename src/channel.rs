@@ -19,7 +19,7 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
 use crate::framework_error::ModuleError;
-use crate::message::ModuleMessage;
+use crate::message::{MessageID, ModuleMessage};
 
 /// Command processed by a ModuleTask.
 #[derive(Debug)]
@@ -32,11 +32,19 @@ pub(crate) enum ModuleCommand {
 
 impl ModuleCommand {
     /// Return whether this command is unique.
-    pub(crate) fn is_unique(&self) -> bool {
+    pub(crate) fn is_unique_message(&self) -> bool {
         match self {
             ModuleCommand::Message { unique, .. } => *unique,
 
             _ => false,
+        }
+    }
+
+    /// Return the MessageID carried by this command.
+    pub(crate) fn message_id(&self) -> Option<&MessageID> {
+        match self {
+            ModuleCommand::Message { message, .. } | ModuleCommand::MessageAndWaitCompletion { message, .. } => Some(&message.message_id),
+            _ => None,
         }
     }
 }
