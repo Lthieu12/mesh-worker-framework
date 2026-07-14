@@ -54,7 +54,7 @@ pub fn filter_messages<'a>(log_list: &'a LogList, module_id: &ModuleID) -> Vec<R
             continue;
         }
 
-        if let LogAction::ModuleMessage { sender_id, message_id, priority, wait_completion } = &log_event.log_action {
+        if let LogAction::ModuleMessage { sender_id, message_id, priority, wait_completion, unique } = &log_event.log_action {
             receive_messages.push(ReceiveMessageLog { log_event, sender_id, message_id, priority: *priority, wait_completion: *wait_completion, log_status: log_event.log_status });
         }
     }

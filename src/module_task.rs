@@ -35,7 +35,8 @@ use crate::channel::{ModuleCommand, ModuleNormalReceiverChannel, ModulePriorityR
 use crate::framework_error::MMFPanic;
 use crate::mmf::{MMF_MOD_CLOSE_NOTIFY, MMF_MOD_DATA, MMF_MOD_INIT_NOTIFY};
 use crate::mmf_log::{LogAction, LogStatus};
-use crate::module::{EntityID, Module, ModuleID, ModuleState};
+use crate::module::{EntityID, Module, ModuleID, ModuleState, ModuleError};
+use crate::message::ModuleMessage;
 
 /// Internal command queue owned by ModuleTask.
 ///
@@ -65,6 +66,11 @@ impl PendingCommands {
     ///
     /// Normal commands are stored using a FIFO policy.
     pub fn push_normal(&mut self, command: ModuleCommand) {
+
+        if command.is_unique() {
+            self.replace_unique_message_or_enqueue(command);
+            return;
+        }
         self.commands.insert(0, command);
     }
 
@@ -76,6 +82,19 @@ impl PendingCommands {
     /// Return whether the queue is empty.
     pub fn is_empty(&self) -> bool {
         self.commands.is_empty()
+    }
+
+
+    /// Replace an already queued unique message.
+    ///
+    /// If no equivalent unique message exists, the command is
+    /// inserted using the normal FIFO policy.
+    fn replace_unique_message_or_enqueue(
+        &mut self,
+        command: ModuleCommand,
+    ) {
+
+        todo!()
     }
 }
 
@@ -138,6 +157,42 @@ pub(crate) fn spawn_module_task(module: Box<dyn Module + Send>, normal_receiver_
             }
         }
     })
+}
+
+/// Execute a business message.
+///
+/// This helper executes the message callback, reports errors and
+/// logs the complete message lifecycle.
+async fn execute_message(
+    module: &mut Box<dyn Module + Send>,
+    module_id: &ModuleID,
+    message: ModuleMessage,
+    priority: bool,
+    wait_completion: bool,
+    unique: bool,
+) -> Result<(), ModuleError> {
+
+    let action_start_timer = Instant::now();
+    let log_action = LogAction::ModuleMessage { sender_id: message.sender_id.clone(), message_id: message.message_id.clone(), priority, wait_completion, unique };
+    let sender_id = message.sender_id.clone();
+    let message_id = message.message_id.clone();
+
+    MMFLog::add_log(action_start_timer, &module_id, log_action.clone(), LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+
+    let result = module.on_message(message).await;
+
+    match &result {
+        Ok(()) => {
+            MMFLog::add_log(action_start_timer, &module_id, log_action, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+        }
+
+        Err(error) => {
+            let error_context = format!("on_message -> MessageID={}, SenderID={}", message_id, sender_id);
+            MMFErr::add_error_internal(&EntityID::Module(module_id.clone()), Some(error_context.to_string()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
+            MMFLog::add_log(action_start_timer, &module_id, log_action, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+        }
+    }
+    result
 }
 
 /// Execute the complete lifecycle of a module.
@@ -258,26 +313,14 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
             // Close command is always processed before module
             // shutdown begins.
             ModuleCommand::Message { message, priority, unique } => {
-                let action_start_timer = Instant::now();
-                let log_action = LogAction::ModuleMessage { sender_id: message.sender_id.clone(), message_id: message.message_id.clone(), priority, wait_completion: false };
-                let sender_id = message.sender_id.clone();
-                let message_id = message.message_id.clone();
-
-                MMFLog::add_log(action_start_timer, &module_id, log_action.clone(), LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
-
-                let result_message = module.on_message(message).await;
-
-                match &result_message {
-                    Ok(()) => {
-                        MMFLog::add_log(action_start_timer, &module_id, log_action, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
-                    }
-
-                    Err(error) => {
-                        let error_context = format!("on_message -> MessageID={}, SenderID={}", message_id, sender_id);
-                        MMFErr::add_error_internal(&EntityID::Module(module_id.clone()), Some(error_context.to_string()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
-                        MMFLog::add_log(action_start_timer, &module_id, log_action, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
-                    }
-                }
+                let _ = execute_message(
+                        &mut module,
+                        &module_id,
+                        message,
+                        priority,
+                        false,
+                        unique,
+                    ).await;
             }
 
             // Execute a business message.
@@ -292,26 +335,14 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
             // Close command is always processed before module
             // shutdown begins.
             ModuleCommand::MessageAndWaitCompletion { reply_sender, message, priority, unique } => {
-                let action_start_timer = Instant::now();
-                let log_action = LogAction::ModuleMessage { sender_id: message.sender_id.clone(), message_id: message.message_id.clone(), priority, wait_completion: true };
-                let sender_id = message.sender_id.clone();
-                let message_id = message.message_id.clone();
-
-                MMFLog::add_log(action_start_timer, &module_id, log_action.clone(), LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
-
-                let result_message = module.on_message(message).await;
-
-                match &result_message {
-                    Ok(()) => {
-                        MMFLog::add_log(action_start_timer, &module_id, log_action, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
-                    }
-
-                    Err(error) => {
-                        let error_context = format!("on_message -> MessageID={}, SenderID={}", message_id, sender_id);
-                        MMFErr::add_error_internal(&EntityID::Module(module_id.clone()), Some(error_context.to_string()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
-                        MMFLog::add_log(action_start_timer, &module_id, log_action, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
-                    }
-                }
+                let result_message = execute_message(
+                    &mut module,
+                    &module_id,
+                    message,
+                    priority,
+                    true,
+                    unique,
+                ).await;
 
                 let _ = reply_sender.send(result_message);
             }

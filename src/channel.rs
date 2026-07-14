@@ -30,6 +30,20 @@ pub(crate) enum ModuleCommand {
     Close { lifecycle_data: Bytes },
 }
 
+impl ModuleCommand {
+
+    /// Return whether this command is unique.
+    pub(crate) fn is_unique(&self) -> bool {
+
+        match self {
+
+            ModuleCommand::Message { unique, .. } => *unique,
+
+            _ => false,
+        }
+    }
+}
+
 pub(crate) type ModuleNormalSenderChannel = Sender<ModuleCommand>;
 pub(crate) type ModuleNormalReceiverChannel = Receiver<ModuleCommand>;
 
