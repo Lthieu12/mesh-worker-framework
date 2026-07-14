@@ -6,6 +6,7 @@
 //! - send_message().
 //! - send_priority_message().
 //! - send_message_and_wait().
+//! - send_unique_message().
 
 use bytes::Bytes;
 use serial_test::serial;
@@ -209,6 +210,80 @@ async fn test_send_message_and_wait() {
     MMFMod::close_module(&module_b_id, Bytes::new()).await.unwrap();
 
     MMFMod::wait_children_close(&EntityID::External("MAIN".to_string()), Some(1000)).await.unwrap();
+
+    MMF::close().unwrap();
+}
+
+// MMF uses a global runtime instance.
+// Integration tests must run serially.
+#[tokio::test]
+#[serial]
+async fn test_send_unique_message() {
+    // Initialize MMF.
+    MMF::init().unwrap();
+
+    MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
+
+    MMF::register_module_type::<SimulationModule>().unwrap();
+
+    // Spawn and initialize the simulation module.
+    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("MAIN".to_string())).unwrap();
+
+    let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Wait { message_delay_ms: 100 }, wait_children_close: false, wait_children_close_timeout_ms: None };
+
+    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
+
+    MMFMod::init_module(&module_id, lifecycle_data).await.unwrap();
+    MMFMod::wait_module_init(&module_id, Some(1000)).await.unwrap();
+
+    // Send a blocking message to keep the module busy.
+    MMFMod::send_message(&EntityID::External("MAIN".to_string()), &module_id, &MESSAGE_CHAIN.to_string(), Bytes::new()).await.unwrap();
+
+    // Give the module enough time to start processing
+    // the blocking message.
+    MMFMod::sleep(Duration::from_millis(20)).await;
+
+    // Send several equivalent unique messages.
+    for _ in 0..5 {
+        MMFMod::send_unique_message(&EntityID::External("MAIN".to_string()), &module_id, &MESSAGE_CHAIN.to_string(), Bytes::new()).await.unwrap();
+    }
+
+    // Wait until all messages have been processed.
+    MMFMod::sleep(Duration::from_millis(300)).await;
+
+    // Verify that only the first and the last unique
+    // messages have been processed.
+    let log_list = MMFLog::wait_log(None).await.unwrap();
+    print_log_list().await;
+
+    let messages = filter_messages(&log_list, &module_id);
+
+    assert_eq!(messages.len(), 4);
+
+    // Start of the blocking message.
+    assert_eq!(messages[0].message_id, &MESSAGE_CHAIN.to_string());
+    assert_eq!(messages[0].log_status, LogStatus::Start);
+
+    // End of the blocking message.
+    assert_eq!(messages[1].message_id, &MESSAGE_CHAIN.to_string());
+    assert_eq!(messages[1].log_status, LogStatus::Ok);
+
+    // Start of the last unique message.
+    assert_eq!(messages[2].message_id, &MESSAGE_CHAIN.to_string());
+    assert_eq!(messages[2].log_status, LogStatus::Start);
+
+    // End of the last unique message.
+    assert_eq!(messages[3].message_id, &MESSAGE_CHAIN.to_string());
+    assert_eq!(messages[3].log_status, LogStatus::Ok);
+
+    // The unique message must correspond to the fifth unique
+    // message that was sent.
+    assert_eq!(*messages[2].message_instance_id, *messages[0].message_instance_id + 5);
+
+    assert_eq!(*messages[3].message_instance_id, *messages[2].message_instance_id);
+
+    MMFMod::close_module(&module_id, Bytes::new()).await.unwrap();
+    MMFMod::wait_module_close(&module_id, Some(1000)).await.unwrap();
 
     MMF::close().unwrap();
 }

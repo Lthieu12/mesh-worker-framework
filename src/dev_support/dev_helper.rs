@@ -10,7 +10,7 @@ use crate::MMFErr;
 use crate::MMFLog;
 use crate::MMFMod;
 
-use crate::message::MessageID;
+use crate::message::{MessageID, MessageInstanceID};
 use crate::mmf_log::{LogAction, LogEvent, LogList, LogStatus};
 use crate::module::{EntityID, ModuleID};
 
@@ -35,6 +35,7 @@ pub async fn print_error_list() {
 #[allow(dead_code)]
 pub struct ReceiveMessageLog<'a> {
     pub log_event: &'a LogEvent,
+    pub message_instance_id: &'a MessageInstanceID,
     pub sender_id: &'a EntityID,
     pub message_id: &'a MessageID,
     pub priority: bool,
@@ -54,8 +55,8 @@ pub fn filter_messages<'a>(log_list: &'a LogList, module_id: &ModuleID) -> Vec<R
             continue;
         }
 
-        if let LogAction::ModuleMessage { sender_id, message_id, priority, wait_completion } = &log_event.log_action {
-            receive_messages.push(ReceiveMessageLog { log_event, sender_id, message_id, priority: *priority, wait_completion: *wait_completion, log_status: log_event.log_status });
+        if let LogAction::ModuleMessage { message_instance_id, sender_id, message_id, priority, wait_completion } = &log_event.log_action {
+            receive_messages.push(ReceiveMessageLog { log_event, message_instance_id, sender_id, message_id, priority: *priority, wait_completion: *wait_completion, log_status: log_event.log_status });
         }
     }
 
