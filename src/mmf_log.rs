@@ -89,8 +89,8 @@ mod terminal_log_column {
     pub(crate) const TIME_LEN: usize = 12;
     pub(crate) const MODULE_ID_LEN: usize = 30;
     pub(crate) const EVENT_LEN: usize = 7;
-    pub(crate) const SENDER_ID_LEN: usize = 30;
     pub(crate) const MESSAGE_ID_LEN: usize = 30;
+    pub(crate) const SENDER_ID_LEN: usize = 30;
     pub(crate) const STATUS_LEN: usize = 6;
     pub(crate) const DURATION_LEN: usize = 8;
 }
@@ -138,13 +138,13 @@ impl LogEvent {
         };
 
         format!(
-            "{:0width_log$} | {:width_time$} | {:width_module$} | {:width_event$} | {:width_sender$} | {:width_message$} | {} | {} | {:width_status$} | {:width_duration$}",
+            "{:0width_log$} | {:width_time$} | {:width_module$} | {:width_event$} | {:width_message$} | {:width_sender$} | {} | {} | {:width_status$} | {:width_duration$}",
             self.log_instance_id,
             &self.timestamp_rfc3339[11..23],
             EntityID::Module(self.module_id.clone()).to_short_string(terminal_log_column::MODULE_ID_LEN),
             event,
-            sender_id,
             message_id,
+            sender_id,
             priority,
             wait,
             status,
@@ -153,8 +153,8 @@ impl LogEvent {
             width_time = terminal_log_column::TIME_LEN,
             width_module = terminal_log_column::MODULE_ID_LEN,
             width_event = terminal_log_column::EVENT_LEN,
-            width_sender = terminal_log_column::SENDER_ID_LEN,
             width_message = terminal_log_column::MESSAGE_ID_LEN,
+            width_sender = terminal_log_column::SENDER_ID_LEN,
             width_status = terminal_log_column::STATUS_LEN,
             width_duration = terminal_log_column::DURATION_LEN,
         )
@@ -162,13 +162,15 @@ impl LogEvent {
 
     /// Converts the log event into a CSV row.
     pub(crate) fn to_csv_string(&self) -> String {
-        let (event, sender_id, message_id, priority, wait) = match &self.log_action {
-            LogAction::ModuleSpawn => ("SPAWN", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
-            LogAction::ModuleInit => ("INIT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
-            LogAction::ModuleClose => ("CLOSE", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
-            LogAction::ModuleAbort => ("ABORT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
-            LogAction::ModulePanic => ("PANIC", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
-            LogAction::ModuleMessage { message_instance_id: _, sender_id, message_id, priority, wait_completion } => ("MESSAGE", sender_id.to_string(), message_id.clone(), if *priority { "Y" } else { "N" }.to_string(), if *wait_completion { "Y" } else { "N" }.to_string()),
+        let (event, message_instance_id, sender_id, message_id, priority, wait) = match &self.log_action {
+            LogAction::ModuleSpawn => ("SPAWN", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
+            LogAction::ModuleInit => ("INIT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
+            LogAction::ModuleClose => ("CLOSE", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
+            LogAction::ModuleAbort => ("ABORT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
+            LogAction::ModulePanic => ("PANIC", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
+            LogAction::ModuleMessage { message_instance_id, sender_id, message_id, priority, wait_completion } => {
+                ("MESSAGE", message_instance_id.to_string(), sender_id.to_string(), message_id.clone(), if *priority { "Y" } else { "N" }.to_string(), if *wait_completion { "Y" } else { "N" }.to_string())
+            }
         };
 
         let duration = match self.duration_ms {
@@ -183,13 +185,14 @@ impl LogEvent {
         };
 
         format!(
-            "{},{},{},{},{},{},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{},{},{}",
             self.log_instance_id,
             string_helper::csv_escape(&self.timestamp_rfc3339),
             string_helper::csv_escape(&self.module_id),
             string_helper::csv_escape(event),
-            string_helper::csv_escape(&sender_id),
+            string_helper::csv_escape(&message_instance_id),
             string_helper::csv_escape(&message_id),
+            string_helper::csv_escape(&sender_id),
             string_helper::csv_escape(&priority),
             string_helper::csv_escape(&wait),
             string_helper::csv_escape(status),
@@ -241,21 +244,21 @@ impl LogList {
         match format {
             LogOutputFormat::Terminal => {
                 let header = format!(
-                    "{:<width_log$} | {:<width_time$} | {:<width_module$} | {:<width_event$} | {:<width_sender$} | {:<width_message$} | P | W | {:<width_status$} | {:<width_duration$}",
+                    "{:<width_log$} | {:<width_time$} | {:<width_module$} | {:<width_event$} | {:<width_message$} | {:<width_sender$} | P | W | {:<width_status$} | {:<width_duration$}",
                     "LogID",
                     "Time",
                     "ModuleID",
                     "Event",
-                    "SenderID",
                     "MessageID",
+                    "SenderID",
                     "STATUS",
                     "Duration",
                     width_log = terminal_log_column::LOG_ID_LEN,
                     width_time = terminal_log_column::TIME_LEN,
                     width_module = terminal_log_column::MODULE_ID_LEN,
                     width_event = terminal_log_column::EVENT_LEN,
-                    width_sender = terminal_log_column::SENDER_ID_LEN,
                     width_message = terminal_log_column::MESSAGE_ID_LEN,
+                    width_sender = terminal_log_column::SENDER_ID_LEN,
                     width_status = terminal_log_column::STATUS_LEN,
                     width_duration = terminal_log_column::DURATION_LEN,
                 );
@@ -264,7 +267,7 @@ impl LogList {
                 format!("{header}\n{separator}")
             }
 
-            LogOutputFormat::CSV => String::from("LogID,Time,ModuleID,Event,SenderID,MessageID,Priority,Wait,Status,Duration"),
+            LogOutputFormat::CSV => String::from("LogID,Time,ModuleID,Event,MessageInstanceID,MessageID,SenderID,Priority,Wait,Status,Duration"),
         }
     }
 
