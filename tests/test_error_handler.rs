@@ -34,10 +34,10 @@ async fn test_mmf_err_module_failures() {
     // Generale application error (external error, not related to a module).
     let application_error = generate_application_error().unwrap_err();
 
-    MMFErr::add_error(&EntityID::External("Application".to_string()), &application_error).unwrap();
+    MMFErr::add_error(&EntityID::External("Application".into()), &application_error).unwrap();
 
     // Simulation module with error on message
-    let module_a_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("Test".to_string())).unwrap();
+    let module_a_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("Test".into())).unwrap();
 
     let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
@@ -47,11 +47,11 @@ async fn test_mmf_err_module_failures() {
 
     // Generate multiple message failures.
     for _ in 0..3 {
-        MMFMod::send_message(&EntityID::External("Test".to_string()), &module_a_id, &"TEST".to_string(), Bytes::new()).await.unwrap();
+        MMFMod::send_message(&EntityID::External("Test".into()), &module_a_id, &"TEST".into(), Bytes::new()).await.unwrap();
     }
 
     // Simulation module with error on init
-    let module_b_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("Test".to_string())).unwrap();
+    let module_b_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("Test".into())).unwrap();
 
     let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Init_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
@@ -61,7 +61,7 @@ async fn test_mmf_err_module_failures() {
     assert!(matches!(result, Err(FrameworkError::Module_InitializationFailed)));
 
     // Simulation module with error on close
-    let module_c_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("Test".to_string())).unwrap();
+    let module_c_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("Test".into())).unwrap();
 
     let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Close_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
@@ -93,7 +93,7 @@ async fn test_mmf_err_module_failures() {
 
     assert_eq!(error_messages.iter().filter(|message| **message == "Simulation close failure").count(), 1);
 
-    let application_error = error_list.error_event_list.iter().find(|error_event| error_event.entity_id == EntityID::External("Application".to_string())).unwrap();
+    let application_error = error_list.error_event_list.iter().find(|error_event| error_event.entity_id == EntityID::External("Application".into())).unwrap();
 
     assert_eq!(application_error.error_description, "Failed to load configuration");
 
@@ -136,7 +136,7 @@ async fn test_mmf_err_buffer_overflow() {
     MMF::init_with_configuration(configuration).unwrap();
     MMF::register_module_type::<SimulationModule>().unwrap();
 
-    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("Test".to_string())).unwrap();
+    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("Test".into())).unwrap();
 
     let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
@@ -147,7 +147,7 @@ async fn test_mmf_err_buffer_overflow() {
 
     // Generate more errors than the buffer can hold.
     for _ in 0..15 {
-        let _ = MMFMod::send_message_and_wait(&EntityID::External("Test".to_string()), &module_id, &"TEST".to_string(), Bytes::new(), Some(1000)).await;
+        let _ = MMFMod::send_message_and_wait(&EntityID::External("Test".into()), &module_id, &"TEST".into(), Bytes::new(), Some(1000)).await;
     }
 
     let error_list = MMFErr::wait_error(Some(0)).await.unwrap();
@@ -160,7 +160,7 @@ async fn test_mmf_err_buffer_overflow() {
 
     assert_eq!(error_list.error_event_list.len(), 10);
 
-    MMFMod::abort_children(&EntityID::External("Test".to_string())).unwrap();
+    MMFMod::abort_children(&EntityID::External("Test".into())).unwrap();
 
     MMF::close().unwrap();
 }

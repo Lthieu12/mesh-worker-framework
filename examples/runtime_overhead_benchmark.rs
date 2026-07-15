@@ -44,7 +44,7 @@ async fn main() {
     let mut module_ids = Vec::with_capacity(module_count);
 
     for _ in 0..module_count {
-        let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("MAIN".to_string())).unwrap();
+        let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("MAIN".into())).unwrap();
 
         module_ids.push(module_id);
     }
