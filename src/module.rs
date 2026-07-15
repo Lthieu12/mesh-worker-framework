@@ -250,6 +250,12 @@ impl ModuleList {
 ///
 /// MMF creates module instances dynamically by calling
 /// `Module::new()` on the registered module type.
+///
+/// MMF stores module instances behind `Box<dyn Module>`.
+///
+/// The `Self: Sized` bounds on `module_type_id()` and `new()` are
+/// required to keep this trait object-safe. Without these bounds,
+/// `Module` could no longer be used as `dyn Module`.
 #[async_trait]
 pub trait Module {
     /// Returns the unique identifier of this module type.
@@ -273,6 +279,11 @@ pub trait Module {
     /// The returned instance must be in its initial state.
     /// Runtime resources should be acquired later during
     /// on_init().
+    ///
+    /// This associated function is only available on concrete module
+    /// types (`Self: Sized`). It is intentionally excluded from trait
+    /// objects (`dyn Module`) so that MMF can store modules behind
+    /// `Box<dyn Module>`.
     fn new() -> Self
     where
         Self: Sized;
