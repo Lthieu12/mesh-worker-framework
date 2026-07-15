@@ -60,12 +60,12 @@ impl Registry {
     }
 
     /// Get module registry entry from ModuleID.
-    pub(crate) fn get_registry_entry(&self, module_id: &ModuleID) -> Result<&RegistryEntry, FrameworkError> {
+    pub(crate) fn get_registry_entry(&self, module_id: &str) -> Result<&RegistryEntry, FrameworkError> {
         self.module_map.get(module_id).ok_or(FrameworkError::Module_NotFound)
     }
 
     /// Get mutable module registry entry from ModuleID.
-    pub(crate) fn get_registry_entry_mut(&mut self, module_id: &ModuleID) -> Result<&mut RegistryEntry, FrameworkError> {
+    pub(crate) fn get_registry_entry_mut(&mut self, module_id: &str) -> Result<&mut RegistryEntry, FrameworkError> {
         self.module_map.get_mut(module_id).ok_or(FrameworkError::Module_NotFound)
     }
 
@@ -85,22 +85,22 @@ impl Registry {
     }
 
     /// Get module type id from ModuleID.
-    pub(crate) fn get_module_type_id(&self, module_id: &ModuleID) -> Result<ModuleTypeID, FrameworkError> {
+    pub(crate) fn get_module_type_id(&self, module_id: &str) -> Result<ModuleTypeID, FrameworkError> {
         Ok(self.get_registry_entry(module_id)?.module_type_id)
     }
 
     /// Get module channel from ModuleID.
-    pub(crate) fn get_module_normal_channel(&self, module_id: &ModuleID) -> Result<ModuleNormalSenderChannel, FrameworkError> {
+    pub(crate) fn get_module_normal_channel(&self, module_id: &str) -> Result<ModuleNormalSenderChannel, FrameworkError> {
         Ok(self.get_registry_entry(module_id)?.normal_sender_channel.clone())
     }
 
     /// Get module priority channel from ModuleID.
-    pub(crate) fn get_module_priority_channel(&self, module_id: &ModuleID) -> Result<ModulePrioritySenderChannel, FrameworkError> {
+    pub(crate) fn get_module_priority_channel(&self, module_id: &str) -> Result<ModulePrioritySenderChannel, FrameworkError> {
         Ok(self.get_registry_entry(module_id)?.priority_sender_channel.clone())
     }
 
     /// Get module state from ModuleID
-    pub(crate) fn get_module_state(&self, module_id: &ModuleID) -> Result<ModuleState, FrameworkError> {
+    pub(crate) fn get_module_state(&self, module_id: &str) -> Result<ModuleState, FrameworkError> {
         Ok(self.get_registry_entry(module_id)?.module_state)
     }
 
@@ -118,7 +118,7 @@ impl Registry {
     }
 
     /// Register a newly created module.
-    pub(crate) fn add_module(&mut self, module_id: &ModuleID, module_type_id: ModuleTypeID, father_id: &EntityID, normal_sender_channel: ModuleNormalSenderChannel, priority_sender_channel: ModulePrioritySenderChannel, join_handle: JoinHandle<()>) -> Result<(), (FrameworkError, JoinHandle<()>)> {
+    pub(crate) fn add_module(&mut self, module_id: &str, module_type_id: ModuleTypeID, father_id: &EntityID, normal_sender_channel: ModuleNormalSenderChannel, priority_sender_channel: ModulePrioritySenderChannel, join_handle: JoinHandle<()>) -> Result<(), (FrameworkError, JoinHandle<()>)> {
         // Prevent duplicate ModuleIDs.
         if self.module_map.contains_key(module_id) {
             return Err((FrameworkError::Module_AlreadyExists, join_handle));
@@ -143,20 +143,20 @@ impl Registry {
         // Create the Registry entry associated with the module.
         let registry_entry = RegistryEntry::new(module_type_id, father_id.clone(), normal_sender_channel, priority_sender_channel, join_handle);
         // Register the module.
-        self.module_map.insert(module_id.clone(), registry_entry);
+        self.module_map.insert(module_id.to_owned(), registry_entry);
 
         // Register the parent/child relationship.
         //
         // child_module_map only stores existing relationships.
         //
         // Modules without children do not have an entry in this map.
-        self.child_module_map.entry(father_id.clone()).or_default().push(module_id.clone());
+        self.child_module_map.entry(father_id.clone()).or_default().push(module_id.to_owned());
 
         Ok(())
     }
 
     /// Remove a module from the registry.
-    pub(crate) fn remove_module(&mut self, module_id: &ModuleID) -> Result<(), FrameworkError> {
+    pub(crate) fn remove_module(&mut self, module_id: &str) -> Result<(), FrameworkError> {
         // Retrieve the Registry entry associated with the module.
         //
         // The father_id must be retrieved before removing the module
@@ -186,25 +186,25 @@ impl Registry {
         //
         // A closed module can no longer be the parent of other
         // modules.
-        self.child_module_map.remove(&EntityID::Module(module_id.clone()));
+        self.child_module_map.remove(&EntityID::Module(module_id.to_owned()));
 
         Ok(())
     }
 
     /// Update the module state of a registered module.
-    pub(crate) fn set_module_state(&mut self, module_id: &ModuleID, module_state: ModuleState) -> Result<(), FrameworkError> {
+    pub(crate) fn set_module_state(&mut self, module_id: &str, module_state: ModuleState) -> Result<(), FrameworkError> {
         let registry_entry = self.get_registry_entry_mut(module_id)?;
         registry_entry.module_state = module_state;
         Ok(())
     }
 
     /// Returns true if the module exists in the Registry.
-    pub(crate) fn contains_module(&self, module_id: &ModuleID) -> bool {
+    pub(crate) fn contains_module(&self, module_id: &str) -> bool {
         self.module_map.contains_key(module_id)
     }
 
     /// Get the module FatherID from ModuleID.
-    pub(crate) fn get_father_id(&self, module_id: &ModuleID) -> Result<EntityID, FrameworkError> {
+    pub(crate) fn get_father_id(&self, module_id: &str) -> Result<EntityID, FrameworkError> {
         let registry_entry = self.get_registry_entry(module_id)?;
         Ok(registry_entry.father_id.clone())
     }
@@ -254,7 +254,7 @@ impl Registry {
     }
 
     /// Take ownership of the JoinHandle associated with a module.
-    pub(crate) fn take_join_handle(&mut self, module_id: &ModuleID) -> Result<JoinHandle<()>, FrameworkError> {
+    pub(crate) fn take_join_handle(&mut self, module_id: &str) -> Result<JoinHandle<()>, FrameworkError> {
         let registry_entry = self.get_registry_entry_mut(module_id)?;
         let join_handle = registry_entry.join_handle.take().expect(MMFPanic::Module_JoinHandleMissing.message());
         Ok(join_handle)

@@ -181,7 +181,7 @@ impl MMFMod {
     }
 
     /// Get the current status of a module.
-    pub fn get_module_status(module_id: &ModuleID) -> Result<ModuleStatus, FrameworkError> {
+    pub fn get_module_status(module_id: &str) -> Result<ModuleStatus, FrameworkError> {
         let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
         let registry_entry = mmf_data.module_registry.get_registry_entry(module_id)?;
@@ -226,7 +226,7 @@ impl MMFMod {
     /// Returns:
     /// - Framework_NotInitialized if MMF has not been initialized.
     /// - Module_NotFound if the module does not exist.
-    pub fn get_module_type_rust_path(module_id: &ModuleID) -> Result<&'static str, FrameworkError> {
+    pub fn get_module_type_rust_path(module_id: &str) -> Result<&'static str, FrameworkError> {
         // Get the ModuleTypeID associated with the module.
         let mmf_mod_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
         let mmf_mod_data = mmf_mod_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
@@ -246,7 +246,7 @@ impl MMFMod {
     /// The module state is immediately changed to Initializing.
     /// This function only queues the Init command and does not wait
     /// for on_init() completion.
-    pub async fn init_module(module_id: &ModuleID, lifecycle_data: Bytes) -> Result<(), FrameworkError> {
+    pub async fn init_module(module_id: &str, lifecycle_data: Bytes) -> Result<(), FrameworkError> {
         // Change Module state to Initializing
         // and read MMF data to retrieve the Module channel
         // associated with the target module.
@@ -275,7 +275,7 @@ impl MMFMod {
     /// The module state is immediately changed to Closing.
     /// This function only queues the Close command and does not wait
     /// for on_close() completion.
-    pub async fn close_module(module_id: &ModuleID, lifecycle_data: Bytes) -> Result<(), FrameworkError> {
+    pub async fn close_module(module_id: &str, lifecycle_data: Bytes) -> Result<(), FrameworkError> {
         // Change Module state to Closing
         // and read MMF data to retrieve the Module channel
         // associated with the target module.
@@ -299,7 +299,7 @@ impl MMFMod {
     }
 
     /// Get the FatherID of a module.
-    pub fn get_father_id(module_id: &ModuleID) -> Result<EntityID, FrameworkError> {
+    pub fn get_father_id(module_id: &str) -> Result<EntityID, FrameworkError> {
         let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
         let father_id = mmf_data.module_registry.get_father_id(module_id)?;
@@ -391,8 +391,8 @@ impl MMFMod {
     /// timeout_ms:
     /// - None => wait indefinitely.
     /// - Some(value) => return Operation_Timeout if the delay expires.
-    pub async fn wait_module_init(module_id: &ModuleID, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
-        MMFMod::wait_module_list_init(&vec![module_id.clone()], timeout_ms).await
+    pub async fn wait_module_init(module_id: &str, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
+        MMFMod::wait_module_list_init(&vec![module_id.to_owned()], timeout_ms).await
     }
 
     /// Wait until all direct children of an entity reach the
@@ -480,8 +480,8 @@ impl MMFMod {
     /// timeout_ms:
     /// - None => wait indefinitely.
     /// - Some(value) => return Operation_Timeout if the delay expires.
-    pub async fn wait_module_close(module_id: &ModuleID, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
-        MMFMod::wait_module_list_close(&vec![module_id.clone()], timeout_ms).await
+    pub async fn wait_module_close(module_id: &str, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
+        MMFMod::wait_module_list_close(&vec![module_id.to_owned()], timeout_ms).await
     }
 
     /// Wait until all direct children of an entity have fully closed.
@@ -552,8 +552,8 @@ impl MMFMod {
     ///
     /// This function should only be used as a recovery mechanism
     /// when normal shutdown has failed.
-    pub fn abort_module(module_id: &ModuleID) -> Result<(), FrameworkError> {
-        MMFMod::abort_module_list(&vec![module_id.clone()])
+    pub fn abort_module(module_id: &str) -> Result<(), FrameworkError> {
+        MMFMod::abort_module_list(&vec![module_id.to_owned()])
     }
 
     /// Forcefully terminate all direct children modules of an entity.

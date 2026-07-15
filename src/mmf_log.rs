@@ -349,7 +349,7 @@ impl MMFLog {
     ///
     /// Returns Framework_NotInitialized if MMF has not
     /// been initialized through MMF::init().
-    pub(crate) fn remove_logged_module(module_id: &ModuleID) -> Result<(), FrameworkError> {
+    pub(crate) fn remove_logged_module(module_id: &str) -> Result<(), FrameworkError> {
         let mut mmf_log_data_guard = MMF_LOG_DATA.write().expect(MMFPanic::MMFLogData_WriteLockPoisoned.message());
         let mmf_log_data = mmf_log_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
         mmf_log_data.logged_module_list.retain(|logged_module_id| logged_module_id != module_id);
@@ -369,7 +369,7 @@ impl MMFLog {
     }
 
     /// Check whether logging is enabled for a module.
-    pub(crate) fn must_log_module(module_id: &ModuleID) -> Result<bool, FrameworkError> {
+    pub(crate) fn must_log_module(module_id: &str) -> Result<bool, FrameworkError> {
         let log_mode = MMF_LOG_MODE.load(Ordering::Relaxed);
 
         if log_mode == LogMode::NoLog as u8 {
@@ -383,7 +383,7 @@ impl MMFLog {
         if log_mode == LogMode::LogSelected as u8 {
             let mmf_log_data_guard = MMF_LOG_DATA.read().expect(MMFPanic::MMFLogData_ReadLockPoisoned.message());
             let logging_data = mmf_log_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
-            return Ok(logging_data.logged_module_list.contains(module_id));
+            return Ok(logging_data.logged_module_list.iter().any(|logged_module_id| logged_module_id == module_id));
         }
 
         // Invalid value => NoLog
@@ -397,7 +397,7 @@ impl MMFLog {
     ///
     /// Returns Framework_NotInitialized if MMF has
     /// not been initialized through MMF::init().
-    pub(crate) fn add_log(action_start_timer: Instant, module_id: &ModuleID, log_action: LogAction, log_status: LogStatus) -> Result<(), FrameworkError> {
+    pub(crate) fn add_log(action_start_timer: Instant, module_id: &str, log_action: LogAction, log_status: LogStatus) -> Result<(), FrameworkError> {
         // Skip immediately if logging is disabled
         // for this module.
         if !Self::must_log_module(module_id)? {
@@ -412,7 +412,7 @@ impl MMFLog {
             LogStatus::Ok | LogStatus::Error => Some(action_start_timer.elapsed().as_millis()),
         };
 
-        let log_event = LogEvent { log_instance_id, timestamp_rfc3339, module_id: module_id.clone(), log_action, log_status, duration_ms };
+        let log_event = LogEvent { log_instance_id, timestamp_rfc3339, module_id: module_id.to_owned(), log_action, log_status, duration_ms };
 
         let mut mmf_log_data_guard = MMF_LOG_DATA.write().expect(MMFPanic::MMFLogData_WriteLockPoisoned.message());
         let logging_data = mmf_log_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;

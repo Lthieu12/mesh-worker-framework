@@ -12,7 +12,7 @@ use crate::MMFMod;
 
 use crate::message::{MessageID, MessageInstanceID};
 use crate::mmf_log::{LogAction, LogEvent, LogList, LogStatus};
-use crate::module::{EntityID, ModuleID};
+use crate::module::EntityID;
 
 #[allow(dead_code)]
 pub fn print_module_list() {
@@ -47,7 +47,7 @@ pub struct ReceiveMessageLog<'a> {
 ///
 /// The returned events preserve the original chronological order.
 #[allow(dead_code)]
-pub fn filter_messages<'a>(log_list: &'a LogList, module_id: &ModuleID) -> Vec<ReceiveMessageLog<'a>> {
+pub fn filter_messages<'a>(log_list: &'a LogList, module_id: &str) -> Vec<ReceiveMessageLog<'a>> {
     let mut receive_messages = Vec::new();
 
     for log_event in &log_list.log_event_list {
