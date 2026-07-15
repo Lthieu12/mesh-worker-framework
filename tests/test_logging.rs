@@ -101,10 +101,10 @@ async fn test_mmf_log_messages() {
 
     MMFMod::init_module(&module_id, lifecycle_data).await.unwrap();
     MMFMod::wait_module_init(&module_id, Some(1000)).await.unwrap();
-    MMFMod::send_message(&EntityID::External("Test".into()), &module_id, &"MSG_1".into(), Bytes::new()).await.unwrap();
-    MMFMod::send_priority_message(&EntityID::External("Test".into()), &module_id, &"MSG_2".into(), Bytes::new()).await.unwrap();
-    MMFMod::send_message_and_wait(&EntityID::External("Test".into()), &module_id, &"MSG_3".into(), Bytes::new(), Some(1000)).await.unwrap();
-    MMFMod::send_priority_message_and_wait(&EntityID::External("Test".into()), &module_id, &"MSG_4".into(), Bytes::new(), Some(1000)).await.unwrap();
+    MMFMod::send_message(&EntityID::External("Test".into()), &module_id, &"MSG_1", Bytes::new()).await.unwrap();
+    MMFMod::send_priority_message(&EntityID::External("Test".into()), &module_id, &"MSG_2", Bytes::new()).await.unwrap();
+    MMFMod::send_message_and_wait(&EntityID::External("Test".into()), &module_id, &"MSG_3", Bytes::new(), Some(1000)).await.unwrap();
+    MMFMod::send_priority_message_and_wait(&EntityID::External("Test".into()), &module_id, &"MSG_4", Bytes::new(), Some(1000)).await.unwrap();
     MMFMod::close_module(&module_id, Bytes::new()).await.unwrap();
     MMFMod::wait_module_close(&module_id, Some(1000)).await.unwrap();
 

@@ -45,16 +45,16 @@ async fn test_message_priority_order() {
     MMFMod::wait_module_init(&module_a_id, Some(1000)).await.unwrap();
 
     // First normal message starts processing.
-    MMFMod::send_message(&EntityID::External("MAIN".into()), &module_a_id, &MESSAGE_NORMAL_1.into(), Bytes::new()).await.unwrap();
+    MMFMod::send_message(&EntityID::External("MAIN".into()), &module_a_id, &MESSAGE_NORMAL_1, Bytes::new()).await.unwrap();
 
     // Ensure the module is busy before sending the remaining messages.
     tokio::time::sleep(Duration::from_millis(20)).await;
 
-    MMFMod::send_message(&EntityID::External("MAIN".into()), &module_a_id, &MESSAGE_NORMAL_2.into(), Bytes::new()).await.unwrap();
+    MMFMod::send_message(&EntityID::External("MAIN".into()), &module_a_id, &MESSAGE_NORMAL_2, Bytes::new()).await.unwrap();
 
-    MMFMod::send_priority_message(&EntityID::External("MAIN".into()), &module_a_id, &MESSAGE_PRIORITY_1.into(), Bytes::new()).await.unwrap();
+    MMFMod::send_priority_message(&EntityID::External("MAIN".into()), &module_a_id, &MESSAGE_PRIORITY_1, Bytes::new()).await.unwrap();
 
-    MMFMod::send_priority_message(&EntityID::External("MAIN".into()), &module_a_id, &MESSAGE_PRIORITY_2.into(), Bytes::new()).await.unwrap();
+    MMFMod::send_priority_message(&EntityID::External("MAIN".into()), &module_a_id, &MESSAGE_PRIORITY_2, Bytes::new()).await.unwrap();
 
     // Wait until every message has been processed.
     tokio::time::sleep(Duration::from_millis(500)).await;
@@ -164,7 +164,7 @@ async fn test_send_message_and_wait() {
     //
     // Trigger the chain.
     //
-    MMFMod::send_message(&EntityID::External("MAIN".into()), &module_a_id, &MESSAGE_CHAIN.into(), Bytes::new()).await.unwrap();
+    MMFMod::send_message(&EntityID::External("MAIN".into()), &module_a_id, &MESSAGE_CHAIN, Bytes::new()).await.unwrap();
 
     //
     // Wait until processing completes.
@@ -237,7 +237,7 @@ async fn test_send_unique_message() {
     MMFMod::wait_module_init(&module_id, Some(1000)).await.unwrap();
 
     // Send a blocking message to keep the module busy.
-    MMFMod::send_message(&EntityID::External("MAIN".into()), &module_id, &MESSAGE_CHAIN.into(), Bytes::new()).await.unwrap();
+    MMFMod::send_message(&EntityID::External("MAIN".into()), &module_id, &MESSAGE_CHAIN, Bytes::new()).await.unwrap();
 
     // Give the module enough time to start processing
     // the blocking message.
@@ -245,7 +245,7 @@ async fn test_send_unique_message() {
 
     // Send several equivalent unique messages.
     for _ in 0..5 {
-        MMFMod::send_unique_message(&EntityID::External("MAIN".into()), &module_id, &MESSAGE_CHAIN.into(), Bytes::new()).await.unwrap();
+        MMFMod::send_unique_message(&EntityID::External("MAIN".into()), &module_id, &MESSAGE_CHAIN, Bytes::new()).await.unwrap();
     }
 
     // Wait until all messages have been processed.
