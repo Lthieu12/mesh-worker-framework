@@ -135,7 +135,7 @@ impl Module for SimulationModule {
                     tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
                 }
                 let module_id = self.module_id.as_ref().expect("module_id should be initialized");
-                MMFMod::send_message_and_wait(&EntityID::Module(module_id.clone()), target_module_id, message_id, Bytes::new(), *timeout_ms).await.unwrap();
+                MMFMod::send_message_and_wait(&EntityID::new_module(module_id.clone()), target_module_id, message_id, Bytes::new(), *timeout_ms).await.unwrap();
             }
 
             SimulationBehavior::Message_Wait { message_delay_ms } => {
@@ -165,7 +165,7 @@ impl Module for SimulationModule {
         if self.wait_children_close {
             let module_id = self.module_id.as_ref().expect("module_id should be initialized");
 
-            MMFMod::wait_children_close(&EntityID::Module(module_id.clone()), self.wait_children_close_timeout_ms).await.unwrap();
+            MMFMod::wait_children_close(&EntityID::new_module(module_id.clone()), self.wait_children_close_timeout_ms).await.unwrap();
         }
 
         // Simulate shutdown work.

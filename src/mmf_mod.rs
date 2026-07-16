@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use crate::MMFLog;
 use crate::channel::{ModuleChannel, ModuleCommand, get_sender_channel};
 use crate::framework_error::{FrameworkError, MMFPanic};
-use crate::message::{MessageInstanceID, ModuleMessage};
+use crate::message::{MessageID, MessageInstanceID, ModuleMessage};
 use crate::mmf::{MMF_DATA, MMF_MOD_CLOSE_NOTIFY, MMF_MOD_DATA, MMF_MOD_INIT_NOTIFY, MMF_MOD_MESSAGE_INSTANCE_COUNTER, MMFConfiguration};
 use crate::mmf_log::{LogAction, LogStatus};
 use crate::module::{EntityID, Module, ModuleError, ModuleID, ModuleList, ModuleState, ModuleStatus, ModuleTypeID};
@@ -569,12 +569,18 @@ impl MMFMod {
     }
 
     /// Send a message to a module.
-    pub async fn send_message(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &str, message_data: Bytes) -> Result<(), FrameworkError> {
+    ///
+    /// message_id may be any type implementing Into<MessageID>.
+    pub async fn send_message<T>(sender_id: &EntityID, receiver_id: &ModuleID, message_id: T, message_data: Bytes) -> Result<(), FrameworkError>
+    where
+        T: Into<MessageID>,
+    {
+        let message_id = message_id.into();
         let normal_sender_channel = get_sender_channel(sender_id, receiver_id, ModuleChannel::Normal)?;
 
         // Generate the unique id and build the message
         let message_instance_id = MMFMod::generate_message_instance_id()?;
-        let framework_message = ModuleMessage::new(sender_id.clone(), receiver_id.clone(), message_id.to_owned(), message_instance_id, message_data);
+        let framework_message = ModuleMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
 
         // Send the message to the target module.
         normal_sender_channel.send(ModuleCommand::Message { message: framework_message, priority: false, unique: false }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
@@ -585,16 +591,22 @@ impl MMFMod {
     /// Send a message and wait until the receiver has finished
     /// processing it.
     ///
+    /// message_id may be any type implementing Into<MessageID>.
+    ///
     /// Returns:
     /// - Ok(()) if on_message() completed successfully.
     /// - ModuleError if on_message() returned an error.
     /// - Operation_Timeout if the timeout expires.
-    pub async fn send_message_and_wait(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &str, message_data: Bytes, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
+    pub async fn send_message_and_wait<T>(sender_id: &EntityID, receiver_id: &ModuleID, message_id: T, message_data: Bytes, timeout_ms: Option<u64>) -> Result<(), FrameworkError>
+    where
+        T: Into<MessageID>,
+    {
+        let message_id = message_id.into();
         let normal_sender_channel = get_sender_channel(sender_id, receiver_id, ModuleChannel::Normal)?;
 
         // Generate the unique id and build the message
         let message_instance_id = MMFMod::generate_message_instance_id()?;
-        let framework_message = ModuleMessage::new(sender_id.clone(), receiver_id.to_owned(), message_id.to_owned(), message_instance_id, message_data);
+        let framework_message = ModuleMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
 
         // Create a temporary reply channel used to signal
         // completion of on_message().
@@ -671,12 +683,18 @@ impl MMFMod {
     ///
     /// Priority messages are always processed before pending
     /// normal messages.
-    pub async fn send_priority_message(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &str, message_data: Bytes) -> Result<(), FrameworkError> {
+    ///
+    /// message_id may be any type implementing Into<MessageID>.
+    pub async fn send_priority_message<T>(sender_id: &EntityID, receiver_id: &ModuleID, message_id: T, message_data: Bytes) -> Result<(), FrameworkError>
+    where
+        T: Into<MessageID>,
+    {
+        let message_id = message_id.into();
         let priority_sender_channel = get_sender_channel(sender_id, receiver_id, ModuleChannel::Priority)?;
 
         // Generate the unique id and build the message
         let message_instance_id = MMFMod::generate_message_instance_id()?;
-        let framework_message = ModuleMessage::new(sender_id.clone(), receiver_id.to_owned(), message_id.to_owned(), message_instance_id, message_data);
+        let framework_message = ModuleMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
 
         // Send the priority message to the target module.
         priority_sender_channel.send(ModuleCommand::Message { message: framework_message, priority: true, unique: false }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
@@ -690,16 +708,22 @@ impl MMFMod {
     /// Priority messages are always processed before pending
     /// normal messages.
     ///
+    /// message_id may be any type implementing Into<MessageID>.
+    ///
     /// Returns:
     /// - Ok(()) if on_message() completed successfully.
     /// - ModuleError if on_message() returned an error.
     /// - Operation_Timeout if the timeout expires.
-    pub async fn send_priority_message_and_wait(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &str, message_data: Bytes, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
+    pub async fn send_priority_message_and_wait<T>(sender_id: &EntityID, receiver_id: &ModuleID, message_id: T, message_data: Bytes, timeout_ms: Option<u64>) -> Result<(), FrameworkError>
+    where
+        T: Into<MessageID>,
+    {
+        let message_id = message_id.into();
         let priority_sender_channel = get_sender_channel(sender_id, receiver_id, ModuleChannel::Priority)?;
 
         // Generate the unique id and build the message
         let message_instance_id = MMFMod::generate_message_instance_id()?;
-        let framework_message = ModuleMessage::new(sender_id.clone(), receiver_id.to_owned(), message_id.to_owned(), message_instance_id, message_data);
+        let framework_message = ModuleMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
 
         // Create a temporary reply channel used to signal
         // completion of on_message().
@@ -779,12 +803,18 @@ impl MMFMod {
     ///
     /// Sending a new unique message replaces the pending one while
     /// preserving its FIFO position.
-    pub async fn send_unique_message(sender_id: &EntityID, receiver_id: &ModuleID, message_id: &str, message_data: Bytes) -> Result<(), FrameworkError> {
+    ///
+    /// message_id may be any type implementing Into<MessageID>.
+    pub async fn send_unique_message<T>(sender_id: &EntityID, receiver_id: &ModuleID, message_id: T, message_data: Bytes) -> Result<(), FrameworkError>
+    where
+        T: Into<MessageID>,
+    {
+        let message_id = message_id.into();
         let normal_sender_channel = get_sender_channel(sender_id, receiver_id, ModuleChannel::Normal)?;
 
         // Generate the unique id and build the message
         let message_instance_id = MMFMod::generate_message_instance_id()?;
-        let framework_message = ModuleMessage::new(sender_id.clone(), receiver_id.to_owned(), message_id.to_owned(), message_instance_id, message_data);
+        let framework_message = ModuleMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
 
         // Send the message to the target module.
         normal_sender_channel.send(ModuleCommand::Message { message: framework_message, priority: false, unique: true }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;

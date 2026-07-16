@@ -30,7 +30,7 @@ async fn test_module_message_panic() {
     MMFMod::wait_module_init(&module_id, Some(1000)).await.unwrap();
 
     // Trigger the panic.
-    MMFMod::send_message(&EntityID::new_external("MAIN"), &module_id, &"TEST", bytes::Bytes::new()).await.unwrap();
+    MMFMod::send_message(&EntityID::new_external("MAIN"), &module_id, "TEST", bytes::Bytes::new()).await.unwrap();
 
     // Wait until MMF has removed the module.
     _ = MMFMod::wait_module_close(&module_id, Some(1000)).await;

@@ -40,7 +40,7 @@ async fn test_file_logging() {
 
     // Generate enough log events to fill the log file.
     for index in 0..100 {
-        MMFMod::send_message(&EntityID::new_external("Test"), &module_id, &format!("Message{index}"), Bytes::new()).await.unwrap();
+        MMFMod::send_message(&EntityID::new_external("Test"), &module_id, format!("Message{index}"), Bytes::new()).await.unwrap();
     }
 
     MMFMod::close_module(&module_id, lifecycle_data).await.unwrap();

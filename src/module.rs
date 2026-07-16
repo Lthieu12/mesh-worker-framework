@@ -26,6 +26,12 @@ pub(crate) type ModuleConstructor = fn() -> Box<dyn Module + Send>;
 
 /// Unique identifier of a module type.
 ///
+/// Unlike ModuleID, MessageID and ExternalID,
+/// ModuleTypeID intentionally remains a `&'static str`.
+///
+/// Module types are compile-time constants defined by each
+/// module implementation and are never generated dynamically.
+///
 /// A ModuleTypeID identifies a module *type*, not a module instance.
 ///
 /// Rules:
@@ -45,7 +51,7 @@ pub type ModuleTypeID = &'static str;
 pub struct ExternalID(String);
 
 impl ExternalID {
-    /// Creates a new external identifier.
+    /// Creates an external identifier.
     pub fn new(external_id: impl Into<String>) -> Self {
         Self(external_id.into())
     }
@@ -80,19 +86,30 @@ impl From<String> for ExternalID {
     }
 }
 
+impl From<&ExternalID> for ExternalID {
+    fn from(value: &ExternalID) -> Self {
+        value.clone()
+    }
+}
+
 /// Unique identifier of a module instance.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct ModuleID(String);
 
 impl ModuleID {
-    /// Creates a new external identifier.
-    pub fn new(external_id: impl Into<String>) -> Self {
-        Self(external_id.into())
+    /// Creates a module identifier.
+    pub fn new(module_id: impl Into<String>) -> Self {
+        Self(module_id.into())
     }
 
     /// Returns the identifier as a string slice.
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    /// Returns a shortened version of the identifier.
+    pub fn to_short_string(&self, max_len: usize) -> String {
+        string_helper::to_short_string(self.as_str(), max_len)
     }
 }
 
@@ -117,6 +134,12 @@ impl From<&str> for ModuleID {
 impl From<String> for ModuleID {
     fn from(value: String) -> Self {
         Self(value)
+    }
+}
+
+impl From<&ModuleID> for ModuleID {
+    fn from(value: &ModuleID) -> Self {
+        value.clone()
     }
 }
 

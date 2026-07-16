@@ -45,16 +45,16 @@ async fn test_message_priority_order() {
     MMFMod::wait_module_init(&module_a_id, Some(1000)).await.unwrap();
 
     // First normal message starts processing.
-    MMFMod::send_message(&EntityID::new_external("MAIN"), &module_a_id, &MESSAGE_NORMAL_1, Bytes::new()).await.unwrap();
+    MMFMod::send_message(&EntityID::new_external("MAIN"), &module_a_id, MESSAGE_NORMAL_1, Bytes::new()).await.unwrap();
 
     // Ensure the module is busy before sending the remaining messages.
     tokio::time::sleep(Duration::from_millis(20)).await;
 
-    MMFMod::send_message(&EntityID::new_external("MAIN"), &module_a_id, &MESSAGE_NORMAL_2, Bytes::new()).await.unwrap();
+    MMFMod::send_message(&EntityID::new_external("MAIN"), &module_a_id, MESSAGE_NORMAL_2, Bytes::new()).await.unwrap();
 
-    MMFMod::send_priority_message(&EntityID::new_external("MAIN"), &module_a_id, &MESSAGE_PRIORITY_1, Bytes::new()).await.unwrap();
+    MMFMod::send_priority_message(&EntityID::new_external("MAIN"), &module_a_id, MESSAGE_PRIORITY_1, Bytes::new()).await.unwrap();
 
-    MMFMod::send_priority_message(&EntityID::new_external("MAIN"), &module_a_id, &MESSAGE_PRIORITY_2, Bytes::new()).await.unwrap();
+    MMFMod::send_priority_message(&EntityID::new_external("MAIN"), &module_a_id, MESSAGE_PRIORITY_2, Bytes::new()).await.unwrap();
 
     // Wait until every message has been processed.
     tokio::time::sleep(Duration::from_millis(500)).await;
@@ -68,45 +68,45 @@ async fn test_message_priority_order() {
     assert_eq!(messages.len(), 8);
 
     // NORMAL_1
-    assert_eq!(messages[0].message_id, MESSAGE_NORMAL_1);
+    assert_eq!(messages[0].message_id.as_str(), MESSAGE_NORMAL_1);
     assert_eq!(messages[0].log_status, LogStatus::Start);
     assert!(!messages[0].priority);
     assert!(!messages[0].wait_completion);
 
-    assert_eq!(messages[1].message_id, MESSAGE_NORMAL_1);
+    assert_eq!(messages[1].message_id.as_str(), MESSAGE_NORMAL_1);
     assert_eq!(messages[1].log_status, LogStatus::Ok);
     assert!(!messages[1].priority);
     assert!(!messages[1].wait_completion);
 
     // PRIORITY_2
-    assert_eq!(messages[2].message_id, MESSAGE_PRIORITY_2);
+    assert_eq!(messages[2].message_id.as_str(), MESSAGE_PRIORITY_2);
     assert_eq!(messages[2].log_status, LogStatus::Start);
     assert!(messages[2].priority);
     assert!(!messages[2].wait_completion);
 
-    assert_eq!(messages[3].message_id, MESSAGE_PRIORITY_2);
+    assert_eq!(messages[3].message_id.as_str(), MESSAGE_PRIORITY_2);
     assert_eq!(messages[3].log_status, LogStatus::Ok);
     assert!(messages[3].priority);
     assert!(!messages[3].wait_completion);
 
     // PRIORITY_1
-    assert_eq!(messages[4].message_id, MESSAGE_PRIORITY_1);
+    assert_eq!(messages[4].message_id.as_str(), MESSAGE_PRIORITY_1);
     assert_eq!(messages[4].log_status, LogStatus::Start);
     assert!(messages[4].priority);
     assert!(!messages[4].wait_completion);
 
-    assert_eq!(messages[5].message_id, MESSAGE_PRIORITY_1);
+    assert_eq!(messages[5].message_id.as_str(), MESSAGE_PRIORITY_1);
     assert_eq!(messages[5].log_status, LogStatus::Ok);
     assert!(messages[5].priority);
     assert!(!messages[5].wait_completion);
 
     // NORMAL_2
-    assert_eq!(messages[6].message_id, MESSAGE_NORMAL_2);
+    assert_eq!(messages[6].message_id.as_str(), MESSAGE_NORMAL_2);
     assert_eq!(messages[6].log_status, LogStatus::Start);
     assert!(!messages[6].priority);
     assert!(!messages[6].wait_completion);
 
-    assert_eq!(messages[7].message_id, MESSAGE_NORMAL_2);
+    assert_eq!(messages[7].message_id.as_str(), MESSAGE_NORMAL_2);
     assert_eq!(messages[7].log_status, LogStatus::Ok);
     assert!(!messages[7].priority);
     assert!(!messages[7].wait_completion);
@@ -164,7 +164,7 @@ async fn test_send_message_and_wait() {
     //
     // Trigger the chain.
     //
-    MMFMod::send_message(&EntityID::new_external("MAIN"), &module_a_id, &MESSAGE_CHAIN, Bytes::new()).await.unwrap();
+    MMFMod::send_message(&EntityID::new_external("MAIN"), &module_a_id, MESSAGE_CHAIN, Bytes::new()).await.unwrap();
 
     //
     // Wait until processing completes.
@@ -183,12 +183,12 @@ async fn test_send_message_and_wait() {
     //
     assert_eq!(messages_a.len(), 2);
 
-    assert_eq!(messages_a[0].message_id, MESSAGE_CHAIN);
+    assert_eq!(messages_a[0].message_id.as_str(), MESSAGE_CHAIN);
     assert_eq!(messages_a[0].log_status, LogStatus::Start);
     assert!(!messages_a[0].priority);
     assert!(!messages_a[0].wait_completion);
 
-    assert_eq!(messages_a[1].message_id, MESSAGE_CHAIN);
+    assert_eq!(messages_a[1].message_id.as_str(), MESSAGE_CHAIN);
     assert_eq!(messages_a[1].log_status, LogStatus::Ok);
 
     //
@@ -196,14 +196,14 @@ async fn test_send_message_and_wait() {
     //
     assert_eq!(messages_b.len(), 2);
 
-    assert_eq!(messages_b[0].message_id, MESSAGE_CHAIN);
+    assert_eq!(messages_b[0].message_id.as_str(), MESSAGE_CHAIN);
     assert_eq!(messages_b[0].log_status, LogStatus::Start);
     assert!(!messages_b[0].priority);
     assert!(messages_b[0].wait_completion);
 
     assert_eq!(messages_b[0].sender_id, &EntityID::Module(module_a_id.clone()));
 
-    assert_eq!(messages_b[1].message_id, MESSAGE_CHAIN);
+    assert_eq!(messages_b[1].message_id.as_str(), MESSAGE_CHAIN);
     assert_eq!(messages_b[1].log_status, LogStatus::Ok);
 
     MMFMod::close_module(&module_a_id, Bytes::new()).await.unwrap();
@@ -237,7 +237,7 @@ async fn test_send_unique_message() {
     MMFMod::wait_module_init(&module_id, Some(1000)).await.unwrap();
 
     // Send a blocking message to keep the module busy.
-    MMFMod::send_message(&EntityID::new_external("MAIN"), &module_id, &MESSAGE_CHAIN, Bytes::new()).await.unwrap();
+    MMFMod::send_message(&EntityID::new_external("MAIN"), &module_id, MESSAGE_CHAIN, Bytes::new()).await.unwrap();
 
     // Give the module enough time to start processing
     // the blocking message.
@@ -245,7 +245,7 @@ async fn test_send_unique_message() {
 
     // Send several equivalent unique messages.
     for _ in 0..5 {
-        MMFMod::send_unique_message(&EntityID::new_external("MAIN"), &module_id, &MESSAGE_CHAIN, Bytes::new()).await.unwrap();
+        MMFMod::send_unique_message(&EntityID::new_external("MAIN"), &module_id, MESSAGE_CHAIN, Bytes::new()).await.unwrap();
     }
 
     // Wait until all messages have been processed.
@@ -261,19 +261,19 @@ async fn test_send_unique_message() {
     assert_eq!(messages.len(), 4);
 
     // Start of the blocking message.
-    assert_eq!(messages[0].message_id, &MESSAGE_CHAIN.to_string());
+    assert_eq!(messages[0].message_id.as_str(), &MESSAGE_CHAIN.to_string());
     assert_eq!(messages[0].log_status, LogStatus::Start);
 
     // End of the blocking message.
-    assert_eq!(messages[1].message_id, &MESSAGE_CHAIN.to_string());
+    assert_eq!(messages[1].message_id.as_str(), &MESSAGE_CHAIN.to_string());
     assert_eq!(messages[1].log_status, LogStatus::Ok);
 
     // Start of the last unique message.
-    assert_eq!(messages[2].message_id, &MESSAGE_CHAIN.to_string());
+    assert_eq!(messages[2].message_id.as_str(), &MESSAGE_CHAIN.to_string());
     assert_eq!(messages[2].log_status, LogStatus::Start);
 
     // End of the last unique message.
-    assert_eq!(messages[3].message_id, &MESSAGE_CHAIN.to_string());
+    assert_eq!(messages[3].message_id.as_str(), &MESSAGE_CHAIN.to_string());
     assert_eq!(messages[3].log_status, LogStatus::Ok);
 
     // The unique message must correspond to the fifth unique

@@ -295,7 +295,7 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
                         MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleInit, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                     }
                     Err(error) => {
-                        MMFErr::add_error_internal(&EntityID::Module(module_id.clone()), Some("on_init".into()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
+                        MMFErr::add_error_internal(&EntityID::new_module(module_id.clone()), Some("on_init".into()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
                         mmf_data.module_registry.set_module_state(&module_id, ModuleState::InitFailed).expect(MMFPanic::Registry_ModuleMissing.message());
                         MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleInit, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                     }
@@ -367,7 +367,7 @@ async fn module_task(module: Box<dyn Module + Send>, normal_receiver_channel: Mo
                         let _ = MMFLog::remove_logged_module(&module_id);
                     }
                     Err(error) => {
-                        MMFErr::add_error_internal(&EntityID::Module(module_id.clone()), Some("on_close".into()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
+                        MMFErr::add_error_internal(&EntityID::new_module(module_id.clone()), Some("on_close".into()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
                         mmf_data.module_registry.set_module_state(&module_id, ModuleState::CloseFailed).expect(MMFPanic::Registry_ModuleMissing.message());
                         MMFLog::add_log(action_start_timer, &module_id, LogAction::ModuleClose, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
                     }

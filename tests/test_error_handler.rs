@@ -47,7 +47,7 @@ async fn test_mmf_err_module_failures() {
 
     // Generate multiple message failures.
     for _ in 0..3 {
-        MMFMod::send_message(&EntityID::new_external("Test"), &module_a_id, &"TEST", Bytes::new()).await.unwrap();
+        MMFMod::send_message(&EntityID::new_external("Test"), &module_a_id, "TEST", Bytes::new()).await.unwrap();
     }
 
     // Simulation module with error on init
@@ -147,7 +147,7 @@ async fn test_mmf_err_buffer_overflow() {
 
     // Generate more errors than the buffer can hold.
     for _ in 0..15 {
-        let _ = MMFMod::send_message_and_wait(&EntityID::new_external("Test"), &module_id, &"TEST", Bytes::new(), Some(1000)).await;
+        let _ = MMFMod::send_message_and_wait(&EntityID::new_external("Test"), &module_id, "TEST", Bytes::new(), Some(1000)).await;
     }
 
     let error_list = MMFErr::wait_error(Some(0)).await.unwrap();

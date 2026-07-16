@@ -122,7 +122,7 @@ impl LogEvent {
             LogAction::ModuleAbort => ("ABORT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
             LogAction::ModulePanic => ("PANIC", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
             LogAction::ModuleMessage { message_instance_id: _, sender_id, message_id, priority, wait_completion } => {
-                ("MESSAGE", sender_id.to_short_string(terminal_log_column::SENDER_ID_LEN), string_helper::to_short_string(&message_id.clone(), terminal_log_column::MESSAGE_ID_LEN), if *priority { "Y" } else { "N" }.to_string(), if *wait_completion { "Y" } else { "N" }.to_string())
+                ("MESSAGE", sender_id.to_short_string(terminal_log_column::SENDER_ID_LEN), message_id.to_short_string(terminal_log_column::MESSAGE_ID_LEN), if *priority { "Y" } else { "N" }.to_string(), if *wait_completion { "Y" } else { "N" }.to_string())
             }
         };
 
@@ -141,7 +141,7 @@ impl LogEvent {
             "{:0width_log$} | {:width_time$} | {:width_module$} | {:width_event$} | {:width_message$} | {:width_sender$} | {} | {} | {:width_status$} | {:width_duration$}",
             self.log_instance_id,
             &self.timestamp_rfc3339[11..23],
-            EntityID::Module(self.module_id.clone()).to_short_string(terminal_log_column::MODULE_ID_LEN),
+            self.module_id.to_short_string(terminal_log_column::MODULE_ID_LEN),
             event,
             message_id,
             sender_id,
@@ -169,7 +169,7 @@ impl LogEvent {
             LogAction::ModuleAbort => ("ABORT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
             LogAction::ModulePanic => ("PANIC", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
             LogAction::ModuleMessage { message_instance_id, sender_id, message_id, priority, wait_completion } => {
-                ("MESSAGE", message_instance_id.to_string(), sender_id.to_string(), message_id.clone(), if *priority { "Y" } else { "N" }.to_string(), if *wait_completion { "Y" } else { "N" }.to_string())
+                ("MESSAGE", message_instance_id.to_string(), sender_id.to_string(), message_id.to_string(), if *priority { "Y" } else { "N" }.to_string(), if *wait_completion { "Y" } else { "N" }.to_string())
             }
         };
 

@@ -16,6 +16,7 @@ Unlike general-purpose actor frameworks, MMF focuses on:
 
 - Deterministic execution
 - Explicit module lifecycle management
+- Type-safe module and message identifiers
 - Module-to-module and external-to-module messaging
 - Message prioritization
 - Parent/child hierarchy management
@@ -50,6 +51,8 @@ Throughout this documentation, "Module" always refers to an MMF runtime module, 
 ## 2. Quick Start
 
 ```text
+let main_entity = EntityID::new_external("MAIN");
+
 MMF::init()?;
 
 // Register module types once.
@@ -57,21 +60,25 @@ MMF::register_module_type::<CameraModule>()?;
 MMF::register_module_type::<DisplayModule>()?;
 
 // Create module instances.
-let camera = MMFMod::spawn_module("CameraModule", &EntityID::External("MAIN".into()))?;
+let camera = MMFMod::spawn_module("CameraModule", &main_entity)?;
 
-let display = MMFMod::spawn_module("DisplayModule", &EntityID::External("MAIN".into()))?;
+let display = MMFMod::spawn_module("DisplayModule", &main_entity)?;
 
 // Initialize them.
-MMFMod::init_module(camera, camera_config).await?;
-MMFMod::init_module(display, display_config).await?;
+MMFMod::init_module(&camera, camera_config).await?;
+MMFMod::init_module(&display, display_config).await?;
 
 // Send messages.
-MMFMod::send_message(&EntityID::External("MAIN".into()), &camera, &"Start".into(), Bytes::new()).await?;
+MMFMod::send_message(&main_entity, &camera, "Start", Bytes::new()).await?;
 
 // Shutdown.
 MMFMod::close_module(&camera, Bytes::new()).await?;
 MMF::close()?;
 ```
+
+MMF provides strongly typed identifiers (ModuleID, EntityID, MessageID) while 
+allowing applications to use plain strings, constants or application-defined 
+enums for message identifiers.
 
 ---
 
@@ -133,7 +140,8 @@ MMF can log all message traffic, including:
 * MessageID
 * MessageInstanceID
 
-This allows runtime debugging in both development and production environments.
+This provides complete message traceability during development 
+and production.
 
 ---
 
@@ -167,6 +175,8 @@ instantiation, will rely on this information.
 ---
 
 ## 4. Communication Patterns
+
+All messaging functions are asynchronous.
 
 MMF uses asynchronous backpressure.
 When a module queue reaches its configured capacity, message senders are suspended asynchronously until space becomes available. 
