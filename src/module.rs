@@ -5,6 +5,7 @@
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use serde::{Deserialize, Serialize};
 
 use crate::message::ModuleMessage;
 use crate::string_helper;
@@ -39,8 +40,85 @@ pub(crate) type ModuleConstructor = fn() -> Box<dyn Module + Send>;
 /// - "SimulationModule"
 pub type ModuleTypeID = &'static str;
 
+/// Unique identifier of an external entity.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct ExternalID(String);
+
+impl ExternalID {
+    /// Creates a new external identifier.
+    pub fn new(external_id: impl Into<String>) -> Self {
+        Self(external_id.into())
+    }
+
+    /// Returns the identifier as a string slice.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for ExternalID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl AsRef<str> for ExternalID {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl From<&str> for ExternalID {
+    fn from(value: &str) -> Self {
+        Self(value.to_owned())
+    }
+}
+
+impl From<String> for ExternalID {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
 /// Unique identifier of a module instance.
-pub type ModuleID = String;
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct ModuleID(String);
+
+impl ModuleID {
+    /// Creates a new external identifier.
+    pub fn new(external_id: impl Into<String>) -> Self {
+        Self(external_id.into())
+    }
+
+    /// Returns the identifier as a string slice.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for ModuleID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl AsRef<str> for ModuleID {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl From<&str> for ModuleID {
+    fn from(value: &str) -> Self {
+        Self(value.to_owned())
+    }
+}
+
+impl From<String> for ModuleID {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
 
 /// Generic error type used by on_init(),
 /// on_message() and on_close().
@@ -52,7 +130,7 @@ pub enum EntityID {
     /// MMF module entity.
     Module(ModuleID),
     /// External entity not managed by MMF.
-    External(String),
+    External(ExternalID),
 }
 
 impl std::fmt::Display for EntityID {
@@ -70,6 +148,15 @@ impl std::fmt::Display for EntityID {
 }
 
 impl EntityID {
+    /// Creates a module entity.
+    pub fn new_module(module_id: ModuleID) -> Self {
+        Self::Module(module_id)
+    }
+
+    /// Creates an external entity.
+    pub fn new_external(external_id: impl Into<ExternalID>) -> Self {
+        Self::External(external_id.into())
+    }
     /// Returns a shortened human-readable representation of the entity.
     ///
     /// Module entities preserve the instance suffix whenever possible.
@@ -77,8 +164,9 @@ impl EntityID {
     pub(crate) fn to_short_string(&self, max_len: usize) -> String {
         match self {
             EntityID::Module(module_id) => {
+                let module_id = module_id.as_str();
                 if module_id.len() <= max_len {
-                    return module_id.clone();
+                    return module_id.to_string();
                 }
 
                 // Keep the instance suffix (":00001") visible.
@@ -93,7 +181,7 @@ impl EntityID {
                 format!("{}...{}", &module_id[..prefix_len], &module_id[module_id.len() - SUFFIX_LEN..])
             }
 
-            EntityID::External(text) => string_helper::to_short_string(text, max_len),
+            EntityID::External(text) => string_helper::to_short_string(text.as_str(), max_len),
         }
     }
 }
@@ -180,7 +268,7 @@ impl ModuleInfo {
 
     /// Converts the module information into a CSV row.
     fn to_csv_string(&self) -> String {
-        format!("{},{},{}", string_helper::csv_escape(&self.module_id), string_helper::csv_escape(&self.father_id.to_string()), string_helper::csv_escape(self.module_state.as_str()),)
+        format!("{},{},{}", string_helper::csv_escape(self.module_id.as_str()), string_helper::csv_escape(&self.father_id.to_string()), string_helper::csv_escape(self.module_state.as_str()),)
     }
 }
 

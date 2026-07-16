@@ -71,7 +71,7 @@ async fn main() {
 
     let timer = Instant::now();
 
-    let sender_id = EntityID::External("MAIN".to_string());
+    let sender_id = EntityID::new_external("MAIN");
     let message_id: MessageID = "PING".to_string();
 
     let futures = module_ids.iter().map(|module_id| MMFMod::send_message_and_wait(&sender_id, module_id, &message_id, Bytes::new(), Some(TIMEOUT_MS)));
@@ -94,7 +94,7 @@ async fn main() {
         MMFMod::close_module(module_id, Bytes::new()).await.unwrap();
     }
 
-    MMFMod::wait_children_close(&EntityID::External("MAIN".to_string()), Some(TIMEOUT_MS)).await.unwrap();
+    MMFMod::wait_children_close(&EntityID::new_external("MAIN"), Some(TIMEOUT_MS)).await.unwrap();
 
     let close_time = timer.elapsed();
 

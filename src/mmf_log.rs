@@ -188,7 +188,7 @@ impl LogEvent {
             "{},{},{},{},{},{},{},{},{},{},{}",
             self.log_instance_id,
             string_helper::csv_escape(&self.timestamp_rfc3339),
-            string_helper::csv_escape(&self.module_id),
+            string_helper::csv_escape(self.module_id.as_str()),
             string_helper::csv_escape(event),
             string_helper::csv_escape(&message_instance_id),
             string_helper::csv_escape(&message_id),
@@ -349,7 +349,7 @@ impl MMFLog {
     ///
     /// Returns Framework_NotInitialized if MMF has not
     /// been initialized through MMF::init().
-    pub(crate) fn remove_logged_module(module_id: &str) -> Result<(), FrameworkError> {
+    pub(crate) fn remove_logged_module(module_id: &ModuleID) -> Result<(), FrameworkError> {
         let mut mmf_log_data_guard = MMF_LOG_DATA.write().expect(MMFPanic::MMFLogData_WriteLockPoisoned.message());
         let mmf_log_data = mmf_log_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
         mmf_log_data.logged_module_list.retain(|logged_module_id| logged_module_id != module_id);
@@ -369,7 +369,7 @@ impl MMFLog {
     }
 
     /// Check whether logging is enabled for a module.
-    pub(crate) fn must_log_module(module_id: &str) -> Result<bool, FrameworkError> {
+    pub(crate) fn must_log_module(module_id: &ModuleID) -> Result<bool, FrameworkError> {
         let log_mode = MMF_LOG_MODE.load(Ordering::Relaxed);
 
         if log_mode == LogMode::NoLog as u8 {
@@ -397,7 +397,7 @@ impl MMFLog {
     ///
     /// Returns Framework_NotInitialized if MMF has
     /// not been initialized through MMF::init().
-    pub(crate) fn add_log(action_start_timer: Instant, module_id: &str, log_action: LogAction, log_status: LogStatus) -> Result<(), FrameworkError> {
+    pub(crate) fn add_log(action_start_timer: Instant, module_id: &ModuleID, log_action: LogAction, log_status: LogStatus) -> Result<(), FrameworkError> {
         // Skip immediately if logging is disabled
         // for this module.
         if !Self::must_log_module(module_id)? {

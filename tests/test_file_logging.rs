@@ -32,7 +32,7 @@ async fn test_file_logging() {
 
     let lifecycle_data = Bytes::from(bincode::serialize(&simulation_configuration).unwrap());
 
-    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("Test".into())).unwrap();
+    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::new_external("Test")).unwrap();
 
     MMFMod::init_module(&module_id, lifecycle_data.clone()).await.unwrap();
 
@@ -40,7 +40,7 @@ async fn test_file_logging() {
 
     // Generate enough log events to fill the log file.
     for index in 0..100 {
-        MMFMod::send_message(&EntityID::External("Test".into()), &module_id, &format!("Message{index}"), Bytes::new()).await.unwrap();
+        MMFMod::send_message(&EntityID::new_external("Test"), &module_id, &format!("Message{index}"), Bytes::new()).await.unwrap();
     }
 
     MMFMod::close_module(&module_id, lifecycle_data).await.unwrap();

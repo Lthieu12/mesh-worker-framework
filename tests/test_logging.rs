@@ -46,7 +46,7 @@ async fn test_mmf_log_module_lifecycle() {
 
     MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
 
-    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("Test".into())).unwrap();
+    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::new_external("Test")).unwrap();
 
     let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
@@ -94,17 +94,17 @@ async fn test_mmf_log_messages() {
 
     MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
 
-    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("Test".into())).unwrap();
+    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::new_external("Test")).unwrap();
 
     let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
     MMFMod::init_module(&module_id, lifecycle_data).await.unwrap();
     MMFMod::wait_module_init(&module_id, Some(1000)).await.unwrap();
-    MMFMod::send_message(&EntityID::External("Test".into()), &module_id, &"MSG_1", Bytes::new()).await.unwrap();
-    MMFMod::send_priority_message(&EntityID::External("Test".into()), &module_id, &"MSG_2", Bytes::new()).await.unwrap();
-    MMFMod::send_message_and_wait(&EntityID::External("Test".into()), &module_id, &"MSG_3", Bytes::new(), Some(1000)).await.unwrap();
-    MMFMod::send_priority_message_and_wait(&EntityID::External("Test".into()), &module_id, &"MSG_4", Bytes::new(), Some(1000)).await.unwrap();
+    MMFMod::send_message(&EntityID::new_external("Test"), &module_id, &"MSG_1", Bytes::new()).await.unwrap();
+    MMFMod::send_priority_message(&EntityID::new_external("Test"), &module_id, &"MSG_2", Bytes::new()).await.unwrap();
+    MMFMod::send_message_and_wait(&EntityID::new_external("Test"), &module_id, &"MSG_3", Bytes::new(), Some(1000)).await.unwrap();
+    MMFMod::send_priority_message_and_wait(&EntityID::new_external("Test"), &module_id, &"MSG_4", Bytes::new(), Some(1000)).await.unwrap();
     MMFMod::close_module(&module_id, Bytes::new()).await.unwrap();
     MMFMod::wait_module_close(&module_id, Some(1000)).await.unwrap();
 
@@ -167,7 +167,7 @@ async fn test_mmf_log_buffer_overflow() {
 
     MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
 
-    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("Test".into())).unwrap();
+    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::new_external("Test")).unwrap();
 
     let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
@@ -183,7 +183,7 @@ async fn test_mmf_log_buffer_overflow() {
 
     // Generate more logs than the buffer can hold.
     for index in 0..15 {
-        MMFMod::send_message(&EntityID::External("Test".into()), &module_id, &format!("MSG_{index}"), Bytes::new()).await.unwrap();
+        MMFMod::send_message(&EntityID::new_external("Test"), &module_id, &format!("MSG_{index}"), Bytes::new()).await.unwrap();
     }
 
     let log_list = MMFLog::wait_log(last_log_instance_id).await.unwrap();

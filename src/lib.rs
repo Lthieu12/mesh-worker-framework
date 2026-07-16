@@ -35,6 +35,6 @@ pub use framework_error::FrameworkError;
 
 pub use module::ModuleError;
 
-pub use module::{EntityID, Module, ModuleID, ModuleInfo, ModuleList, ModuleOutputFormat, ModuleState, ModuleStatus, ModuleTypeID};
+pub use module::{EntityID, ExternalID, Module, ModuleID, ModuleInfo, ModuleList, ModuleOutputFormat, ModuleState, ModuleStatus, ModuleTypeID};
 
 pub use message::{MessageID, ModuleMessage};

@@ -25,7 +25,7 @@ async fn test_module_timeout_init() {
     MMF::init().unwrap();
     MMF::register_module_type::<SimulationModule>().unwrap();
 
-    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("MAIN".into())).unwrap();
+    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::new_external("MAIN")).unwrap();
 
     // Very long init
     let configuration = SimulationModuleConfig { init_delay_ms: 5_000, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
@@ -47,7 +47,7 @@ async fn test_module_timeout_close() {
     MMF::init().unwrap();
     MMF::register_module_type::<SimulationModule>().unwrap();
 
-    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("MAIN".into())).unwrap();
+    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::new_external("MAIN")).unwrap();
 
     // Very long close
     let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 5_000, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };

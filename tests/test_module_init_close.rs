@@ -18,13 +18,13 @@ use mesh_module_framework::*;
 async fn test_module_init_failed() {
     MMF::init().unwrap();
 
-    let result = MMFMod::spawn_module("SimulationModule", &EntityID::External("MAIN".into()));
+    let result = MMFMod::spawn_module("SimulationModule", &EntityID::new_external("MAIN"));
 
     assert!(matches!(result, Err(FrameworkError::ModuleType_NotRegistered)));
 
     MMF::register_module_type::<SimulationModule>().unwrap();
 
-    let module_id = MMFMod::spawn_module("SimulationModule", &EntityID::External("MAIN".into())).unwrap();
+    let module_id = MMFMod::spawn_module("SimulationModule", &EntityID::new_external("MAIN")).unwrap();
 
     let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Init_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
@@ -35,7 +35,7 @@ async fn test_module_init_failed() {
     println!("Result: {:?}", module_id);
     assert!(matches!(module_id, Err(FrameworkError::Module_InitializationFailed)));
 
-    MMFMod::abort_children(&EntityID::External("MAIN".into())).unwrap();
+    MMFMod::abort_children(&EntityID::new_external("MAIN")).unwrap();
 
     MMF::close().unwrap();
 }
@@ -49,7 +49,7 @@ async fn test_module_close_failed() {
 
     MMF::register_module_type::<SimulationModule>().unwrap();
 
-    let module_id = MMFMod::spawn_module("SimulationModule", &EntityID::External("MAIN".into())).unwrap();
+    let module_id = MMFMod::spawn_module("SimulationModule", &EntityID::new_external("MAIN")).unwrap();
 
     let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Close_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
@@ -65,7 +65,7 @@ async fn test_module_close_failed() {
     println!("Result: {:?}", result);
     assert!(matches!(result, Err(FrameworkError::Module_CloseFailed)));
 
-    MMFMod::abort_children(&EntityID::External("MAIN".into())).unwrap();
+    MMFMod::abort_children(&EntityID::new_external("MAIN")).unwrap();
 
     MMF::close().unwrap();
 }

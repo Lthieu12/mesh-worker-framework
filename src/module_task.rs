@@ -174,7 +174,7 @@ pub(crate) fn spawn_module_task(module: Box<dyn Module + Send>, normal_receiver_
 ///
 /// This helper executes the message callback, reports errors and
 /// logs the complete message lifecycle.
-async fn execute_message(module: &mut Box<dyn Module + Send>, module_id: &str, message: ModuleMessage, priority: bool, wait_completion: bool) -> Result<(), ModuleError> {
+async fn execute_message(module: &mut Box<dyn Module + Send>, module_id: &ModuleID, message: ModuleMessage, priority: bool, wait_completion: bool) -> Result<(), ModuleError> {
     let action_start_timer = Instant::now();
     let log_action = LogAction::ModuleMessage { message_instance_id: message.message_instance_id, sender_id: message.sender_id.clone(), message_id: message.message_id.clone(), priority, wait_completion };
     let sender_id = message.sender_id.clone();

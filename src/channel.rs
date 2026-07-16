@@ -21,7 +21,7 @@ use tokio::sync::oneshot;
 use crate::framework_error::{FrameworkError, MMFPanic, ModuleError};
 use crate::message::{MessageID, ModuleMessage};
 use crate::mmf::MMF_MOD_DATA;
-use crate::module::{EntityID, ModuleState};
+use crate::module::{EntityID, ModuleID, ModuleState};
 
 pub(crate) type ModuleSenderChannel = Sender<ModuleCommand>;
 pub(crate) type ModuleReceiverChannel = Receiver<ModuleCommand>;
@@ -68,7 +68,7 @@ impl ModuleCommand {
 ///
 /// The sender and receiver states are validated before the
 /// channel is returned.
-pub(crate) fn get_sender_channel(sender_id: &EntityID, receiver_id: &str, channel: ModuleChannel) -> Result<ModuleSenderChannel, FrameworkError> {
+pub(crate) fn get_sender_channel(sender_id: &EntityID, receiver_id: &ModuleID, channel: ModuleChannel) -> Result<ModuleSenderChannel, FrameworkError> {
     let sender_channel: ModuleNormalSenderChannel = {
         // Read MMF data.
         //

@@ -20,7 +20,7 @@ async fn test_module_message_panic() {
 
     MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
 
-    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::External("MAIN".into())).unwrap();
+    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::new_external("MAIN")).unwrap();
 
     let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Panic, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
@@ -30,7 +30,7 @@ async fn test_module_message_panic() {
     MMFMod::wait_module_init(&module_id, Some(1000)).await.unwrap();
 
     // Trigger the panic.
-    MMFMod::send_message(&EntityID::External("MAIN".into()), &module_id, &"TEST", bytes::Bytes::new()).await.unwrap();
+    MMFMod::send_message(&EntityID::new_external("MAIN"), &module_id, &"TEST", bytes::Bytes::new()).await.unwrap();
 
     // Wait until MMF has removed the module.
     _ = MMFMod::wait_module_close(&module_id, Some(1000)).await;
