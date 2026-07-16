@@ -111,6 +111,11 @@ impl ModuleID {
     pub fn to_short_string(&self, max_len: usize) -> String {
         string_helper::to_short_string(self.as_str(), max_len)
     }
+
+    /// Returns this module identifier as an EntityID.
+    pub fn as_entity_id(&self) -> EntityID {
+        EntityID::new_module(self.clone())
+    }
 }
 
 impl std::fmt::Display for ModuleID {

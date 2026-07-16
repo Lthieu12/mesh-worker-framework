@@ -165,7 +165,7 @@ impl Module for SimulationModule {
         if self.wait_children_close {
             let module_id = self.module_id.as_ref().expect("module_id should be initialized");
 
-            MMFMod::wait_children_close(&EntityID::new_module(module_id.clone()), self.wait_children_close_timeout_ms).await.unwrap();
+            MMFMod::wait_children_close(&module_id.as_entity_id(), self.wait_children_close_timeout_ms).await.unwrap();
         }
 
         // Simulate shutdown work.
