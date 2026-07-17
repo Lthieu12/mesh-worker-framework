@@ -18,7 +18,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-use crate::framework_error::{FrameworkError, MMFPanic, ModuleError};
+use crate::framework_error::{MMFError, MMFPanic, ModuleError};
 use crate::message::{MessageID, ModuleMessage};
 use crate::mmf::MMF_MOD_DATA;
 use crate::module::{EntityID, ModuleID, ModuleState};
@@ -68,7 +68,7 @@ impl ModuleCommand {
 ///
 /// The sender and receiver states are validated before the
 /// channel is returned.
-pub(crate) fn get_sender_channel(sender_id: &EntityID, receiver_id: &ModuleID, channel: ModuleChannel) -> Result<ModuleSenderChannel, FrameworkError> {
+pub(crate) fn get_sender_channel(sender_id: &EntityID, receiver_id: &ModuleID, channel: ModuleChannel) -> Result<ModuleSenderChannel, MMFError> {
     let sender_channel: ModuleNormalSenderChannel = {
         // Read MMF data.
         //
@@ -76,7 +76,7 @@ pub(crate) fn get_sender_channel(sender_id: &EntityID, receiver_id: &ModuleID, c
         // not modify the Registry or ModuleState.
         let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
 
-        let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let mmf_data = mmf_data_guard.as_ref().ok_or(MMFError::Framework_NotInitialized)?;
 
         // Validate the sender.
         //
@@ -88,7 +88,7 @@ pub(crate) fn get_sender_channel(sender_id: &EntityID, receiver_id: &ModuleID, c
             EntityID::Module(module_id) => {
                 let module_state = mmf_data.module_registry.get_module_state(module_id)?;
                 if module_state != ModuleState::Initialized {
-                    return Err(FrameworkError::Module_NotInitialized);
+                    return Err(MMFError::Module_NotInitialized);
                 }
             }
             EntityID::External(_) => {}
@@ -99,7 +99,7 @@ pub(crate) fn get_sender_channel(sender_id: &EntityID, receiver_id: &ModuleID, c
         // Messages can only be sent to initialized modules.
         let module_state = mmf_data.module_registry.get_module_state(receiver_id)?;
         if module_state != ModuleState::Initialized {
-            return Err(FrameworkError::Module_NotInitialized);
+            return Err(MMFError::Module_NotInitialized);
         }
 
         // Retrieve the communication channel associated with

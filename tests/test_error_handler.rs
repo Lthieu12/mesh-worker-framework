@@ -58,7 +58,7 @@ async fn test_mmf_err_module_failures() {
 
     MMFMod::init_module(&module_b_id, lifecycle_data).await.unwrap();
     let result = MMFMod::wait_module_init(&module_b_id, Some(1000)).await;
-    assert!(matches!(result, Err(FrameworkError::Module_InitializationFailed)));
+    assert!(matches!(result, Err(MMFError::Module_InitializationFailed)));
 
     // Simulation module with error on close
     let module_c_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::new_external("Test")).unwrap();
@@ -71,7 +71,7 @@ async fn test_mmf_err_module_failures() {
     MMFMod::close_module(&module_c_id, Bytes::new()).await.unwrap();
 
     let result = MMFMod::wait_module_close(&module_c_id, Some(1000)).await;
-    assert!(matches!(result, Err(FrameworkError::Module_CloseFailed)));
+    assert!(matches!(result, Err(MMFError::Module_CloseFailed)));
 
     let error_list = MMFErr::wait_error(None).await.unwrap();
 

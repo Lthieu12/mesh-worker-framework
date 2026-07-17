@@ -20,7 +20,7 @@ async fn test_module_init_failed() {
 
     let result = MMFMod::spawn_module("SimulationModule", &EntityID::new_external("MAIN"));
 
-    assert!(matches!(result, Err(FrameworkError::ModuleType_NotRegistered)));
+    assert!(matches!(result, Err(MMFError::ModuleType_NotRegistered)));
 
     MMF::register_module_type::<SimulationModule>().unwrap();
 
@@ -33,7 +33,7 @@ async fn test_module_init_failed() {
 
     let module_id = MMFMod::wait_module_list_init(&vec![module_id.clone()], Some(1000)).await;
     println!("Result: {:?}", module_id);
-    assert!(matches!(module_id, Err(FrameworkError::Module_InitializationFailed)));
+    assert!(matches!(module_id, Err(MMFError::Module_InitializationFailed)));
 
     MMFMod::abort_children(&EntityID::new_external("MAIN")).unwrap();
 
@@ -63,7 +63,7 @@ async fn test_module_close_failed() {
     let result = MMFMod::wait_module_list_close(&vec![module_id.clone()], Some(1000)).await;
 
     println!("Result: {:?}", result);
-    assert!(matches!(result, Err(FrameworkError::Module_CloseFailed)));
+    assert!(matches!(result, Err(MMFError::Module_CloseFailed)));
 
     MMFMod::abort_children(&EntityID::new_external("MAIN")).unwrap();
 

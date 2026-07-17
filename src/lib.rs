@@ -31,7 +31,7 @@ pub use mmf_err::{ErrorEvent, ErrorInstanceID, ErrorList, ErrorOutputFormat, MMF
 pub use mmf_log::{LogAction, LogEvent, LogInstanceID, LogList, LogMode, LogOutputFormat, LogStatus, MMFLog};
 pub use mmf_mod::MMFMod;
 
-pub use framework_error::FrameworkError;
+pub use framework_error::MMFError;
 
 pub use module::ModuleError;
 

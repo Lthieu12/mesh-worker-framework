@@ -26,7 +26,7 @@ async fn test_spawn_blocking_panic() {
     })
     .await;
 
-    assert!(matches!(result, Err(FrameworkError::BlockingTask_Failed(_))));
+    assert!(matches!(result, Err(MMFError::BlockingTask_Failed(_))));
 
     MMF::close().unwrap();
 }

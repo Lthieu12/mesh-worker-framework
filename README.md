@@ -50,35 +50,124 @@ Throughout this documentation, "Module" always refers to an MMF runtime module, 
 
 ## 2. Quick Start
 
-```text
-let main_entity = EntityID::new_external("MAIN");
+The following example, available in `examples/getting_started/main.rs`, demonstrates the recommended way to initialize MMF,
+register a module type, spawn a module, exchange messages and gracefully shut down the framework.
 
-MMF::init()?;
+```rust,ignore
+use bytes::Bytes;
 
-// Register module types once.
-MMF::register_module_type::<CameraModule>()?;
-MMF::register_module_type::<DisplayModule>()?;
+use mesh_module_framework::*;
 
-// Create module instances.
-let camera = MMFMod::spawn_module("CameraModule", &main_entity)?;
+// DemoModule and DemoMessages are defined in
+// examples/getting_started/modules/demo_module.rs.
+use modules::demo_module::{DemoMessages, DemoModule};
 
-let display = MMFMod::spawn_module("DisplayModule", &main_entity)?;
+// Tokio provides the async runtime used by MMF.
+#[tokio::main]
+async fn main() -> Result<(), MMFError> {
+    let main_entity = EntityID::new_external("MAIN");
 
-// Initialize them.
-MMFMod::init_module(&camera, camera_config).await?;
-MMFMod::init_module(&display, display_config).await?;
+    // Initialize MMF.
+    MMF::init()?;
 
-// Send messages.
-MMFMod::send_message(&main_entity, &camera, "Start", Bytes::new()).await?;
+    // Register available module types.
+    MMF::register_module_type::<DemoModule>()?;
 
-// Shutdown.
-MMFMod::close_module(&camera, Bytes::new()).await?;
-MMF::close()?;
+    // Create the module.
+    let demo_module_id = MMFMod::spawn_module("DemoModule", &main_entity)?;
+
+    // Initialize it.
+    MMFMod::init_module(&demo_module_id, Bytes::new()).await?;
+    MMFMod::wait_module_init(&demo_module_id, None).await?;
+
+    // Send a few messages.
+    MMFMod::send_message(&main_entity, &demo_module_id, DemoMessages::QUICK_CALCULATION, Bytes::new()).await?;
+    MMFMod::send_message(&main_entity, &demo_module_id, DemoMessages::LONG_CALCULATION, Bytes::new()).await?;
+
+    // Close the module.
+    MMFMod::close_module(&demo_module_id, Bytes::new()).await?;
+    MMFMod::wait_module_close(&demo_module_id, None).await?;
+
+    // Shutdown.
+    MMF::close()?;
+
+    Ok(())
+}
 ```
 
-MMF provides strongly typed identifiers (ModuleID, EntityID, MessageID) while 
-allowing applications to use plain strings, constants or application-defined 
-enums for message identifiers.
+The following DemoModule implementation, available in `examples/getting_started/modules/demo_module.rs`, is used by the previous example and illustrates the minimum implementation required to create an MMF module.
+
+```rust,ignore
+use std::time::Duration;
+use bytes::Bytes;
+use async_trait::async_trait;
+use mesh_module_framework::*;
+
+/// Message identifiers handled by DemoModule.
+pub struct DemoMessages;
+
+/// Defines the message identifiers.
+impl DemoMessages {
+    pub const QUICK_CALCULATION: &'static str = "QUICK_CALCULATION";
+    pub const LONG_CALCULATION: &'static str = "LONG_CALCULATION";
+}
+
+/// Private data associated with a DemoModule instance.
+pub struct DemoModule {
+    module_id: Option<ModuleID>,
+    father_id: Option<EntityID>,
+}
+
+/// MMF module implementation for DemoModule.
+#[async_trait]
+impl Module for DemoModule {
+    fn module_type_id() -> ModuleTypeID {
+        "DemoModule"
+    }
+
+    fn new() -> Self {
+        Self { module_id: None, father_id: None, }
+    }
+
+    async fn on_init(&mut self, module_id: ModuleID, father_id: EntityID, _lifecycle_data: Bytes) -> Result<(), ModuleError> {
+        // Store identifiers for later use (for example to send messages or
+        // spawn child modules from within the module).
+        self.module_id = Some(module_id);
+        self.father_id = Some(father_id);
+
+        Ok(())
+    }
+
+    async fn on_message(&mut self, message: ModuleMessage) -> Result<(), ModuleError> {
+        
+        match message.message_id.as_str() {
+            DemoMessages::QUICK_CALCULATION => {
+                // Small blocking work performed directly by the module.
+                std::thread::sleep(Duration::from_millis(10));
+            }
+
+            DemoMessages::LONG_CALCULATION => {
+                // Long blocking work should be offloaded to a dedicated thread.
+                MMFMod::spawn_blocking(|| {
+                    std::thread::sleep(Duration::from_millis(1000));
+                })
+                .await?;
+            }
+
+            _ => {
+                // Ignore unsupported messages.
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn on_close(&mut self, _lifecycle_data: Bytes) -> Result<(), ModuleError> {
+
+        Ok(())
+    }
+}
+```
 
 ---
 
@@ -156,7 +245,7 @@ Each module implementation defines its own unique
 Module types are typically registered once during
 application startup:
 
-```text
+```rust,ignore
 MMF::init()?;
 
 MMF::register_module_type::<CameraModule>()?;

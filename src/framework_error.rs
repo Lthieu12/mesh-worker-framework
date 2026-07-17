@@ -17,7 +17,7 @@ pub type ModuleError = anyhow::Error;
 ///   - Module_ChannelClosed
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
-pub enum FrameworkError {
+pub enum MMFError {
     /// The operation timed out.
     Operation_Timeout,
 
@@ -98,96 +98,96 @@ pub enum FrameworkError {
 }
 
 /// Human-readable representation of FrameworkError.
-impl fmt::Display for FrameworkError {
+impl fmt::Display for MMFError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            FrameworkError::Operation_Timeout => write!(f, "The operation timed out."),
+            MMFError::Operation_Timeout => write!(f, "The operation timed out."),
 
-            FrameworkError::Framework_NotInitialized => {
+            MMFError::Framework_NotInitialized => {
                 write!(f, "The framework has not been initialized.")
             }
 
-            FrameworkError::Framework_AlreadyInitialized => {
+            MMFError::Framework_AlreadyInitialized => {
                 write!(f, "The framework is already initialized.")
             }
 
-            FrameworkError::Framework_CannotClose_ModulesStillRunning => {
+            MMFError::Framework_CannotClose_ModulesStillRunning => {
                 write!(f, "The framework shutdown failed: one or more modules are still running.")
             }
 
-            FrameworkError::ModuleType_NotFound => {
+            MMFError::ModuleType_NotFound => {
                 write!(f, "The requested module type was not found.")
             }
 
-            FrameworkError::ModuleType_DuplicateModuleTypeID => {
+            MMFError::ModuleType_DuplicateModuleTypeID => {
                 write!(f, "ModuleTypeID is already used by another module type.")
             }
 
-            FrameworkError::ModuleType_AlreadyRegistered => {
+            MMFError::ModuleType_AlreadyRegistered => {
                 write!(f, "The requested module type is already registered.")
             }
 
-            FrameworkError::ModuleType_NotRegistered => {
+            MMFError::ModuleType_NotRegistered => {
                 write!(f, "The requested module type has not been registered.")
             }
 
-            FrameworkError::Module_InitializationFailed => {
+            MMFError::Module_InitializationFailed => {
                 write!(f, "A module failed during its initialization.")
             }
 
-            FrameworkError::Module_NotFound => write!(f, "The requested module was not found."),
+            MMFError::Module_NotFound => write!(f, "The requested module was not found."),
 
-            FrameworkError::Module_CloseFailed => write!(f, "A module failed during its closing."),
+            MMFError::Module_CloseFailed => write!(f, "A module failed during its closing."),
 
-            FrameworkError::Module_ChannelClosed => {
+            MMFError::Module_ChannelClosed => {
                 write!(f, "A module communication channel is closed.")
             }
 
-            FrameworkError::Module_AlreadyExists => {
+            MMFError::Module_AlreadyExists => {
                 write!(f, "The requested module already exists.")
             }
 
-            FrameworkError::Module_AlreadyInitialized => {
+            MMFError::Module_AlreadyInitialized => {
                 write!(f, "The requested module is already initialized.")
             }
 
-            FrameworkError::Module_NotInitialized => {
+            MMFError::Module_NotInitialized => {
                 write!(f, "The requested module has not been initialized.")
             }
 
-            FrameworkError::Module_Panicked(panic_message) => {
+            MMFError::Module_Panicked(panic_message) => {
                 write!(f, "A module has panicked: {}", panic_message)
             }
 
-            FrameworkError::Module_MessageError(error) => {
+            MMFError::Module_MessageError(error) => {
                 write!(f, "Module message processing failed: {}", error)
             }
 
-            FrameworkError::FatherModule_NotFound => {
+            MMFError::FatherModule_NotFound => {
                 write!(f, "The requested father module was not found.")
             }
 
-            FrameworkError::Message_InstanceIDExhausted => {
+            MMFError::Message_InstanceIDExhausted => {
                 write!(f, "MessageInstanceID counter exhausted.")
             }
 
-            FrameworkError::Error_InstanceIDExhausted => {
+            MMFError::Error_InstanceIDExhausted => {
                 write!(f, "ErrorInstanceID counter exhausted.")
             }
 
-            FrameworkError::Logging_InstanceIDExhausted => {
+            MMFError::Logging_InstanceIDExhausted => {
                 write!(f, "LoggingInstanceID counter exhausted.")
             }
 
-            FrameworkError::Logging_LogFileInvalidPath => {
+            MMFError::Logging_LogFileInvalidPath => {
                 write!(f, "Invalid log file path.")
             }
 
-            FrameworkError::Logging_LogFileAccessFailed(error) => {
+            MMFError::Logging_LogFileAccessFailed(error) => {
                 write!(f, "Failed to access to log file: {}", error)
             }
 
-            FrameworkError::BlockingTask_Failed(error) => {
+            MMFError::BlockingTask_Failed(error) => {
                 write!(f, "Blocking task execution failed: {}", error)
             }
         }
@@ -195,7 +195,7 @@ impl fmt::Display for FrameworkError {
 }
 
 /// Standard Rust error implementation for FrameworkError.
-impl Error for FrameworkError {}
+impl Error for MMFError {}
 
 /// Panic errors of MMF.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

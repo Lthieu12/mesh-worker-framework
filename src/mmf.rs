@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use std::sync::{LazyLock, RwLock};
 use tokio::sync::Notify;
 
-use crate::framework_error::{FrameworkError, MMFPanic};
+use crate::framework_error::{MMFError, MMFPanic};
 use crate::log_file;
 use crate::mmf::TimestampFormat::LocalTime;
 use crate::mmf_err::ErrorData;
@@ -157,15 +157,15 @@ impl MMF {
     }
 
     /// Initialize MMF using the default configuration.
-    pub fn init() -> Result<(), FrameworkError> {
+    pub fn init() -> Result<(), MMFError> {
         Self::init_with_configuration(MMFConfiguration::default())
     }
 
     /// Initialize the MMF framework with custom configuration.
-    pub fn init_with_configuration(mut mmf_configuration: MMFConfiguration) -> Result<(), FrameworkError> {
+    pub fn init_with_configuration(mut mmf_configuration: MMFConfiguration) -> Result<(), MMFError> {
         let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
         if mmf_data_guard.is_some() {
-            return Err(FrameworkError::Framework_AlreadyInitialized);
+            return Err(MMFError::Framework_AlreadyInitialized);
         }
         *mmf_data_guard = Some(MMFData::new());
         drop(mmf_data_guard);
@@ -211,11 +211,11 @@ impl MMF {
     /// Use MMFMod::close_module() to terminate modules
     /// gracefully, or MMFMod::abort_module() as a last
     /// resort if a module becomes unresponsive.
-    pub fn close() -> Result<(), FrameworkError> {
+    pub fn close() -> Result<(), MMFError> {
         // Check that MMF has been initialized.
         let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
         if mmf_data_guard.is_none() {
-            return Err(FrameworkError::Framework_NotInitialized);
+            return Err(MMFError::Framework_NotInitialized);
         }
         drop(mmf_data_guard);
 
@@ -224,7 +224,7 @@ impl MMF {
             let mmf_mod_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
             let mmf_mod_data = mmf_mod_data_guard.as_ref().expect(MMFPanic::MMFModData_Missing.message());
             if !mmf_mod_data.module_registry.is_empty() {
-                return Err(FrameworkError::Framework_CannotClose_ModulesStillRunning);
+                return Err(MMFError::Framework_CannotClose_ModulesStillRunning);
             }
         }
 
@@ -272,24 +272,24 @@ impl MMF {
     ///   already been registered.
     /// - Module_DuplicateModuleTypeID if the ModuleTypeID is
     ///   already associated with a different Rust module type.
-    pub fn register_module_type<T>() -> Result<(), FrameworkError>
+    pub fn register_module_type<T>() -> Result<(), MMFError>
     where
         T: Module + Send + 'static,
     {
         let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let mmf_data = mmf_data_guard.as_mut().ok_or(MMFError::Framework_NotInitialized)?;
         let rust_type_name = std::any::type_name::<T>();
 
         match mmf_data.module_type_registry.get_module_rust_type_name(T::module_type_id()) {
             Ok(registered_rust_type_name) => {
                 if registered_rust_type_name == rust_type_name {
-                    return Err(FrameworkError::ModuleType_AlreadyRegistered);
+                    return Err(MMFError::ModuleType_AlreadyRegistered);
                 }
 
-                return Err(FrameworkError::ModuleType_DuplicateModuleTypeID);
+                return Err(MMFError::ModuleType_DuplicateModuleTypeID);
             }
 
-            Err(FrameworkError::ModuleType_NotFound) => {
+            Err(MMFError::ModuleType_NotFound) => {
                 // Create the constructor associated with this module type.
                 //
                 // The constructor is stored in the ModuleTypeRegistry and

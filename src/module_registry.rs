@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use tokio::task::JoinHandle;
 
 use crate::channel::{ModuleNormalSenderChannel, ModulePrioritySenderChannel};
-use crate::framework_error::{FrameworkError, MMFPanic};
+use crate::framework_error::{MMFError, MMFPanic};
 use crate::module::{EntityID, ModuleID, ModuleInfo, ModuleState, ModuleTypeID};
 
 /// Information associated with a registered module.
@@ -60,13 +60,13 @@ impl Registry {
     }
 
     /// Get module registry entry from ModuleID.
-    pub(crate) fn get_registry_entry(&self, module_id: &ModuleID) -> Result<&RegistryEntry, FrameworkError> {
-        self.module_map.get(module_id).ok_or(FrameworkError::Module_NotFound)
+    pub(crate) fn get_registry_entry(&self, module_id: &ModuleID) -> Result<&RegistryEntry, MMFError> {
+        self.module_map.get(module_id).ok_or(MMFError::Module_NotFound)
     }
 
     /// Get mutable module registry entry from ModuleID.
-    pub(crate) fn get_registry_entry_mut(&mut self, module_id: &ModuleID) -> Result<&mut RegistryEntry, FrameworkError> {
-        self.module_map.get_mut(module_id).ok_or(FrameworkError::Module_NotFound)
+    pub(crate) fn get_registry_entry_mut(&mut self, module_id: &ModuleID) -> Result<&mut RegistryEntry, MMFError> {
+        self.module_map.get_mut(module_id).ok_or(MMFError::Module_NotFound)
     }
 
     /// Retrieve information about all modules currently
@@ -85,22 +85,22 @@ impl Registry {
     }
 
     /// Get module type id from ModuleID.
-    pub(crate) fn get_module_type_id(&self, module_id: &ModuleID) -> Result<ModuleTypeID, FrameworkError> {
+    pub(crate) fn get_module_type_id(&self, module_id: &ModuleID) -> Result<ModuleTypeID, MMFError> {
         Ok(self.get_registry_entry(module_id)?.module_type_id)
     }
 
     /// Get module channel from ModuleID.
-    pub(crate) fn get_module_normal_channel(&self, module_id: &ModuleID) -> Result<ModuleNormalSenderChannel, FrameworkError> {
+    pub(crate) fn get_module_normal_channel(&self, module_id: &ModuleID) -> Result<ModuleNormalSenderChannel, MMFError> {
         Ok(self.get_registry_entry(module_id)?.normal_sender_channel.clone())
     }
 
     /// Get module priority channel from ModuleID.
-    pub(crate) fn get_module_priority_channel(&self, module_id: &ModuleID) -> Result<ModulePrioritySenderChannel, FrameworkError> {
+    pub(crate) fn get_module_priority_channel(&self, module_id: &ModuleID) -> Result<ModulePrioritySenderChannel, MMFError> {
         Ok(self.get_registry_entry(module_id)?.priority_sender_channel.clone())
     }
 
     /// Get module state from ModuleID
-    pub(crate) fn get_module_state(&self, module_id: &ModuleID) -> Result<ModuleState, FrameworkError> {
+    pub(crate) fn get_module_state(&self, module_id: &ModuleID) -> Result<ModuleState, MMFError> {
         Ok(self.get_registry_entry(module_id)?.module_state)
     }
 
@@ -118,10 +118,10 @@ impl Registry {
     }
 
     /// Register a newly created module.
-    pub(crate) fn add_module(&mut self, module_id: &ModuleID, module_type_id: ModuleTypeID, father_id: &EntityID, normal_sender_channel: ModuleNormalSenderChannel, priority_sender_channel: ModulePrioritySenderChannel, join_handle: JoinHandle<()>) -> Result<(), (FrameworkError, JoinHandle<()>)> {
+    pub(crate) fn add_module(&mut self, module_id: &ModuleID, module_type_id: ModuleTypeID, father_id: &EntityID, normal_sender_channel: ModuleNormalSenderChannel, priority_sender_channel: ModulePrioritySenderChannel, join_handle: JoinHandle<()>) -> Result<(), (MMFError, JoinHandle<()>)> {
         // Prevent duplicate ModuleIDs.
         if self.module_map.contains_key(module_id) {
-            return Err((FrameworkError::Module_AlreadyExists, join_handle));
+            return Err((MMFError::Module_AlreadyExists, join_handle));
         }
 
         // Validate the parent entity.
@@ -134,7 +134,7 @@ impl Registry {
         match father_id {
             EntityID::Module(father_id_ref) => {
                 if !Registry::contains_module(self, father_id_ref) {
-                    return Err((FrameworkError::FatherModule_NotFound, join_handle));
+                    return Err((MMFError::FatherModule_NotFound, join_handle));
                 }
             }
             EntityID::External(_) => {}
@@ -156,7 +156,7 @@ impl Registry {
     }
 
     /// Remove a module from the registry.
-    pub(crate) fn remove_module(&mut self, module_id: &ModuleID) -> Result<(), FrameworkError> {
+    pub(crate) fn remove_module(&mut self, module_id: &ModuleID) -> Result<(), MMFError> {
         // Retrieve the Registry entry associated with the module.
         //
         // The father_id must be retrieved before removing the module
@@ -192,7 +192,7 @@ impl Registry {
     }
 
     /// Update the module state of a registered module.
-    pub(crate) fn set_module_state(&mut self, module_id: &ModuleID, module_state: ModuleState) -> Result<(), FrameworkError> {
+    pub(crate) fn set_module_state(&mut self, module_id: &ModuleID, module_state: ModuleState) -> Result<(), MMFError> {
         let registry_entry = self.get_registry_entry_mut(module_id)?;
         registry_entry.module_state = module_state;
         Ok(())
@@ -204,20 +204,20 @@ impl Registry {
     }
 
     /// Get the module FatherID from ModuleID.
-    pub(crate) fn get_father_id(&self, module_id: &ModuleID) -> Result<EntityID, FrameworkError> {
+    pub(crate) fn get_father_id(&self, module_id: &ModuleID) -> Result<EntityID, MMFError> {
         let registry_entry = self.get_registry_entry(module_id)?;
         Ok(registry_entry.father_id.clone())
     }
 
     /// Get the child ModuleIDs of an entity.
-    pub(crate) fn get_children_ids(&self, entity_id: &EntityID) -> Result<Vec<ModuleID>, FrameworkError> {
+    pub(crate) fn get_children_ids(&self, entity_id: &EntityID) -> Result<Vec<ModuleID>, MMFError> {
         // Validate the module if the entity is managed by MMF.
         //
         // External entities are not managed by MMF and therefore
         // cannot be validated.
         if let EntityID::Module(module_id) = entity_id {
             if !Registry::contains_module(self, module_id) {
-                return Err(FrameworkError::Module_NotFound);
+                return Err(MMFError::Module_NotFound);
             }
         }
 
@@ -232,14 +232,14 @@ impl Registry {
     }
 
     /// Get the number of child modules of an entity.
-    pub(crate) fn get_children_count(&self, entity_id: &EntityID) -> Result<usize, FrameworkError> {
+    pub(crate) fn get_children_count(&self, entity_id: &EntityID) -> Result<usize, MMFError> {
         // Validate the module if the entity is managed by MMF.
         //
         // External entities are not managed by MMF and therefore
         // cannot be validated.
         if let EntityID::Module(module_id) = entity_id {
             if !Registry::contains_module(self, module_id) {
-                return Err(FrameworkError::Module_NotFound);
+                return Err(MMFError::Module_NotFound);
             }
         }
 
@@ -254,7 +254,7 @@ impl Registry {
     }
 
     /// Take ownership of the JoinHandle associated with a module.
-    pub(crate) fn take_join_handle(&mut self, module_id: &ModuleID) -> Result<JoinHandle<()>, FrameworkError> {
+    pub(crate) fn take_join_handle(&mut self, module_id: &ModuleID) -> Result<JoinHandle<()>, MMFError> {
         let registry_entry = self.get_registry_entry_mut(module_id)?;
         let join_handle = registry_entry.join_handle.take().expect(MMFPanic::Module_JoinHandleMissing.message());
         Ok(join_handle)

@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use crate::framework_error::FrameworkError;
+use crate::framework_error::MMFError;
 use crate::module::{ModuleConstructor, ModuleTypeID};
 
 /// Information associated with a registered module type.
@@ -39,8 +39,8 @@ impl ModuleTypeRegistry {
     }
 
     /// Get the Rust type name associated with a ModuleTypeID.
-    pub(crate) fn get_module_rust_type_name(&self, module_type_id: ModuleTypeID) -> Result<&'static str, FrameworkError> {
-        let module_type_entry = self.module_type_map.get(module_type_id).ok_or(FrameworkError::ModuleType_NotFound)?;
+    pub(crate) fn get_module_rust_type_name(&self, module_type_id: ModuleTypeID) -> Result<&'static str, MMFError> {
+        let module_type_entry = self.module_type_map.get(module_type_id).ok_or(MMFError::ModuleType_NotFound)?;
         Ok(module_type_entry.module_rust_type_name)
     }
 
@@ -48,8 +48,8 @@ impl ModuleTypeRegistry {
     ///
     /// The returned function creates a new instance of the
     /// corresponding module type each time it is invoked.
-    pub(crate) fn get_module_constructor(&self, module_type_id: ModuleTypeID) -> Result<ModuleConstructor, FrameworkError> {
-        let module_type_entry = self.module_type_map.get(module_type_id).ok_or(FrameworkError::ModuleType_NotFound)?;
+    pub(crate) fn get_module_constructor(&self, module_type_id: ModuleTypeID) -> Result<ModuleConstructor, MMFError> {
+        let module_type_entry = self.module_type_map.get(module_type_id).ok_or(MMFError::ModuleType_NotFound)?;
         Ok(module_type_entry.module_constructor)
     }
 

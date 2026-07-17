@@ -7,7 +7,7 @@ use std::collections::VecDeque;
 use std::sync::atomic::Ordering;
 
 use crate::MMF;
-use crate::framework_error::{FrameworkError, MMFPanic};
+use crate::framework_error::{MMFError, MMFPanic};
 use crate::mmf::{MMF_ERR_DATA, MMF_ERR_INSTANCE_COUNTER, MMF_ERR_NOTIFY};
 use crate::module::EntityID;
 use crate::string_helper;
@@ -170,10 +170,10 @@ pub struct MMFErr;
 /// Public MMFErr entry point.
 impl MMFErr {
     /// Generate a unique ErrorInstanceID.
-    fn generate_error_instance_id() -> Result<u64, FrameworkError> {
+    fn generate_error_instance_id() -> Result<u64, MMFError> {
         let current_id = MMF_ERR_INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed);
         if current_id == u64::MAX {
-            return Err(FrameworkError::Error_InstanceIDExhausted);
+            return Err(MMFError::Error_InstanceIDExhausted);
         }
 
         Ok(current_id)
@@ -189,7 +189,7 @@ impl MMFErr {
     ///
     /// Error events are stored in a circular buffer and
     /// notify all MMFErr waiters.
-    pub(crate) fn add_error_internal(entity_id: &EntityID, callback_name: Option<String>, error: &anyhow::Error) -> Result<(), FrameworkError> {
+    pub(crate) fn add_error_internal(entity_id: &EntityID, callback_name: Option<String>, error: &anyhow::Error) -> Result<(), MMFError> {
         let error_instance_id = MMFErr::generate_error_instance_id()?;
         let error_message = error.to_string();
 
@@ -216,7 +216,7 @@ impl MMFErr {
         // the oldest error events are discarded to make
         // room for newer ones.
         let mut mmf_err_data_guard = MMF_ERR_DATA.write().expect(MMFPanic::MMFErrData_WriteLockPoisoned.message());
-        let mmf_err_data = mmf_err_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let mmf_err_data = mmf_err_data_guard.as_mut().ok_or(MMFError::Framework_NotInitialized)?;
         let error_event_buffer_capacity = mmf_err_data.error_event_buffer_capacity;
 
         while mmf_err_data.error_event_list.len() >= error_event_buffer_capacity {
@@ -244,7 +244,7 @@ impl MMFErr {
     ///
     /// Error events are stored in a circular buffer and
     /// notify all MMFErr waiters.
-    pub fn add_error(entity_id: &EntityID, error: &anyhow::Error) -> Result<(), FrameworkError> {
+    pub fn add_error(entity_id: &EntityID, error: &anyhow::Error) -> Result<(), MMFError> {
         MMFErr::add_error_internal(entity_id, None, error)
     }
 
@@ -263,7 +263,7 @@ impl MMFErr {
     ///
     /// Returns Framework_NotInitialized if MMFErr
     /// has not been initialized through MMF::init().
-    pub async fn wait_error(last_error_instance_id: Option<ErrorInstanceID>) -> Result<ErrorList, FrameworkError> {
+    pub async fn wait_error(last_error_instance_id: Option<ErrorInstanceID>) -> Result<ErrorList, MMFError> {
         loop {
             let error_list = MMFErr::get_error_list(last_error_instance_id)?;
 
@@ -299,9 +299,9 @@ impl MMFErr {
     ///
     /// Returns Framework_NotInitialized if MMFErr has
     /// not been initialized through MMF::init().
-    fn get_error_list(last_error_instance_id: Option<ErrorInstanceID>) -> Result<ErrorList, FrameworkError> {
+    fn get_error_list(last_error_instance_id: Option<ErrorInstanceID>) -> Result<ErrorList, MMFError> {
         let mmf_err_data_guard = MMF_ERR_DATA.read().expect(MMFPanic::MMFErrData_ReadLockPoisoned.message());
-        let mmf_err_data = mmf_err_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let mmf_err_data = mmf_err_data_guard.as_ref().ok_or(MMFError::Framework_NotInitialized)?;
 
         // No error event is currently stored in MMFErr.
         if mmf_err_data.error_event_list.is_empty() {

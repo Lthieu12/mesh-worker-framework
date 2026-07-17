@@ -5,7 +5,7 @@ use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Error, Write};
 use std::path::{Path, PathBuf};
 
-use crate::framework_error::FrameworkError;
+use crate::framework_error::MMFError;
 use crate::mmf::MMFConfiguration;
 use crate::mmf_log::{LogEvent, LogList, LogOutputFormat, LoggingData};
 
@@ -27,7 +27,7 @@ const LOG_FILE_FULL_MESSAGE: &str = "Maximum log file size reached.\n\
 ///
 /// Existing MMF log files are truncated.
 /// Existing non-MMF files are never modified.
-pub(crate) fn init_log_file(configuration: &mut MMFConfiguration) -> Result<File, FrameworkError> {
+pub(crate) fn init_log_file(configuration: &mut MMFConfiguration) -> Result<File, MMFError> {
     // Find a reusable MMF log file.
     configuration.log_file_path = find_log_file_path(&configuration.log_file_path)?;
 
@@ -48,7 +48,7 @@ pub(crate) fn init_log_file(configuration: &mut MMFConfiguration) -> Result<File
 /// If the requested file already exists but is not an MMF log
 /// file, numbered filenames are tried until a suitable file
 /// is found.
-fn find_log_file_path(log_file_path: &Path) -> Result<PathBuf, FrameworkError> {
+fn find_log_file_path(log_file_path: &Path) -> Result<PathBuf, MMFError> {
     let mut candidate_log_file_path = log_file_path.to_path_buf();
     let mut file_index = 1;
 
@@ -64,7 +64,7 @@ fn find_log_file_path(log_file_path: &Path) -> Result<PathBuf, FrameworkError> {
         }
 
         // Build the next candidate log file path.
-        let mut file_name = log_file_path.file_stem().ok_or(FrameworkError::Logging_LogFileInvalidPath)?.to_os_string();
+        let mut file_name = log_file_path.file_stem().ok_or(MMFError::Logging_LogFileInvalidPath)?.to_os_string();
 
         file_name.push(format!("_{file_index}"));
 
@@ -80,7 +80,7 @@ fn find_log_file_path(log_file_path: &Path) -> Result<PathBuf, FrameworkError> {
 }
 
 /// Returns whether the specified file is an MMF log file.
-fn is_mmf_log_file(log_file_path: &Path) -> Result<bool, FrameworkError> {
+fn is_mmf_log_file(log_file_path: &Path) -> Result<bool, MMFError> {
     let log_file = File::open(log_file_path).map_err(|error| log_file_access_failed(error, log_file_path))?;
 
     let mut reader = BufReader::new(log_file);
@@ -101,12 +101,12 @@ fn is_mmf_log_file(log_file_path: &Path) -> Result<bool, FrameworkError> {
 }
 
 /// Creates a FrameworkError for a log file access failure.
-fn log_file_access_failed(error: Error, log_file_path: &Path) -> FrameworkError {
-    FrameworkError::Logging_LogFileAccessFailed(anyhow::Error::new(error).context(format!("Log file: {}", log_file_path.display(),)))
+fn log_file_access_failed(error: Error, log_file_path: &Path) -> MMFError {
+    MMFError::Logging_LogFileAccessFailed(anyhow::Error::new(error).context(format!("Log file: {}", log_file_path.display(),)))
 }
 
 /// Writes a log event to the MMF log file.
-pub(crate) fn write_log_event(logging_data: &mut LoggingData, log_event: &LogEvent) -> Result<(), FrameworkError> {
+pub(crate) fn write_log_event(logging_data: &mut LoggingData, log_event: &LogEvent) -> Result<(), MMFError> {
     // File logging is disabled.
     if !logging_data.log_file_enabled {
         return Ok(());

@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 
 use crate::MMFLog;
 use crate::channel::{ModuleChannel, ModuleCommand, get_sender_channel};
-use crate::framework_error::{FrameworkError, MMFPanic};
+use crate::framework_error::{MMFError, MMFPanic};
 use crate::message::{MessageID, MessageInstanceID, ModuleMessage};
 use crate::mmf::{MMF_DATA, MMF_MOD_CLOSE_NOTIFY, MMF_MOD_DATA, MMF_MOD_INIT_NOTIFY, MMF_MOD_MESSAGE_INSTANCE_COUNTER, MMFConfiguration};
 use crate::mmf_log::{LogAction, LogStatus};
@@ -42,10 +42,10 @@ pub struct MMFMod;
 /// Public MMFMod entry point.
 impl MMFMod {
     /// Generate a unique MessageInstanceID.
-    fn generate_message_instance_id() -> Result<MessageInstanceID, FrameworkError> {
+    fn generate_message_instance_id() -> Result<MessageInstanceID, MMFError> {
         let current_id = MMF_MOD_MESSAGE_INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed);
         if current_id == u64::MAX {
-            return Err(FrameworkError::Message_InstanceIDExhausted);
+            return Err(MMFError::Message_InstanceIDExhausted);
         }
 
         Ok(current_id)
@@ -58,14 +58,14 @@ impl MMFMod {
     ///
     /// MMF retrieves the registered module constructor,
     /// creates a new module instance, then spawns it.
-    pub fn spawn_module(module_type_id: ModuleTypeID, father_id: &EntityID) -> Result<ModuleID, FrameworkError> {
+    pub fn spawn_module(module_type_id: ModuleTypeID, father_id: &EntityID) -> Result<ModuleID, MMFError> {
         // Ensure the framework has been initialized.
         let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let mmf_data = mmf_data_guard.as_ref().ok_or(MMFError::Framework_NotInitialized)?;
 
         // Ensure the module type has been registered.
         if !mmf_data.module_type_registry.contains_module_type(module_type_id) {
-            return Err(FrameworkError::ModuleType_NotRegistered);
+            return Err(MMFError::ModuleType_NotRegistered);
         }
 
         // Retrieve the constructor associated with the ModuleTypeID.
@@ -93,9 +93,9 @@ impl MMFMod {
     /// After this function returns:
     /// - MMF owns the ModuleID, channels and JoinHandle.
     /// - The Tokio task owns the module instance itself.
-    pub(crate) fn spawn_module_instance(module_type_id: ModuleTypeID, module: Box<dyn Module + Send>, father_id: &EntityID) -> Result<ModuleID, FrameworkError> {
+    pub(crate) fn spawn_module_instance(module_type_id: ModuleTypeID, module: Box<dyn Module + Send>, father_id: &EntityID) -> Result<ModuleID, MMFError> {
         let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let mmf_data = mmf_data_guard.as_mut().ok_or(MMFError::Framework_NotInitialized)?;
 
         // Child modules can only be attached to an
         // initialized parent module.
@@ -107,7 +107,7 @@ impl MMFMod {
                 let module_state = mmf_data.module_registry.get_module_state(father_id_ref)?;
 
                 if module_state != ModuleState::Initialized {
-                    return Err(FrameworkError::Module_NotInitialized);
+                    return Err(MMFError::Module_NotInitialized);
                 }
             }
 
@@ -164,12 +164,12 @@ impl MMFMod {
     ///
     /// The blocking work is executed on Tokio's blocking thread pool,
     /// allowing the Tokio runtime to continue executing other MMF modules.
-    pub async fn spawn_blocking<F, R>(f: F) -> Result<R, FrameworkError>
+    pub async fn spawn_blocking<F, R>(f: F) -> Result<R, MMFError>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        tokio::task::spawn_blocking(f).await.map_err(|e| FrameworkError::BlockingTask_Failed(anyhow::anyhow!(e)))
+        tokio::task::spawn_blocking(f).await.map_err(|e| MMFError::BlockingTask_Failed(anyhow::anyhow!(e)))
     }
 
     /// Suspend the current module for the specified duration.
@@ -181,9 +181,9 @@ impl MMFMod {
     }
 
     /// Get the current status of a module.
-    pub fn get_module_status(module_id: &ModuleID) -> Result<ModuleStatus, FrameworkError> {
+    pub fn get_module_status(module_id: &ModuleID) -> Result<ModuleStatus, MMFError> {
         let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let mmf_data = mmf_data_guard.as_ref().ok_or(MMFError::Framework_NotInitialized)?;
         let registry_entry = mmf_data.module_registry.get_registry_entry(module_id)?;
         let normal_channel_capacity = mmf_data.module_normal_channel_capacity;
         let priority_channel_capacity = mmf_data.module_priority_channel_capacity;
@@ -208,9 +208,9 @@ impl MMFMod {
     ///
     /// Returns Framework_NotInitialized if MMF has not
     /// been initialized through MMF::init().
-    pub fn get_module_info_list() -> Result<ModuleList, FrameworkError> {
+    pub fn get_module_info_list() -> Result<ModuleList, MMFError> {
         let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let mmf_data = mmf_data_guard.as_ref().ok_or(MMFError::Framework_NotInitialized)?;
 
         Ok(ModuleList { module_info_list: mmf_data.module_registry.get_module_info_list() })
     }
@@ -226,16 +226,16 @@ impl MMFMod {
     /// Returns:
     /// - Framework_NotInitialized if MMF has not been initialized.
     /// - Module_NotFound if the module does not exist.
-    pub fn get_module_type_rust_path(module_id: &ModuleID) -> Result<&'static str, FrameworkError> {
+    pub fn get_module_type_rust_path(module_id: &ModuleID) -> Result<&'static str, MMFError> {
         // Get the ModuleTypeID associated with the module.
         let mmf_mod_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
-        let mmf_mod_data = mmf_mod_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let mmf_mod_data = mmf_mod_data_guard.as_ref().ok_or(MMFError::Framework_NotInitialized)?;
         let module_type_id = mmf_mod_data.module_registry.get_module_type_id(module_id)?;
         drop(mmf_mod_data_guard);
 
         // Get the Rust type name associated with the ModuleTypeID.
         let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let mmf_data = mmf_data_guard.as_ref().ok_or(MMFError::Framework_NotInitialized)?;
         let module_rust_type_name = mmf_data.module_type_registry.get_module_rust_type_name(module_type_id)?;
 
         Ok(module_rust_type_name)
@@ -246,7 +246,7 @@ impl MMFMod {
     /// The module state is immediately changed to Initializing.
     /// This function only queues the Init command and does not wait
     /// for on_init() completion.
-    pub async fn init_module(module_id: &ModuleID, lifecycle_data: Bytes) -> Result<(), FrameworkError> {
+    pub async fn init_module(module_id: &ModuleID, lifecycle_data: Bytes) -> Result<(), MMFError> {
         // Change Module state to Initializing
         // and read MMF data to retrieve the Module channel
         // associated with the target module.
@@ -254,10 +254,10 @@ impl MMFMod {
         // Only modules in the Created state can be initialized.
         let normal_sender_channel = {
             let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
-            let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
+            let mmf_data = mmf_data_guard.as_mut().ok_or(MMFError::Framework_NotInitialized)?;
             let module_state = mmf_data.module_registry.get_module_state(module_id)?;
             if module_state != ModuleState::Created {
-                return Err(FrameworkError::Module_AlreadyInitialized);
+                return Err(MMFError::Module_AlreadyInitialized);
             }
             mmf_data.module_registry.set_module_state(module_id, ModuleState::Initializing)?;
 
@@ -265,7 +265,7 @@ impl MMFMod {
         };
 
         // Send the Init command to ModuleTask.
-        normal_sender_channel.send(ModuleCommand::Init { lifecycle_data }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        normal_sender_channel.send(ModuleCommand::Init { lifecycle_data }).await.map_err(|_| MMFError::Module_ChannelClosed)?;
 
         Ok(())
     }
@@ -275,7 +275,7 @@ impl MMFMod {
     /// The module state is immediately changed to Closing.
     /// This function only queues the Close command and does not wait
     /// for on_close() completion.
-    pub async fn close_module(module_id: &ModuleID, lifecycle_data: Bytes) -> Result<(), FrameworkError> {
+    pub async fn close_module(module_id: &ModuleID, lifecycle_data: Bytes) -> Result<(), MMFError> {
         // Change Module state to Closing
         // and read MMF data to retrieve the Module channel
         // associated with the target module.
@@ -283,25 +283,25 @@ impl MMFMod {
         // Only modules in the Initialized state can be closed.
         let normal_sender_channel = {
             let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
-            let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
+            let mmf_data = mmf_data_guard.as_mut().ok_or(MMFError::Framework_NotInitialized)?;
             let module_state = mmf_data.module_registry.get_module_state(module_id)?;
             if module_state != ModuleState::Initialized {
-                return Err(FrameworkError::Module_NotInitialized);
+                return Err(MMFError::Module_NotInitialized);
             }
             mmf_data.module_registry.set_module_state(module_id, ModuleState::Closing)?;
             mmf_data.module_registry.get_module_normal_channel(module_id)?
         };
 
         // Send the Close command to ModuleTask.
-        normal_sender_channel.send(ModuleCommand::Close { lifecycle_data }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        normal_sender_channel.send(ModuleCommand::Close { lifecycle_data }).await.map_err(|_| MMFError::Module_ChannelClosed)?;
 
         Ok(())
     }
 
     /// Get the FatherID of a module.
-    pub fn get_father_id(module_id: &ModuleID) -> Result<EntityID, FrameworkError> {
+    pub fn get_father_id(module_id: &ModuleID) -> Result<EntityID, MMFError> {
         let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let mmf_data = mmf_data_guard.as_ref().ok_or(MMFError::Framework_NotInitialized)?;
         let father_id = mmf_data.module_registry.get_father_id(module_id)?;
         drop(mmf_data_guard);
 
@@ -309,17 +309,17 @@ impl MMFMod {
     }
 
     /// Get the child ModuleIDs of an entity.
-    pub fn get_children_ids(entity_id: &EntityID) -> Result<Vec<ModuleID>, FrameworkError> {
+    pub fn get_children_ids(entity_id: &EntityID) -> Result<Vec<ModuleID>, MMFError> {
         let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let mmf_data = mmf_data_guard.as_ref().ok_or(MMFError::Framework_NotInitialized)?;
 
         mmf_data.module_registry.get_children_ids(entity_id)
     }
 
     /// Get the number of child modules of an entity.
-    pub fn get_children_count(entity_id: &EntityID) -> Result<usize, FrameworkError> {
+    pub fn get_children_count(entity_id: &EntityID) -> Result<usize, MMFError> {
         let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let mmf_data = mmf_data_guard.as_ref().ok_or(MMFError::Framework_NotInitialized)?;
         let children_count = mmf_data.module_registry.get_children_count(entity_id)?;
         drop(mmf_data_guard);
         Ok(children_count)
@@ -330,7 +330,7 @@ impl MMFMod {
     /// timeout_ms:
     /// - None => wait indefinitely.
     /// - Some(value) => return Operation_Timeout if the delay expires.
-    pub async fn wait_module_list_init(module_ids: &Vec<ModuleID>, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
+    pub async fn wait_module_list_init(module_ids: &Vec<ModuleID>, timeout_ms: Option<u64>) -> Result<(), MMFError> {
         let wait_future = async {
             loop {
                 // Register interest in the next initialization event
@@ -343,7 +343,7 @@ impl MMFMod {
                 // next notification.
                 let (all_init_finished, one_init_failed) = {
                     let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
-                    let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+                    let mmf_data = mmf_data_guard.as_ref().ok_or(MMFError::Framework_NotInitialized)?;
 
                     let mut all_init_finished = true;
                     let mut one_init_failed = false;
@@ -369,7 +369,7 @@ impl MMFMod {
 
                 if all_init_finished {
                     if one_init_failed {
-                        return Err(FrameworkError::Module_InitializationFailed);
+                        return Err(MMFError::Module_InitializationFailed);
                     }
 
                     return Ok(());
@@ -381,7 +381,7 @@ impl MMFMod {
         };
 
         match timeout_ms {
-            Some(timeout_ms) => tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), wait_future).await.map_err(|_| FrameworkError::Operation_Timeout)?,
+            Some(timeout_ms) => tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), wait_future).await.map_err(|_| MMFError::Operation_Timeout)?,
             None => wait_future.await,
         }
     }
@@ -391,7 +391,7 @@ impl MMFMod {
     /// timeout_ms:
     /// - None => wait indefinitely.
     /// - Some(value) => return Operation_Timeout if the delay expires.
-    pub async fn wait_module_init(module_id: &ModuleID, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
+    pub async fn wait_module_init(module_id: &ModuleID, timeout_ms: Option<u64>) -> Result<(), MMFError> {
         MMFMod::wait_module_list_init(&vec![module_id.to_owned()], timeout_ms).await
     }
 
@@ -401,7 +401,7 @@ impl MMFMod {
     /// timeout_ms:
     /// - None => wait indefinitely.
     /// - Some(value) => return Operation_Timeout if the delay expires.
-    pub async fn wait_children_init(entity_id: &EntityID, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
+    pub async fn wait_children_init(entity_id: &EntityID, timeout_ms: Option<u64>) -> Result<(), MMFError> {
         // Resolve the current child list and delegate the wait
         // operation to wait_module_list_init().
         MMFMod::wait_module_list_init(&MMFMod::get_children_ids(entity_id)?, timeout_ms).await
@@ -415,7 +415,7 @@ impl MMFMod {
     /// timeout_ms:
     /// - None => wait indefinitely.
     /// - Some(value) => return Operation_Timeout if the delay expires.
-    pub async fn wait_module_list_close(module_ids: &Vec<ModuleID>, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
+    pub async fn wait_module_list_close(module_ids: &Vec<ModuleID>, timeout_ms: Option<u64>) -> Result<(), MMFError> {
         let wait_future = async {
             loop {
                 // Register interest in the next closing event
@@ -428,7 +428,7 @@ impl MMFMod {
                 // next notification.
                 let (all_close_finished, one_close_failed) = {
                     let mmf_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
-                    let mmf_data = mmf_data_guard.as_ref().ok_or(FrameworkError::Framework_NotInitialized)?;
+                    let mmf_data = mmf_data_guard.as_ref().ok_or(MMFError::Framework_NotInitialized)?;
 
                     let mut all_close_finished = true;
                     let mut one_close_failed = false;
@@ -439,7 +439,7 @@ impl MMFMod {
                     for module_id in module_ids {
                         match mmf_data.module_registry.get_module_state(module_id) {
                             // A module not found has been properly closed.
-                            Err(FrameworkError::Module_NotFound) => {}
+                            Err(MMFError::Module_NotFound) => {}
 
                             Ok(ModuleState::CloseFailed) => {
                                 one_close_failed = true;
@@ -456,7 +456,7 @@ impl MMFMod {
 
                 if all_close_finished {
                     if one_close_failed {
-                        return Err(FrameworkError::Module_CloseFailed);
+                        return Err(MMFError::Module_CloseFailed);
                     }
 
                     return Ok(());
@@ -467,7 +467,7 @@ impl MMFMod {
         };
 
         match timeout_ms {
-            Some(timeout_ms) => tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), wait_future).await.map_err(|_| FrameworkError::Operation_Timeout)?,
+            Some(timeout_ms) => tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), wait_future).await.map_err(|_| MMFError::Operation_Timeout)?,
             None => wait_future.await,
         }
     }
@@ -480,7 +480,7 @@ impl MMFMod {
     /// timeout_ms:
     /// - None => wait indefinitely.
     /// - Some(value) => return Operation_Timeout if the delay expires.
-    pub async fn wait_module_close(module_id: &ModuleID, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
+    pub async fn wait_module_close(module_id: &ModuleID, timeout_ms: Option<u64>) -> Result<(), MMFError> {
         MMFMod::wait_module_list_close(&vec![module_id.to_owned()], timeout_ms).await
     }
 
@@ -492,7 +492,7 @@ impl MMFMod {
     /// timeout_ms:
     /// - None => wait indefinitely.
     /// - Some(value) => return Operation_Timeout if the delay expires.
-    pub async fn wait_children_close(entity_id: &EntityID, timeout_ms: Option<u64>) -> Result<(), FrameworkError> {
+    pub async fn wait_children_close(entity_id: &EntityID, timeout_ms: Option<u64>) -> Result<(), MMFError> {
         // Resolve the current child list and delegate the wait
         // operation to wait_module_list_close().
         MMFMod::wait_module_list_close(&MMFMod::get_children_ids(entity_id)?, timeout_ms).await
@@ -506,9 +506,9 @@ impl MMFMod {
     ///
     /// This function should only be used as a recovery mechanism
     /// when normal shutdown has failed.
-    pub fn abort_module_list(module_ids: &Vec<ModuleID>) -> Result<(), FrameworkError> {
+    pub fn abort_module_list(module_ids: &Vec<ModuleID>) -> Result<(), MMFError> {
         let mut mmf_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_mut().ok_or(FrameworkError::Framework_NotInitialized)?;
+        let mmf_data = mmf_data_guard.as_mut().ok_or(MMFError::Framework_NotInitialized)?;
 
         for module_id in module_ids {
             let action_start_timer = Instant::now();
@@ -552,7 +552,7 @@ impl MMFMod {
     ///
     /// This function should only be used as a recovery mechanism
     /// when normal shutdown has failed.
-    pub fn abort_module(module_id: &ModuleID) -> Result<(), FrameworkError> {
+    pub fn abort_module(module_id: &ModuleID) -> Result<(), MMFError> {
         MMFMod::abort_module_list(&vec![module_id.to_owned()])
     }
 
@@ -564,14 +564,14 @@ impl MMFMod {
     ///
     /// This function should only be used as a recovery mechanism
     /// when normal shutdown has failed.
-    pub fn abort_children(entity_id: &EntityID) -> Result<(), FrameworkError> {
+    pub fn abort_children(entity_id: &EntityID) -> Result<(), MMFError> {
         MMFMod::abort_module_list(&MMFMod::get_children_ids(entity_id)?)
     }
 
     /// Send a message to a module.
     ///
     /// `message_id` may be any type implementing `Into<MessageID>`.
-    pub async fn send_message<T>(sender_id: &EntityID, receiver_id: &ModuleID, message_id: T, message_data: Bytes) -> Result<(), FrameworkError>
+    pub async fn send_message<T>(sender_id: &EntityID, receiver_id: &ModuleID, message_id: T, message_data: Bytes) -> Result<(), MMFError>
     where
         T: Into<MessageID>,
     {
@@ -583,7 +583,7 @@ impl MMFMod {
         let framework_message = ModuleMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
 
         // Send the message to the target module.
-        normal_sender_channel.send(ModuleCommand::Message { message: framework_message, priority: false, unique: false }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        normal_sender_channel.send(ModuleCommand::Message { message: framework_message, priority: false, unique: false }).await.map_err(|_| MMFError::Module_ChannelClosed)?;
 
         Ok(())
     }
@@ -597,7 +597,7 @@ impl MMFMod {
     /// - Ok(()) if on_message() completed successfully.
     /// - ModuleError if on_message() returned an error.
     /// - Operation_Timeout if the timeout expires.
-    pub async fn send_message_and_wait<T>(sender_id: &EntityID, receiver_id: &ModuleID, message_id: T, message_data: Bytes, timeout_ms: Option<u64>) -> Result<(), FrameworkError>
+    pub async fn send_message_and_wait<T>(sender_id: &EntityID, receiver_id: &ModuleID, message_id: T, message_data: Bytes, timeout_ms: Option<u64>) -> Result<(), MMFError>
     where
         T: Into<MessageID>,
     {
@@ -613,7 +613,7 @@ impl MMFMod {
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<Result<(), ModuleError>>();
 
         // Send the message to the receiver module.
-        normal_sender_channel.send(ModuleCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority: false }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        normal_sender_channel.send(ModuleCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority: false }).await.map_err(|_| MMFError::Module_ChannelClosed)?;
 
         // Wait for completion or timeout.
         //
@@ -633,7 +633,7 @@ impl MMFMod {
                 let channel_result = match timeout_result {
                     Ok(channel_result) => channel_result,
                     Err(_) => {
-                        return Err(FrameworkError::Operation_Timeout);
+                        return Err(MMFError::Operation_Timeout);
                     }
                 };
 
@@ -646,7 +646,7 @@ impl MMFMod {
                 match channel_result {
                     Ok(module_result) => module_result,
                     Err(_) => {
-                        return Err(FrameworkError::Module_ChannelClosed);
+                        return Err(MMFError::Module_ChannelClosed);
                     }
                 }
             }
@@ -661,7 +661,7 @@ impl MMFMod {
                 match channel_result {
                     Ok(module_result) => module_result,
                     Err(_) => {
-                        return Err(FrameworkError::Module_ChannelClosed);
+                        return Err(MMFError::Module_ChannelClosed);
                     }
                 }
             }
@@ -672,7 +672,7 @@ impl MMFMod {
         match module_result {
             Ok(()) => {}
             Err(module_error) => {
-                return Err(FrameworkError::Module_MessageError(module_error));
+                return Err(MMFError::Module_MessageError(module_error));
             }
         }
 
@@ -685,7 +685,7 @@ impl MMFMod {
     /// normal messages.
     ///
     /// `message_id` may be any type implementing `Into<MessageID>`.
-    pub async fn send_priority_message<T>(sender_id: &EntityID, receiver_id: &ModuleID, message_id: T, message_data: Bytes) -> Result<(), FrameworkError>
+    pub async fn send_priority_message<T>(sender_id: &EntityID, receiver_id: &ModuleID, message_id: T, message_data: Bytes) -> Result<(), MMFError>
     where
         T: Into<MessageID>,
     {
@@ -697,7 +697,7 @@ impl MMFMod {
         let framework_message = ModuleMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
 
         // Send the priority message to the target module.
-        priority_sender_channel.send(ModuleCommand::Message { message: framework_message, priority: true, unique: false }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        priority_sender_channel.send(ModuleCommand::Message { message: framework_message, priority: true, unique: false }).await.map_err(|_| MMFError::Module_ChannelClosed)?;
 
         Ok(())
     }
@@ -714,7 +714,7 @@ impl MMFMod {
     /// - Ok(()) if on_message() completed successfully.
     /// - ModuleError if on_message() returned an error.
     /// - Operation_Timeout if the timeout expires.
-    pub async fn send_priority_message_and_wait<T>(sender_id: &EntityID, receiver_id: &ModuleID, message_id: T, message_data: Bytes, timeout_ms: Option<u64>) -> Result<(), FrameworkError>
+    pub async fn send_priority_message_and_wait<T>(sender_id: &EntityID, receiver_id: &ModuleID, message_id: T, message_data: Bytes, timeout_ms: Option<u64>) -> Result<(), MMFError>
     where
         T: Into<MessageID>,
     {
@@ -730,7 +730,7 @@ impl MMFMod {
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel();
 
         // Send the message to the receiver module.
-        priority_sender_channel.send(ModuleCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority: true }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        priority_sender_channel.send(ModuleCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority: true }).await.map_err(|_| MMFError::Module_ChannelClosed)?;
 
         // Wait for completion or timeout.
         //
@@ -750,7 +750,7 @@ impl MMFMod {
                 let channel_result = match timeout_result {
                     Ok(channel_result) => channel_result,
                     Err(_) => {
-                        return Err(FrameworkError::Operation_Timeout);
+                        return Err(MMFError::Operation_Timeout);
                     }
                 };
 
@@ -763,7 +763,7 @@ impl MMFMod {
                 match channel_result {
                     Ok(module_result) => module_result,
                     Err(_) => {
-                        return Err(FrameworkError::Module_ChannelClosed);
+                        return Err(MMFError::Module_ChannelClosed);
                     }
                 }
             }
@@ -778,7 +778,7 @@ impl MMFMod {
                 match channel_result {
                     Ok(module_result) => module_result,
                     Err(_) => {
-                        return Err(FrameworkError::Module_ChannelClosed);
+                        return Err(MMFError::Module_ChannelClosed);
                     }
                 }
             }
@@ -789,7 +789,7 @@ impl MMFMod {
         match module_result {
             Ok(()) => {}
             Err(module_error) => {
-                return Err(FrameworkError::Module_MessageError(module_error));
+                return Err(MMFError::Module_MessageError(module_error));
             }
         }
 
@@ -805,7 +805,7 @@ impl MMFMod {
     /// preserving its FIFO position.
     ///
     /// `message_id` may be any type implementing `Into<MessageID>`.
-    pub async fn send_unique_message<T>(sender_id: &EntityID, receiver_id: &ModuleID, message_id: T, message_data: Bytes) -> Result<(), FrameworkError>
+    pub async fn send_unique_message<T>(sender_id: &EntityID, receiver_id: &ModuleID, message_id: T, message_data: Bytes) -> Result<(), MMFError>
     where
         T: Into<MessageID>,
     {
@@ -817,7 +817,7 @@ impl MMFMod {
         let framework_message = ModuleMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
 
         // Send the message to the target module.
-        normal_sender_channel.send(ModuleCommand::Message { message: framework_message, priority: false, unique: true }).await.map_err(|_| FrameworkError::Module_ChannelClosed)?;
+        normal_sender_channel.send(ModuleCommand::Message { message: framework_message, priority: false, unique: true }).await.map_err(|_| MMFError::Module_ChannelClosed)?;
 
         Ok(())
     }

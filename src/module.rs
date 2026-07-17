@@ -372,6 +372,7 @@ impl ModuleList {
 /// The `Self: Sized` bounds on `module_type_id()` and `new()` are
 /// required to keep this trait object-safe. Without these bounds,
 /// `Module` could no longer be used as `dyn Module`.
+///
 #[async_trait]
 pub trait Module {
     /// Returns the unique identifier of this module type.

@@ -15,3 +15,7 @@ chrono = "0.4"
 
 [dev-dependencies]
 serial_test = "3"
+
+[[example]]
+name = "getting_started"
+path = "examples/getting_started/main.rs"

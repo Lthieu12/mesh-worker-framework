@@ -33,7 +33,7 @@ async fn test_module_timeout_init() {
 
     MMFMod::init_module(&module_id, lifecycle_data).await.unwrap();
 
-    assert!(matches!(MMFMod::wait_module_init(&module_id, Some(100)).await, Err(FrameworkError::Operation_Timeout)));
+    assert!(matches!(MMFMod::wait_module_init(&module_id, Some(100)).await, Err(MMFError::Operation_Timeout)));
 
     MMFMod::abort_module(&module_id).unwrap();
     MMF::close().unwrap();
@@ -59,7 +59,7 @@ async fn test_module_timeout_close() {
 
     MMFMod::close_module(&module_id, Bytes::new()).await.unwrap();
 
-    assert!(matches!(MMFMod::wait_module_close(&module_id, Some(100)).await, Err(FrameworkError::Operation_Timeout)));
+    assert!(matches!(MMFMod::wait_module_close(&module_id, Some(100)).await, Err(MMFError::Operation_Timeout)));
 
     MMFMod::abort_module(&module_id).unwrap();
     MMF::close().unwrap();
