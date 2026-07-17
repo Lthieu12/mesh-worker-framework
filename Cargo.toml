@@ -19,3 +19,7 @@ serial_test = "3"
 [[example]]
 name = "getting_started"
 path = "examples/getting_started/main.rs"
+
+[[example]]
+name = "runtime_overhead_benchmark"
+path = "examples/benchmarks/runtime_overhead_benchmark.rs"

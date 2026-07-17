@@ -11,12 +11,18 @@
 //!
 //! The `DemoModule` implementation is intentionally minimal so the
 //! focus remains on the MMF API rather than application logic.
+//!
+//! Run with:
+//!
+//! cargo run --release --example getting_started
 
 use bytes::Bytes;
 
-mod modules;
-
 use mesh_module_framework::*;
+
+// DemoModule and DemoMessages are defined in
+// examples/getting_started/modules/demo_module.rs.
+mod modules;
 use modules::demo_module::{DemoMessages, DemoModule};
 
 // Tokio provides the async runtime used by MMF.
