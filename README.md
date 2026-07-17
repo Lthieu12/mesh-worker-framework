@@ -50,8 +50,8 @@ Throughout this documentation, "Module" always refers to an MMF runtime module, 
 
 ## 2. Quick Start
 
-The following example, available in `examples/getting_started/main.rs`, demonstrates the recommended way to initialize MMF,
-register a module type, spawn a module, exchange messages and gracefully shut down the framework.
+The complete, compiled version of this example is available in `examples/getting_started`.
+It demonstrates the recommended way to initialize MMF, register a module type, spawn a module, exchange messages and gracefully shut down the framework.
 
 ```rust,ignore
 use bytes::Bytes;
