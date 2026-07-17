@@ -570,7 +570,7 @@ impl MMFMod {
 
     /// Send a message to a module.
     ///
-    /// message_id may be any type implementing Into<MessageID>.
+    /// message_id may be any type implementing `Into<MessageID>`.
     pub async fn send_message<T>(sender_id: &EntityID, receiver_id: &ModuleID, message_id: T, message_data: Bytes) -> Result<(), FrameworkError>
     where
         T: Into<MessageID>,
@@ -591,7 +591,7 @@ impl MMFMod {
     /// Send a message and wait until the receiver has finished
     /// processing it.
     ///
-    /// message_id may be any type implementing Into<MessageID>.
+    /// message_id may be any type implementing `Into<MessageID>`.
     ///
     /// Returns:
     /// - Ok(()) if on_message() completed successfully.
@@ -684,7 +684,7 @@ impl MMFMod {
     /// Priority messages are always processed before pending
     /// normal messages.
     ///
-    /// message_id may be any type implementing Into<MessageID>.
+    /// message_id may be any type implementing `Into<MessageID>`.
     pub async fn send_priority_message<T>(sender_id: &EntityID, receiver_id: &ModuleID, message_id: T, message_data: Bytes) -> Result<(), FrameworkError>
     where
         T: Into<MessageID>,
@@ -708,7 +708,7 @@ impl MMFMod {
     /// Priority messages are always processed before pending
     /// normal messages.
     ///
-    /// message_id may be any type implementing Into<MessageID>.
+    /// message_id may be any type implementing `Into<MessageID>`.
     ///
     /// Returns:
     /// - Ok(()) if on_message() completed successfully.
@@ -804,7 +804,7 @@ impl MMFMod {
     /// Sending a new unique message replaces the pending one while
     /// preserving its FIFO position.
     ///
-    /// message_id may be any type implementing Into<MessageID>.
+    /// message_id may be any type implementing `Into<MessageID>`.
     pub async fn send_unique_message<T>(sender_id: &EntityID, receiver_id: &ModuleID, message_id: T, message_data: Bytes) -> Result<(), FrameworkError>
     where
         T: Into<MessageID>,
