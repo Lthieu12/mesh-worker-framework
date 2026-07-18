@@ -1,5 +1,5 @@
 # ============================================================================
-# Verify MMF on Windows and Linux.
+# Verify MWF on Windows and Linux.
 # ============================================================================
 
 $ErrorActionPreference = "Stop"
@@ -49,7 +49,7 @@ try {
 
     Write-Host ""
     Write-Host "========================================"
-    Write-Host "        MMF Verification"
+    Write-Host "        MWF Verification"
     Write-Host "========================================"
 
     # ========================================================================
@@ -82,7 +82,7 @@ try {
 
     Write-Host ""
     Write-Host "========================================"
-    Write-Host "MMF verification completed successfully."
+    Write-Host "MWF verification completed successfully."
     Write-Host "========================================"
 
     exit 0
@@ -93,7 +93,7 @@ catch {
     Write-Host "[FAIL] $($_.Exception.Message)"
     Write-Host ""
     Write-Host "========================================"
-    Write-Host "MMF verification failed."
+    Write-Host "MWF verification failed."
     Write-Host "========================================"
 
     exit 1

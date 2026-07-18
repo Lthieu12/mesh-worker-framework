@@ -8,5 +8,5 @@ fn main() {
         _ => String::from("unknown"),
     };
 
-    println!("cargo:rustc-env=MMF_GIT_COMMIT={}", git_commit);
+    println!("cargo:rustc-env=MWF_GIT_COMMIT={}", git_commit);
 }

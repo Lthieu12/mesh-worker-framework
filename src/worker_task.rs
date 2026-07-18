@@ -1,14 +1,14 @@
-//! Tokio runtime for MMF workers.
+//! Tokio runtime for MWF workers.
 //!
 //! worker_task owns the Tokio task associated with a worker instance.
 //!
 //! After a worker is spawned:
-//! - MMF owns the Senders and the JoinHandle.
+//! - MWF owns the Senders and the JoinHandle.
 //! - WorkerTask owns the worker instance and the Receivers.
 //!
 //! Responsibilities:
 //! - Own the worker instance.
-//! - Receive commands and messages sent by MMF.
+//! - Receive commands and messages sent by MWF.
 //! - Execute the worker callbacks.
 //! - Terminate the worker task when requested.
 //! - Process all worker commands sequentially.
@@ -20,7 +20,7 @@
 //!
 //! Commands are then executed sequentially from this queue.
 //!
-//! MMF never directly calls on_init(), on_message() or on_close().
+//! MWF never directly calls on_init(), on_message() or on_close().
 //! These callbacks are executed inside the worker task because
 //! the worker instance is owned by Tokio after spawn_worker().
 
@@ -30,12 +30,12 @@ use std::panic::AssertUnwindSafe;
 use std::time::Instant;
 use tokio::task::JoinHandle;
 
-use crate::MMFErr;
-use crate::MMFLog;
+use crate::MWFErr;
+use crate::MWFLog;
 use crate::channel::{WorkerCommand, WorkerNormalReceiverChannel, WorkerPriorityReceiverChannel};
-use crate::framework_error::MMFPanic;
+use crate::framework_error::MWFPanic;
 use crate::message::WorkerMessage;
-use crate::mmf::{MMF_WRK_CLOSE_NOTIFY, MMF_WRK_DATA, MMF_WRK_INIT_NOTIFY};
+use crate::mmf::{MWF_WRK_CLOSE_NOTIFY, MWF_WRK_DATA, MWF_WRK_INIT_NOTIFY};
 use crate::mmf_log::{LogAction, LogStatus};
 use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerState};
 
@@ -115,7 +115,7 @@ impl PendingCommands {
 /// spawned Tokio task.
 ///
 /// After this function returns:
-/// - MMF owns the command Senders and the JoinHandle.
+/// - MWF owns the command Senders and the JoinHandle.
 /// - WorkerTask owns the worker instance and the Receiver channels.
 ///
 /// The spawned Tokio task executes the complete worker
@@ -146,25 +146,25 @@ pub(crate) fn spawn_worker_task(worker: Box<dyn Worker + Send>, normal_receiver_
                     anyhow::anyhow!("Unknown panic")
                 };
 
-                // Store the panic in MMFErr.
-                MMFErr::add_error_internal(&EntityID::Worker(task_worker_id.clone()), Some("on_init".into()), &panic_error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
-                // Log the panic in MMFLog
-                MMFLog::add_log(Instant::now(), &task_worker_id, LogAction::WorkerPanic, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                // Store the panic in MWFErr.
+                MWFErr::add_error_internal(&EntityID::Worker(task_worker_id.clone()), Some("on_init".into()), &panic_error).expect(MWFPanic::ErrorBuffer_AddErrorFailed.message());
+                // Log the panic in MWFLog
+                MWFLog::add_log(Instant::now(), &task_worker_id, LogAction::WorkerPanic, LogStatus::Error).expect(MWFPanic::LogBuffer_AddLogFailed.message());
 
-                let mut mmf_data_guard = MMF_WRK_DATA.write().expect(MMFPanic::MMFWrkData_WriteLockPoisoned.message());
-                let mmf_data = mmf_data_guard.as_mut().expect(MMFPanic::MMFWrkData_Missing.message());
+                let mut mmf_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
+                let mmf_data = mmf_data_guard.as_mut().expect(MWFPanic::MWFWrkData_Missing.message());
 
                 // Update the worker state.
-                mmf_data.worker_registry.set_worker_state(&task_worker_id, WorkerState::Panicked).expect(MMFPanic::Registry_workerMissing.message());
+                mmf_data.worker_registry.set_worker_state(&task_worker_id, WorkerState::Panicked).expect(MWFPanic::Registry_workerMissing.message());
 
                 // Remove the worker from the Registry.
-                mmf_data.worker_registry.remove_worker(&task_worker_id).expect(MMFPanic::Registry_workerMissing.message());
+                mmf_data.worker_registry.remove_worker(&task_worker_id).expect(MWFPanic::Registry_workerMissing.message());
 
                 drop(mmf_data_guard);
 
                 // Wake up all waiters interested in worker
                 // shutdown events.
-                MMF_WRK_CLOSE_NOTIFY.notify_waiters();
+                MWF_WRK_CLOSE_NOTIFY.notify_waiters();
             }
         }
     })
@@ -180,19 +180,19 @@ async fn execute_message(worker: &mut Box<dyn Worker + Send>, worker_id: &Worker
     let sender_id = message.sender_id.clone();
     let message_id = message.message_id.clone();
 
-    MMFLog::add_log(action_start_timer, worker_id, log_action.clone(), LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+    MWFLog::add_log(action_start_timer, worker_id, log_action.clone(), LogStatus::Start).expect(MWFPanic::LogBuffer_AddLogFailed.message());
 
     let result = worker.on_message(message).await;
 
     match &result {
         Ok(()) => {
-            MMFLog::add_log(action_start_timer, worker_id, log_action, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+            MWFLog::add_log(action_start_timer, worker_id, log_action, LogStatus::Ok).expect(MWFPanic::LogBuffer_AddLogFailed.message());
         }
 
         Err(error) => {
             let error_context = format!("on_message -> MessageID={}, SenderID={}", message_id, sender_id);
-            MMFErr::add_error_internal(&EntityID::Worker(worker_id.to_owned()), Some(error_context), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
-            MMFLog::add_log(action_start_timer, worker_id, log_action, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+            MWFErr::add_error_internal(&EntityID::Worker(worker_id.to_owned()), Some(error_context), error).expect(MWFPanic::ErrorBuffer_AddErrorFailed.message());
+            MWFLog::add_log(action_start_timer, worker_id, log_action, LogStatus::Error).expect(MWFPanic::LogBuffer_AddLogFailed.message());
         }
     }
     result
@@ -244,13 +244,13 @@ async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: Wo
 
                 command = priority_receiver_channel.recv() => {
                     pending_commands.push_priority(
-                        command.expect(MMFPanic::Worker_PriorityChannelClosed.message())
+                        command.expect(MWFPanic::Worker_PriorityChannelClosed.message())
                     );
                 }
 
                 command = normal_receiver_channel.recv() => {
                     pending_commands.push_normal(
-                        command.expect(MMFPanic::Worker_NormalChannelClosed.message())
+                        command.expect(MWFPanic::Worker_NormalChannelClosed.message())
                     );
                 }
             }
@@ -267,19 +267,19 @@ async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: Wo
         }
 
         // Execute the next scheduled command.
-        let command = pending_commands.pop_next().expect(MMFPanic::Worker_PendingCommandsEmpty.message());
+        let command = pending_commands.pop_next().expect(MWFPanic::Worker_PendingCommandsEmpty.message());
 
         match command {
             // Execute worker initialization.
             //
-            // MMF has already changed the worker state from
+            // MWF has already changed the worker state from
             // Created to Initializing before sending this command.
             //
             // WorkerTask is responsible for marking the worker
             // as Initialized only after on_init() completes.
             WorkerCommand::Init { lifecycle_data } => {
                 let action_start_timer = Instant::now();
-                MMFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerInit, LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerInit, LogStatus::Start).expect(MWFPanic::LogBuffer_AddLogFailed.message());
 
                 let result_init = worker.on_init(worker_id.clone(), parent_id.clone(), lifecycle_data).await;
 
@@ -287,24 +287,24 @@ async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: Wo
                 //
                 // The worker is now fully initialized and can
                 // receive business messages.
-                let mut mmf_data_guard = MMF_WRK_DATA.write().expect(MMFPanic::MMFWrkData_WriteLockPoisoned.message());
-                let mmf_data = mmf_data_guard.as_mut().expect(MMFPanic::MMFWrkData_Missing.message());
+                let mut mmf_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
+                let mmf_data = mmf_data_guard.as_mut().expect(MWFPanic::MWFWrkData_Missing.message());
                 match &result_init {
                     Ok(()) => {
-                        mmf_data.worker_registry.set_worker_state(&worker_id, WorkerState::Initialized).expect(MMFPanic::Registry_workerMissing.message());
-                        MMFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerInit, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                        mmf_data.worker_registry.set_worker_state(&worker_id, WorkerState::Initialized).expect(MWFPanic::Registry_workerMissing.message());
+                        MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerInit, LogStatus::Ok).expect(MWFPanic::LogBuffer_AddLogFailed.message());
                     }
                     Err(error) => {
-                        MMFErr::add_error_internal(&EntityID::new_worker(worker_id.clone()), Some("on_init".into()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
-                        mmf_data.worker_registry.set_worker_state(&worker_id, WorkerState::InitFailed).expect(MMFPanic::Registry_workerMissing.message());
-                        MMFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerInit, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                        MWFErr::add_error_internal(&EntityID::new_worker(worker_id.clone()), Some("on_init".into()), error).expect(MWFPanic::ErrorBuffer_AddErrorFailed.message());
+                        mmf_data.worker_registry.set_worker_state(&worker_id, WorkerState::InitFailed).expect(MWFPanic::Registry_workerMissing.message());
+                        MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerInit, LogStatus::Error).expect(MWFPanic::LogBuffer_AddLogFailed.message());
                     }
                 }
                 drop(mmf_data_guard);
 
                 // Wake up all waiters interested in worker
                 // initialization events.
-                MMF_WRK_INIT_NOTIFY.notify_waiters();
+                MWF_WRK_INIT_NOTIFY.notify_waiters();
             }
 
             // Execute a business message.
@@ -321,7 +321,7 @@ async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: Wo
 
             // Execute a business message.
             //
-            // MMF is blocked waiting for confirmation that on_message()
+            // MWF is blocked waiting for confirmation that on_message()
             // has completed.
             //
             // Messages are processed through the same FIFO queue
@@ -338,14 +338,14 @@ async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: Wo
 
             // Execute worker shutdown.
             //
-            // MMF has already changed the worker state from
+            // MWF has already changed the worker state from
             // Initialized to Closing before sending this command.
             //
             // WorkerTask is responsible for removing the worker
             // from the Registry only after on_close() completes.
             WorkerCommand::Close { lifecycle_data } => {
                 let action_start_timer = Instant::now();
-                MMFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerClose, LogStatus::Start).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerClose, LogStatus::Start).expect(MWFPanic::LogBuffer_AddLogFailed.message());
 
                 let result_close = worker.on_close(lifecycle_data).await;
 
@@ -353,23 +353,23 @@ async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: Wo
                 //
                 // Closed indicates that the worker lifecycle
                 // completed successfully.
-                let mut mmf_data_guard = MMF_WRK_DATA.write().expect(MMFPanic::MMFWrkData_WriteLockPoisoned.message());
-                let mmf_data = mmf_data_guard.as_mut().expect(MMFPanic::MMFWrkData_Missing.message());
+                let mut mmf_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
+                let mmf_data = mmf_data_guard.as_mut().expect(MWFPanic::MWFWrkData_Missing.message());
                 match &result_close {
                     Ok(()) => {
-                        mmf_data.worker_registry.set_worker_state(&worker_id, WorkerState::Closed).expect(MMFPanic::Registry_workerMissing.message());
-                        MMFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerClose, LogStatus::Ok).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                        mmf_data.worker_registry.set_worker_state(&worker_id, WorkerState::Closed).expect(MWFPanic::Registry_workerMissing.message());
+                        MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerClose, LogStatus::Ok).expect(MWFPanic::LogBuffer_AddLogFailed.message());
                         // Remove the worker from the Registry.
                         //
                         // Once removed, the worker is no longer visible
-                        // to MMF and cannot receive new commands.
-                        mmf_data.worker_registry.remove_worker(&worker_id).expect(MMFPanic::Registry_workerMissing.message());
-                        let _ = MMFLog::remove_logged_worker(&worker_id);
+                        // to MWF and cannot receive new commands.
+                        mmf_data.worker_registry.remove_worker(&worker_id).expect(MWFPanic::Registry_workerMissing.message());
+                        let _ = MWFLog::remove_logged_worker(&worker_id);
                     }
                     Err(error) => {
-                        MMFErr::add_error_internal(&EntityID::new_worker(worker_id.clone()), Some("on_close".into()), error).expect(MMFPanic::ErrorBuffer_AddErrorFailed.message());
-                        mmf_data.worker_registry.set_worker_state(&worker_id, WorkerState::CloseFailed).expect(MMFPanic::Registry_workerMissing.message());
-                        MMFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerClose, LogStatus::Error).expect(MMFPanic::LogBuffer_AddLogFailed.message());
+                        MWFErr::add_error_internal(&EntityID::new_worker(worker_id.clone()), Some("on_close".into()), error).expect(MWFPanic::ErrorBuffer_AddErrorFailed.message());
+                        mmf_data.worker_registry.set_worker_state(&worker_id, WorkerState::CloseFailed).expect(MWFPanic::Registry_workerMissing.message());
+                        MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerClose, LogStatus::Error).expect(MWFPanic::LogBuffer_AddLogFailed.message());
                     }
                 }
 
@@ -377,7 +377,7 @@ async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: Wo
 
                 // Wake up all waiters interested in worker
                 // shutdown events.
-                MMF_WRK_CLOSE_NOTIFY.notify_waiters();
+                MWF_WRK_CLOSE_NOTIFY.notify_waiters();
 
                 // Terminate the Tokio task associated with
                 // this worker.

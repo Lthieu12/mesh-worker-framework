@@ -1,4 +1,4 @@
-//! MMF communication channels and commands.
+//! MWF communication channels and commands.
 //!
 //! This file defines the channel types used to communicate
 //! with WorkerTasks.
@@ -11,16 +11,16 @@
 //! and processed before normal commands using a LIFO policy.
 //!
 //! This guarantees that commands are processed by a worker in the
-//! same order they are accepted by MMF.
+//! same order they are accepted by MWF.
 
 use bytes::Bytes;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-use crate::framework_error::{MMFError, MMFPanic, WorkerError};
+use crate::framework_error::{MWFError, MWFPanic, WorkerError};
 use crate::message::{MessageID, WorkerMessage};
-use crate::mmf::MMF_WRK_DATA;
+use crate::mmf::MWF_WRK_DATA;
 use crate::worker::{EntityID, WorkerID, WorkerState};
 
 pub(crate) type WorkerSenderChannel = Sender<WorkerCommand>;
@@ -68,27 +68,27 @@ impl WorkerCommand {
 ///
 /// The sender and receiver states are validated before the
 /// channel is returned.
-pub(crate) fn get_sender_channel(sender_id: &EntityID, receiver_id: &WorkerID, channel: WorkerChannel) -> Result<WorkerSenderChannel, MMFError> {
+pub(crate) fn get_sender_channel(sender_id: &EntityID, receiver_id: &WorkerID, channel: WorkerChannel) -> Result<WorkerSenderChannel, MWFError> {
     let sender_channel: WorkerNormalSenderChannel = {
-        // Read MMF data.
+        // Read MWF data.
         //
         // send_message() only requires a read lock because it does
         // not modify the Registry or workerState.
-        let mmf_data_guard = MMF_WRK_DATA.read().expect(MMFPanic::MMFWrkData_ReadLockPoisoned.message());
+        let mmf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
 
-        let mmf_data = mmf_data_guard.as_ref().ok_or(MMFError::Framework_NotInitialized)?;
+        let mmf_data = mmf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
 
         // Validate the sender.
         //
-        // MMF workers must be initialized before they can
-        // send messages through MMF.
+        // MWF workers must be initialized before they can
+        // send messages through MWF.
         //
         // External senders are not validated.
         match sender_id {
             EntityID::Worker(worker_id) => {
                 let worker_state = mmf_data.worker_registry.get_worker_state(worker_id)?;
                 if worker_state != WorkerState::Initialized {
-                    return Err(MMFError::Worker_NotInitialized);
+                    return Err(MWFError::Worker_NotInitialized);
                 }
             }
             EntityID::External(_) => {}
@@ -99,7 +99,7 @@ pub(crate) fn get_sender_channel(sender_id: &EntityID, receiver_id: &WorkerID, c
         // Messages can only be sent to initialized workers.
         let worker_state = mmf_data.worker_registry.get_worker_state(receiver_id)?;
         if worker_state != WorkerState::Initialized {
-            return Err(MMFError::Worker_NotInitialized);
+            return Err(MWFError::Worker_NotInitialized);
         }
 
         // Retrieve the communication channel associated with

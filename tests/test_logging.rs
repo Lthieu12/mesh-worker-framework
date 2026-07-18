@@ -1,9 +1,9 @@
-//! Verify proper behavior of MMFLog.
+//! Verify proper behavior of MWFLog.
 //!
 //! First test :
 //! Validate worker lifecycle logging.
 //!
-//! This test verifies that MMFLog records:
+//! This test verifies that MWFLog records:
 //! - workerSpawn
 //! - workerInit
 //! - workerClose
@@ -13,7 +13,7 @@
 //!
 //! Validate message reception logging.
 //!
-//! This test verifies that MMFLog records
+//! This test verifies that MWFLog records
 //! received messages with the correct:
 //! - sender_id
 //! - message_id
@@ -22,7 +22,7 @@
 //! - LogStatus
 //!
 //! Third test :
-//! Validate MMFLog circular buffer behavior.
+//! Validate MWFLog circular buffer behavior.
 //!
 //! This test verifies that:
 //! - old log events are overwritten when the buffer is full
@@ -36,28 +36,28 @@ use dev_support::dev_helper::*;
 use dev_support::simulation_worker::{SimulationBehavior, SimulationWorker, SimulationWorkerConfig};
 use mesh_worker_framework::*;
 
-// MMF uses a global runtime instance.
+// MWF uses a global runtime instance.
 // Integration tests must run serially.
 #[tokio::test]
 #[serial]
 async fn test_mmf_log_worker_lifecycle() {
-    MMF::init().unwrap();
-    MMF::register_worker_type::<SimulationWorker>().unwrap();
+    MWF::init().unwrap();
+    MWF::register_worker_type::<SimulationWorker>().unwrap();
 
-    MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
+    MWFLog::set_log_mode(LogMode::LogAll, None).unwrap();
 
-    let worker_id = MMFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
+    let worker_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MMFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
+    MWFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
 
-    MMFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
-    MMFWrk::close_worker(&worker_id, Bytes::new()).await.unwrap();
-    MMFWrk::wait_worker_close(&worker_id, Some(1000)).await.unwrap();
+    MWFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
+    MWFWrk::close_worker(&worker_id, Bytes::new()).await.unwrap();
+    MWFWrk::wait_worker_close(&worker_id, Some(1000)).await.unwrap();
 
-    let log_list = MMFLog::wait_log(None).await.unwrap();
+    let log_list = MWFLog::wait_log(None).await.unwrap();
 
     print_log_list().await;
 
@@ -81,34 +81,34 @@ async fn test_mmf_log_worker_lifecycle() {
     assert_eq!(log_list.log_event_list[3].log_status, LogStatus::Start);
     assert_eq!(log_list.log_event_list[4].log_status, LogStatus::Ok);
 
-    MMF::close().unwrap();
+    MWF::close().unwrap();
 }
 
-// MMF uses a global runtime instance.
+// MWF uses a global runtime instance.
 // Integration tests must run serially.
 #[tokio::test]
 #[serial]
 async fn test_mmf_log_messages() {
-    MMF::init().unwrap();
-    MMF::register_worker_type::<SimulationWorker>().unwrap();
+    MWF::init().unwrap();
+    MWF::register_worker_type::<SimulationWorker>().unwrap();
 
-    MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
+    MWFLog::set_log_mode(LogMode::LogAll, None).unwrap();
 
-    let worker_id = MMFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
+    let worker_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MMFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
-    MMFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
-    MMFWrk::send_message(&EntityID::new_external("Test"), &worker_id, "MSG_1", Bytes::new()).await.unwrap();
-    MMFWrk::send_priority_message(&EntityID::new_external("Test"), &worker_id, "MSG_2", Bytes::new()).await.unwrap();
-    MMFWrk::send_message_and_wait(&EntityID::new_external("Test"), &worker_id, "MSG_3", Bytes::new(), Some(1000)).await.unwrap();
-    MMFWrk::send_priority_message_and_wait(&EntityID::new_external("Test"), &worker_id, "MSG_4", Bytes::new(), Some(1000)).await.unwrap();
-    MMFWrk::close_worker(&worker_id, Bytes::new()).await.unwrap();
-    MMFWrk::wait_worker_close(&worker_id, Some(1000)).await.unwrap();
+    MWFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
+    MWFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
+    MWFWrk::send_message(&EntityID::new_external("Test"), &worker_id, "MSG_1", Bytes::new()).await.unwrap();
+    MWFWrk::send_priority_message(&EntityID::new_external("Test"), &worker_id, "MSG_2", Bytes::new()).await.unwrap();
+    MWFWrk::send_message_and_wait(&EntityID::new_external("Test"), &worker_id, "MSG_3", Bytes::new(), Some(1000)).await.unwrap();
+    MWFWrk::send_priority_message_and_wait(&EntityID::new_external("Test"), &worker_id, "MSG_4", Bytes::new(), Some(1000)).await.unwrap();
+    MWFWrk::close_worker(&worker_id, Bytes::new()).await.unwrap();
+    MWFWrk::wait_worker_close(&worker_id, Some(1000)).await.unwrap();
 
-    let log_list = MMFLog::wait_log(None).await.unwrap();
+    let log_list = MWFLog::wait_log(None).await.unwrap();
 
     let mut found_normal = false;
     let mut found_priority = false;
@@ -152,48 +152,48 @@ async fn test_mmf_log_messages() {
     assert!(found_wait);
     assert!(found_priority_wait);
 
-    MMF::close().unwrap();
+    MWF::close().unwrap();
 }
 
-// MMF uses a global runtime instance.
+// MWF uses a global runtime instance.
 // Integration tests must run serially.
 #[tokio::test]
 #[serial]
 async fn test_mmf_log_buffer_overflow() {
-    let config = MMFConfiguration { log_event_buffer_capacity: 10, ..Default::default() };
+    let config = MWFConfiguration { log_event_buffer_capacity: 10, ..Default::default() };
 
-    MMF::init_with_configuration(config).unwrap();
-    MMF::register_worker_type::<SimulationWorker>().unwrap();
+    MWF::init_with_configuration(config).unwrap();
+    MWF::register_worker_type::<SimulationWorker>().unwrap();
 
-    MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
+    MWFLog::set_log_mode(LogMode::LogAll, None).unwrap();
 
-    let worker_id = MMFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
+    let worker_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MMFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
+    MWFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
 
-    MMFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
+    MWFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
 
     // Consume all logs currently present.
-    let log_list = MMFLog::wait_log(None).await.unwrap();
+    let log_list = MWFLog::wait_log(None).await.unwrap();
 
     let last_log_instance_id = log_list.last_log_instance_id;
 
     // Generate more logs than the buffer can hold.
     for index in 0..15 {
-        MMFWrk::send_message(&EntityID::new_external("Test"), &worker_id, format!("MSG_{index}"), Bytes::new()).await.unwrap();
+        MWFWrk::send_message(&EntityID::new_external("Test"), &worker_id, format!("MSG_{index}"), Bytes::new()).await.unwrap();
     }
 
-    let log_list = MMFLog::wait_log(last_log_instance_id).await.unwrap();
+    let log_list = MWFLog::wait_log(last_log_instance_id).await.unwrap();
 
     assert_eq!(log_list.missing_log_count, 20);
 
     assert_eq!(log_list.log_event_list.len(), 10);
 
-    MMFWrk::close_worker(&worker_id, Bytes::new()).await.unwrap();
-    MMFWrk::wait_worker_close(&worker_id, Some(1000)).await.unwrap();
+    MWFWrk::close_worker(&worker_id, Bytes::new()).await.unwrap();
+    MWFWrk::wait_worker_close(&worker_id, Some(1000)).await.unwrap();
 
-    MMF::close().unwrap();
+    MWF::close().unwrap();
 }

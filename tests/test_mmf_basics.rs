@@ -1,4 +1,4 @@
-//! Validate MMF framework lifecycle operations.
+//! Validate MWF framework lifecycle operations.
 //!
 //! These tests verify framework initialization,
 //! shutdown and protection against invalid
@@ -13,31 +13,31 @@ mod tests {
 
     #[test]
     fn test_mmf_init_close() {
-        let info = MMF::get_info();
+        let info = MWF::get_info();
         println!("{}", info);
 
-        assert!(!MMF::is_initialized());
+        assert!(!MWF::is_initialized());
 
-        assert!(MMF::init().is_ok());
+        assert!(MWF::init().is_ok());
 
-        assert!(MMF::is_initialized());
+        assert!(MWF::is_initialized());
 
-        assert!(MMF::close().is_ok());
+        assert!(MWF::close().is_ok());
 
-        assert!(!MMF::is_initialized());
+        assert!(!MWF::is_initialized());
     }
 
     #[test]
     fn test_mmf_double_init() {
-        assert!(MMF::init().is_ok());
+        assert!(MWF::init().is_ok());
 
-        assert!(matches!(MMF::init(), Err(MMFError::Framework_AlreadyInitialized)));
+        assert!(matches!(MWF::init(), Err(MWFError::Framework_AlreadyInitialized)));
 
-        assert!(MMF::close().is_ok());
+        assert!(MWF::close().is_ok());
     }
 
     #[test]
     fn test_mmf_double_close() {
-        assert!(matches!(MMF::close(), Err(MMFError::Framework_NotInitialized)));
+        assert!(matches!(MWF::close(), Err(MWFError::Framework_NotInitialized)));
     }
 }

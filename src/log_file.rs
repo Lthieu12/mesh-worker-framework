@@ -1,17 +1,17 @@
-//! Internal MMF log file management.
+//! Internal MWF log file management.
 
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Error, Write};
 use std::path::{Path, PathBuf};
 
-use crate::framework_error::MMFError;
-use crate::mmf::MMFConfiguration;
+use crate::framework_error::MWFError;
+use crate::mmf::MWFConfiguration;
 use crate::mmf_log::{LogEvent, LogList, LogOutputFormat, LoggingData};
 
-/// Header written at the beginning of every MMF log file.
+/// Header written at the beginning of every MWF log file.
 ///
-/// This header allows MMF to distinguish its own log files
+/// This header allows MWF to distinguish its own log files
 /// from user-created files sharing the same name.
 const LOG_FILE_HEADER_V1: &str = "############################################################
 # Mesh Worker Framework Log File
@@ -23,12 +23,12 @@ const LOG_FILE_HEADER_V1: &str = "##############################################
 const LOG_FILE_FULL_MESSAGE: &str = "Maximum log file size reached.\n\
      File logging disabled.\n";
 
-/// Initializes the MMF log file.
+/// Initializes the MWF log file.
 ///
-/// Existing MMF log files are truncated.
-/// Existing non-MMF files are never modified.
-pub(crate) fn init_log_file(configuration: &mut MMFConfiguration) -> Result<File, MMFError> {
-    // Find a reusable MMF log file.
+/// Existing MWF log files are truncated.
+/// Existing non-MWF files are never modified.
+pub(crate) fn init_log_file(configuration: &mut MWFConfiguration) -> Result<File, MWFError> {
+    // Find a reusable MWF log file.
     configuration.log_file_path = find_log_file_path(&configuration.log_file_path)?;
 
     // Open and initialize the log file.
@@ -43,12 +43,12 @@ pub(crate) fn init_log_file(configuration: &mut MMFConfiguration) -> Result<File
     Ok(log_file)
 }
 
-/// Finds a reusable MMF log file.
+/// Finds a reusable MWF log file.
 ///
-/// If the requested file already exists but is not an MMF log
+/// If the requested file already exists but is not an MWF log
 /// file, numbered filenames are tried until a suitable file
 /// is found.
-fn find_log_file_path(log_file_path: &Path) -> Result<PathBuf, MMFError> {
+fn find_log_file_path(log_file_path: &Path) -> Result<PathBuf, MWFError> {
     let mut candidate_log_file_path = log_file_path.to_path_buf();
     let mut file_index = 1;
 
@@ -58,13 +58,13 @@ fn find_log_file_path(log_file_path: &Path) -> Result<PathBuf, MMFError> {
             return Ok(candidate_log_file_path);
         }
 
-        // Candidate log file belongs to MMF.
+        // Candidate log file belongs to MWF.
         if is_mmf_log_file(&candidate_log_file_path)? {
             return Ok(candidate_log_file_path);
         }
 
         // Build the next candidate log file path.
-        let mut file_name = log_file_path.file_stem().ok_or(MMFError::Logging_LogFileInvalidPath)?.to_os_string();
+        let mut file_name = log_file_path.file_stem().ok_or(MWFError::Logging_LogFileInvalidPath)?.to_os_string();
 
         file_name.push(format!("_{file_index}"));
 
@@ -79,8 +79,8 @@ fn find_log_file_path(log_file_path: &Path) -> Result<PathBuf, MMFError> {
     }
 }
 
-/// Returns whether the specified file is an MMF log file.
-fn is_mmf_log_file(log_file_path: &Path) -> Result<bool, MMFError> {
+/// Returns whether the specified file is an MWF log file.
+fn is_mmf_log_file(log_file_path: &Path) -> Result<bool, MWFError> {
     let log_file = File::open(log_file_path).map_err(|error| log_file_access_failed(error, log_file_path))?;
 
     let mut reader = BufReader::new(log_file);
@@ -101,12 +101,12 @@ fn is_mmf_log_file(log_file_path: &Path) -> Result<bool, MMFError> {
 }
 
 /// Creates a FrameworkError for a log file access failure.
-fn log_file_access_failed(error: Error, log_file_path: &Path) -> MMFError {
-    MMFError::Logging_LogFileAccessFailed(anyhow::Error::new(error).context(format!("Log file: {}", log_file_path.display(),)))
+fn log_file_access_failed(error: Error, log_file_path: &Path) -> MWFError {
+    MWFError::Logging_LogFileAccessFailed(anyhow::Error::new(error).context(format!("Log file: {}", log_file_path.display(),)))
 }
 
-/// Writes a log event to the MMF log file.
-pub(crate) fn write_log_event(logging_data: &mut LoggingData, log_event: &LogEvent) -> Result<(), MMFError> {
+/// Writes a log event to the MWF log file.
+pub(crate) fn write_log_event(logging_data: &mut LoggingData, log_event: &LogEvent) -> Result<(), MWFError> {
     // File logging is disabled.
     if !logging_data.log_file_enabled {
         return Ok(());

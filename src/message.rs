@@ -1,4 +1,4 @@
-//! Message definitions for MMF.
+//! Message definitions for MWF.
 //!
 //! This file contains the structures exchanged between workers.
 //! All communications within the framework are performed using
@@ -67,7 +67,7 @@ impl From<&MessageID> for MessageID {
 pub type MessageInstanceID = u64;
 
 #[derive(Debug, Clone)]
-/// Message exchanged between workers through MMF.
+/// Message exchanged between workers through MWF.
 pub struct WorkerMessage {
     /// Identifier of the sender entity.
     pub sender_id: EntityID,

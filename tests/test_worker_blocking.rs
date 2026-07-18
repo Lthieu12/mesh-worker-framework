@@ -1,4 +1,4 @@
-//! Tests for MMF blocking task helpers.
+//! Tests for MWF blocking task helpers.
 
 use serial_test::serial;
 
@@ -7,26 +7,26 @@ use mesh_worker_framework::*;
 #[tokio::test]
 #[serial]
 async fn test_spawn_blocking_ok() {
-    MMF::init().unwrap();
+    MWF::init().unwrap();
 
-    let result = MMFWrk::spawn_blocking(|| 42).await.unwrap();
+    let result = MWFWrk::spawn_blocking(|| 42).await.unwrap();
 
     assert_eq!(result, 42);
 
-    MMF::close().unwrap();
+    MWF::close().unwrap();
 }
 
 #[tokio::test]
 #[serial]
 async fn test_spawn_blocking_panic() {
-    MMF::init().unwrap();
+    MWF::init().unwrap();
 
-    let result = MMFWrk::spawn_blocking(|| {
+    let result = MWFWrk::spawn_blocking(|| {
         panic!("Blocking task panic");
     })
     .await;
 
-    assert!(matches!(result, Err(MMFError::BlockingTask_Failed(_))));
+    assert!(matches!(result, Err(MWFError::BlockingTask_Failed(_))));
 
-    MMF::close().unwrap();
+    MWF::close().unwrap();
 }

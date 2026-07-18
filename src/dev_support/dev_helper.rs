@@ -4,11 +4,11 @@
 //! examples, integration tests and runtime stress tests.
 //!
 //! These helpers are intended for development only and
-//! are not part of the MMF runtime itself.
+//! are not part of the MWF runtime itself.
 
-use crate::MMFErr;
-use crate::MMFLog;
-use crate::MMFWrk;
+use crate::MWFErr;
+use crate::MWFLog;
+use crate::MWFWrk;
 
 use crate::message::{MessageID, MessageInstanceID};
 use crate::mmf_log::{LogAction, LogEvent, LogList, LogStatus};
@@ -16,19 +16,19 @@ use crate::worker::{EntityID, WorkerID};
 
 #[allow(dead_code)]
 pub fn print_worker_list() {
-    let worker_list = MMFWrk::get_worker_info_list().unwrap();
+    let worker_list = MWFWrk::get_worker_info_list().unwrap();
     println!("{worker_list}");
 }
 
 #[allow(dead_code)]
 pub async fn print_log_list() {
-    let log_list = MMFLog::wait_log(None).await.unwrap();
+    let log_list = MWFLog::wait_log(None).await.unwrap();
     println!("{log_list}");
 }
 
 #[allow(dead_code)]
 pub async fn print_error_list() {
-    let error_list = MMFErr::wait_error(None).await.unwrap();
+    let error_list = MWFErr::wait_error(None).await.unwrap();
     println!("{error_list}");
 }
 

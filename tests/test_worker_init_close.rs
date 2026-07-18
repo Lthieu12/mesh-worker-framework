@@ -11,61 +11,61 @@ use serial_test::serial;
 use dev_support::simulation_worker::{SimulationBehavior, SimulationWorker, SimulationWorkerConfig};
 use mesh_worker_framework::*;
 
-// MMF uses a global runtime instance.
+// MWF uses a global runtime instance.
 // Integration tests must run serially.
 #[tokio::test]
 #[serial]
 async fn test_worker_init_failed() {
-    MMF::init().unwrap();
+    MWF::init().unwrap();
 
-    let result = MMFWrk::spawn_worker("SimulationWorker", &EntityID::new_external("MAIN"));
+    let result = MWFWrk::spawn_worker("SimulationWorker", &EntityID::new_external("MAIN"));
 
-    assert!(matches!(result, Err(MMFError::WorkerType_NotRegistered)));
+    assert!(matches!(result, Err(MWFError::WorkerType_NotRegistered)));
 
-    MMF::register_worker_type::<SimulationWorker>().unwrap();
+    MWF::register_worker_type::<SimulationWorker>().unwrap();
 
-    let worker_id = MMFWrk::spawn_worker("SimulationWorker", &EntityID::new_external("MAIN")).unwrap();
+    let worker_id = MWFWrk::spawn_worker("SimulationWorker", &EntityID::new_external("MAIN")).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Init_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MMFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
+    MWFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
 
-    let worker_id = MMFWrk::wait_worker_list_init(&vec![worker_id.clone()], Some(1000)).await;
+    let worker_id = MWFWrk::wait_worker_list_init(&vec![worker_id.clone()], Some(1000)).await;
     println!("Result: {:?}", worker_id);
-    assert!(matches!(worker_id, Err(MMFError::Worker_InitializationFailed)));
+    assert!(matches!(worker_id, Err(MWFError::Worker_InitializationFailed)));
 
-    MMFWrk::abort_children(&EntityID::new_external("MAIN")).unwrap();
+    MWFWrk::abort_children(&EntityID::new_external("MAIN")).unwrap();
 
-    MMF::close().unwrap();
+    MWF::close().unwrap();
 }
 
-// MMF uses a global runtime instance.
+// MWF uses a global runtime instance.
 // Integration tests must run serially.
 #[tokio::test]
 #[serial]
 async fn test_worker_close_failed() {
-    MMF::init().unwrap();
+    MWF::init().unwrap();
 
-    MMF::register_worker_type::<SimulationWorker>().unwrap();
+    MWF::register_worker_type::<SimulationWorker>().unwrap();
 
-    let worker_id = MMFWrk::spawn_worker("SimulationWorker", &EntityID::new_external("MAIN")).unwrap();
+    let worker_id = MWFWrk::spawn_worker("SimulationWorker", &EntityID::new_external("MAIN")).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Close_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MMFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
+    MWFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
 
-    MMFWrk::wait_worker_list_init(&vec![worker_id.clone()], Some(1000)).await.unwrap();
+    MWFWrk::wait_worker_list_init(&vec![worker_id.clone()], Some(1000)).await.unwrap();
 
-    MMFWrk::close_worker(&worker_id, Bytes::new()).await.unwrap();
+    MWFWrk::close_worker(&worker_id, Bytes::new()).await.unwrap();
 
-    let result = MMFWrk::wait_worker_list_close(&vec![worker_id.clone()], Some(1000)).await;
+    let result = MWFWrk::wait_worker_list_close(&vec![worker_id.clone()], Some(1000)).await;
 
     println!("Result: {:?}", result);
-    assert!(matches!(result, Err(MMFError::Worker_CloseFailed)));
+    assert!(matches!(result, Err(MWFError::Worker_CloseFailed)));
 
-    MMFWrk::abort_children(&EntityID::new_external("MAIN")).unwrap();
+    MWFWrk::abort_children(&EntityID::new_external("MAIN")).unwrap();
 
-    MMF::close().unwrap();
+    MWF::close().unwrap();
 }

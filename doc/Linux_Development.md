@@ -4,13 +4,13 @@
 
 The goal of this setup is to provide a **native Linux development and verification environment** alongside the existing Windows environment, without using a dual boot or a traditional virtual machine.
 
-This environment will allow MMF to:
+This environment will allow MWF to:
 
 * Compile with the native Linux Rust toolchain.
 * Run unit tests under Linux.
 * Run documentation tests (`cargo test --doc`).
 * Compile all examples.
-* Verify that MMF remains fully cross-platform (Windows + Linux).
+* Verify that MWF remains fully cross-platform (Windows + Linux).
 * Execute a future validation script that will automatically run all Windows checks followed by the Linux checks.
 
 WSL2 provides a lightweight Linux environment fully integrated into Windows while keeping the existing development workflow unchanged.
@@ -212,7 +212,7 @@ The development machine now provides:
 * Native Linux compilation
 * Native Linux testing
 
-At this point, MMF can be compiled and tested on both supported operating systems.
+At this point, MWF can be compiled and tested on both supported operating systems.
 
 ---
 
@@ -237,4 +237,4 @@ The script will:
    * `cargo test --doc`
    * `cargo build --examples`
 
-This provides a single command capable of validating MMF on both officially supported platforms before each release.
+This provides a single command capable of validating MWF on both officially supported platforms before each release.

@@ -1,13 +1,13 @@
 //! Framework error definitions.
 //!
-//! This file contains all errors that can be returned by MMF public APIs.
+//! This file contains all errors that can be returned by MWF public APIs.
 
 use std::error::Error;
 use std::fmt;
 
 pub type WorkerError = anyhow::Error;
 
-/// Errors returned by MMF functions.
+/// Errors returned by MWF functions.
 ///
 /// Naming convention:
 /// - Category_Error
@@ -17,7 +17,7 @@ pub type WorkerError = anyhow::Error;
 ///   - worker_ChannelClosed
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
-pub enum MMFError {
+pub enum MWFError {
     /// The operation timed out.
     Operation_Timeout,
 
@@ -98,96 +98,96 @@ pub enum MMFError {
 }
 
 /// Human-readable representation of FrameworkError.
-impl fmt::Display for MMFError {
+impl fmt::Display for MWFError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            MMFError::Operation_Timeout => write!(f, "The operation timed out."),
+            MWFError::Operation_Timeout => write!(f, "The operation timed out."),
 
-            MMFError::Framework_NotInitialized => {
+            MWFError::Framework_NotInitialized => {
                 write!(f, "The framework has not been initialized.")
             }
 
-            MMFError::Framework_AlreadyInitialized => {
+            MWFError::Framework_AlreadyInitialized => {
                 write!(f, "The framework is already initialized.")
             }
 
-            MMFError::Framework_CannotClose_workersStillRunning => {
+            MWFError::Framework_CannotClose_workersStillRunning => {
                 write!(f, "The framework shutdown failed: one or more workers are still running.")
             }
 
-            MMFError::WorkerType_NotFound => {
+            MWFError::WorkerType_NotFound => {
                 write!(f, "The requested worker type was not found.")
             }
 
-            MMFError::WorkerType_DuplicateWorkerTypeID => {
+            MWFError::WorkerType_DuplicateWorkerTypeID => {
                 write!(f, "WorkerTypeID is already used by another worker type.")
             }
 
-            MMFError::WorkerType_AlreadyRegistered => {
+            MWFError::WorkerType_AlreadyRegistered => {
                 write!(f, "The requested worker type is already registered.")
             }
 
-            MMFError::WorkerType_NotRegistered => {
+            MWFError::WorkerType_NotRegistered => {
                 write!(f, "The requested worker type has not been registered.")
             }
 
-            MMFError::Worker_InitializationFailed => {
+            MWFError::Worker_InitializationFailed => {
                 write!(f, "A worker failed during its initialization.")
             }
 
-            MMFError::Worker_NotFound => write!(f, "The requested worker was not found."),
+            MWFError::Worker_NotFound => write!(f, "The requested worker was not found."),
 
-            MMFError::Worker_CloseFailed => write!(f, "A worker failed during its closing."),
+            MWFError::Worker_CloseFailed => write!(f, "A worker failed during its closing."),
 
-            MMFError::Worker_ChannelClosed => {
+            MWFError::Worker_ChannelClosed => {
                 write!(f, "A worker communication channel is closed.")
             }
 
-            MMFError::Worker_AlreadyExists => {
+            MWFError::Worker_AlreadyExists => {
                 write!(f, "The requested worker already exists.")
             }
 
-            MMFError::Worker_AlreadyInitialized => {
+            MWFError::Worker_AlreadyInitialized => {
                 write!(f, "The requested worker is already initialized.")
             }
 
-            MMFError::Worker_NotInitialized => {
+            MWFError::Worker_NotInitialized => {
                 write!(f, "The requested worker has not been initialized.")
             }
 
-            MMFError::Worker_Panicked(panic_message) => {
+            MWFError::Worker_Panicked(panic_message) => {
                 write!(f, "A worker has panicked: {}", panic_message)
             }
 
-            MMFError::Worker_MessageError(error) => {
+            MWFError::Worker_MessageError(error) => {
                 write!(f, "Worker message processing failed: {}", error)
             }
 
-            MMFError::ParentWorker_NotFound => {
+            MWFError::ParentWorker_NotFound => {
                 write!(f, "The requested father worker was not found.")
             }
 
-            MMFError::Message_InstanceIDExhausted => {
+            MWFError::Message_InstanceIDExhausted => {
                 write!(f, "MessageInstanceID counter exhausted.")
             }
 
-            MMFError::Error_InstanceIDExhausted => {
+            MWFError::Error_InstanceIDExhausted => {
                 write!(f, "ErrorInstanceID counter exhausted.")
             }
 
-            MMFError::Logging_InstanceIDExhausted => {
+            MWFError::Logging_InstanceIDExhausted => {
                 write!(f, "LoggingInstanceID counter exhausted.")
             }
 
-            MMFError::Logging_LogFileInvalidPath => {
+            MWFError::Logging_LogFileInvalidPath => {
                 write!(f, "Invalid log file path.")
             }
 
-            MMFError::Logging_LogFileAccessFailed(error) => {
+            MWFError::Logging_LogFileAccessFailed(error) => {
                 write!(f, "Failed to access to log file: {}", error)
             }
 
-            MMFError::BlockingTask_Failed(error) => {
+            MWFError::BlockingTask_Failed(error) => {
                 write!(f, "Blocking task execution failed: {}", error)
             }
         }
@@ -195,78 +195,78 @@ impl fmt::Display for MMFError {
 }
 
 /// Standard Rust error implementation for FrameworkError.
-impl Error for MMFError {}
+impl Error for MWFError {}
 
-/// Panic errors of MMF.
+/// Panic errors of MWF.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[allow(non_camel_case_types)]
-pub(crate) enum MMFPanic {
+pub(crate) enum MWFPanic {
     Worker_PriorityChannelClosed,
     Worker_NormalChannelClosed,
     Worker_PendingCommandsEmpty,
 
-    MMFData_ReadLockPoisoned,
-    MMFData_WriteLockPoisoned,
+    MWFData_ReadLockPoisoned,
+    MWFData_WriteLockPoisoned,
 
-    MMFWrkData_ReadLockPoisoned,
-    MMFWrkData_WriteLockPoisoned,
-    MMFWrkData_Missing,
+    MWFWrkData_ReadLockPoisoned,
+    MWFWrkData_WriteLockPoisoned,
+    MWFWrkData_Missing,
 
     Registry_workerMissing,
 
     worker_JoinHandleMissing,
 
-    MMFErrData_ReadLockPoisoned,
-    MMFErrData_WriteLockPoisoned,
+    MWFErrData_ReadLockPoisoned,
+    MWFErrData_WriteLockPoisoned,
 
     ErrorBuffer_Inconsistency,
     ErrorBuffer_AddErrorFailed,
 
-    MMFLogData_ReadLockPoisoned,
-    MMFLogData_WriteLockPoisoned,
+    MWFLogData_ReadLockPoisoned,
+    MWFLogData_WriteLockPoisoned,
 
     LogBuffer_Inconsistency,
     LogBuffer_AddLogFailed,
 }
 
-impl MMFPanic {
+impl MWFPanic {
     pub(crate) fn message(&self) -> &'static str {
         match self {
-            MMFPanic::Worker_PriorityChannelClosed => "Internal MMF error: worker priority command channel unexpectedly closed.",
+            MWFPanic::Worker_PriorityChannelClosed => "Internal MWF error: worker priority command channel unexpectedly closed.",
 
-            MMFPanic::Worker_NormalChannelClosed => "Internal MMF error: worker normal command channel unexpectedly closed.",
+            MWFPanic::Worker_NormalChannelClosed => "Internal MWF error: worker normal command channel unexpectedly closed.",
 
-            MMFPanic::Worker_PendingCommandsEmpty => "Internal MMF error: worker pending commands cannot be empty.",
+            MWFPanic::Worker_PendingCommandsEmpty => "Internal MWF error: worker pending commands cannot be empty.",
 
-            MMFPanic::MMFData_ReadLockPoisoned => "Internal MMF error: MMF_DATA read lock poisoned.",
+            MWFPanic::MWFData_ReadLockPoisoned => "Internal MWF error: MWF_DATA read lock poisoned.",
 
-            MMFPanic::MMFData_WriteLockPoisoned => "Internal MMF error: MMF_DATA write lock poisoned.",
+            MWFPanic::MWFData_WriteLockPoisoned => "Internal MWF error: MWF_DATA write lock poisoned.",
 
-            MMFPanic::MMFWrkData_ReadLockPoisoned => "Internal MMF error: MMFWrk_DATA read lock poisoned.",
+            MWFPanic::MWFWrkData_ReadLockPoisoned => "Internal MWF error: MWFWrk_DATA read lock poisoned.",
 
-            MMFPanic::MMFWrkData_WriteLockPoisoned => "Internal MMF error: MMFWrk_DATA write lock poisoned.",
+            MWFPanic::MWFWrkData_WriteLockPoisoned => "Internal MWF error: MWFWrk_DATA write lock poisoned.",
 
-            MMFPanic::MMFWrkData_Missing => "Internal MMF error: MMFWrk_DATA is unexpectedly missing",
+            MWFPanic::MWFWrkData_Missing => "Internal MWF error: MWFWrk_DATA is unexpectedly missing",
 
-            MMFPanic::Registry_workerMissing => "Internal MMF error: worker unexpectedly missing in registry.",
+            MWFPanic::Registry_workerMissing => "Internal MWF error: worker unexpectedly missing in registry.",
 
-            MMFPanic::worker_JoinHandleMissing => "Internal MMF error: JoinHandle unexpectedly missing.",
+            MWFPanic::worker_JoinHandleMissing => "Internal MWF error: JoinHandle unexpectedly missing.",
 
-            MMFPanic::MMFErrData_ReadLockPoisoned => "Internal MMF error: MMFErr_DATA read lock poisoned.",
+            MWFPanic::MWFErrData_ReadLockPoisoned => "Internal MWF error: MWFErr_DATA read lock poisoned.",
 
-            MMFPanic::MMFErrData_WriteLockPoisoned => "Internal MMF error: MMFErr_DATA write lock poisoned.",
+            MWFPanic::MWFErrData_WriteLockPoisoned => "Internal MWF error: MWFErr_DATA write lock poisoned.",
 
-            MMFPanic::ErrorBuffer_Inconsistency => "Internal MMF error: error buffer is inconsistent.",
+            MWFPanic::ErrorBuffer_Inconsistency => "Internal MWF error: error buffer is inconsistent.",
 
-            MMFPanic::ErrorBuffer_AddErrorFailed => "Internal MMF error: add error to buffer unexpectedly failed.",
+            MWFPanic::ErrorBuffer_AddErrorFailed => "Internal MWF error: add error to buffer unexpectedly failed.",
 
-            MMFPanic::MMFLogData_ReadLockPoisoned => "Internal MMF error: MMFLog_DATA read lock poisoned.",
+            MWFPanic::MWFLogData_ReadLockPoisoned => "Internal MWF error: MWFLog_DATA read lock poisoned.",
 
-            MMFPanic::MMFLogData_WriteLockPoisoned => "Internal MMF error: MMFLog_DATA write lock poisoned.",
+            MWFPanic::MWFLogData_WriteLockPoisoned => "Internal MWF error: MWFLog_DATA write lock poisoned.",
 
-            MMFPanic::LogBuffer_Inconsistency => "Internal MMF error: logging buffer is inconsistent.",
+            MWFPanic::LogBuffer_Inconsistency => "Internal MWF error: logging buffer is inconsistent.",
 
-            MMFPanic::LogBuffer_AddLogFailed => "Internal MMF error: add log to buffer unexpectedly failed.",
+            MWFPanic::LogBuffer_AddLogFailed => "Internal MWF error: add log to buffer unexpectedly failed.",
         }
     }
 }

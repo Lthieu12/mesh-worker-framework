@@ -1,8 +1,8 @@
-# Mesh Worker Framework (MMF)
+# Mesh Worker Framework (MWF)
 
-## 1. Why MMF?
+## 1. Why MWF?
 
-Mesh Worker Framework (MMF) is a Rust Tokio/Futures-based runtime for building applications composed of long-running software workers that communicate through asynchronous messages.
+Mesh Worker Framework (MWF) is a Rust Tokio/Futures-based runtime for building applications composed of long-running software workers that communicate through asynchronous messages.
 
 Typical applications include:
 
@@ -12,7 +12,7 @@ Typical applications include:
 - Robotics
 - Data acquisition systems
 
-Unlike general-purpose actor frameworks, MMF focuses on:
+Unlike general-purpose actor frameworks, MWF focuses on:
 
 - Deterministic execution
 - Explicit worker lifecycle management
@@ -24,10 +24,10 @@ Unlike general-purpose actor frameworks, MMF focuses on:
 - Centralized logging and diagnostics
 - Cross-platform support (Windows and Linux)
 
-MMF intentionally remains application-agnostic. Business concepts such as workflows, measurements and calculations are left outside the framework.
+MWF intentionally remains application-agnostic. Business concepts such as workflows, measurements and calculations are left outside the framework.
 
 ```text
-                          MMF
+                          MWF
                Framework Entry Point
       (Initialization / Shutdown / Configuration)
 
@@ -36,7 +36,7 @@ MMF intentionally remains application-agnostic. Business concepts such as workfl
          │                   │                   │
          ▼                   ▼                   ▼
  +----------------+   +----------------+   +----------------+
- |     MMFWrk     |   |     MMFLog     |   |     MMFErr     |
+ |     MWFWrk     |   |     MWFLog     |   |     MWFErr     |
  +----------------+   +----------------+   +----------------+
  | Messaging      |   | Log events     |   | Error events   |
  | Lifecycle      |   | Monitoring     |   | Monitoring     |
@@ -44,14 +44,14 @@ MMF intentionally remains application-agnostic. Business concepts such as workfl
  +----------------+   +----------------+   +----------------+
 ```
 
-Throughout this documentation, "Worker" always refers to an MMF runtime worker, not a text language worker.
+Throughout this documentation, "Worker" always refers to an MWF runtime worker, not a text language worker.
 
 ---
 
 ## 2. Quick Start
 
 The complete, compiled version of this example is available in `examples/getting_started`.
-It demonstrates the recommended way to initialize MMF, register a worker type, spawn a worker, exchange messages and gracefully shut down the framework.
+It demonstrates the recommended way to initialize MWF, register a worker type, spawn a worker, exchange messages and gracefully shut down the framework.
 
 ```rust,ignore
 use bytes::Bytes;
@@ -63,40 +63,40 @@ use mesh_worker_framework::*;
 mod workers;
 use workers::demo_worker::{DemoMessages, DemoWorker};
 
-// Tokio provides the async runtime used by MMF.
+// Tokio provides the async runtime used by MWF.
 #[tokio::main]
-async fn main() -> Result<(), MMFError> {
+async fn main() -> Result<(), MWFError> {
     let main_entity = EntityID::new_external("MAIN");
 
-    // Initialize MMF.
-    MMF::init()?;
+    // Initialize MWF.
+    MWF::init()?;
 
     // Register available worker types.
-    MMF::register_worker_type::<DemoWorker>()?;
+    MWF::register_worker_type::<DemoWorker>()?;
 
     // Create the worker.
-    let demo_worker_id = MMFWrk::spawn_worker("DemoWorker", &main_entity)?;
+    let demo_worker_id = MWFWrk::spawn_worker("DemoWorker", &main_entity)?;
 
     // Initialize it.
-    MMFWrk::init_worker(&demo_worker_id, Bytes::new()).await?;
-    MMFWrk::wait_worker_init(&demo_worker_id, None).await?;
+    MWFWrk::init_worker(&demo_worker_id, Bytes::new()).await?;
+    MWFWrk::wait_worker_init(&demo_worker_id, None).await?;
 
     // Send a few messages.
-    MMFWrk::send_message(&main_entity, &demo_worker_id, DemoMessages::QUICK_CALCULATION, Bytes::new()).await?;
-    MMFWrk::send_message(&main_entity, &demo_worker_id, DemoMessages::LONG_CALCULATION, Bytes::new()).await?;
+    MWFWrk::send_message(&main_entity, &demo_worker_id, DemoMessages::QUICK_CALCULATION, Bytes::new()).await?;
+    MWFWrk::send_message(&main_entity, &demo_worker_id, DemoMessages::LONG_CALCULATION, Bytes::new()).await?;
 
     // Close the worker.
-    MMFWrk::close_worker(&demo_worker_id, Bytes::new()).await?;
-    MMFWrk::wait_worker_close(&demo_worker_id, None).await?;
+    MWFWrk::close_worker(&demo_worker_id, Bytes::new()).await?;
+    MWFWrk::wait_worker_close(&demo_worker_id, None).await?;
 
     // Shutdown.
-    MMF::close()?;
+    MWF::close()?;
 
     Ok(())
 }
 ```
 
-The following DemoWorker implementation, available in `examples/getting_started/workers/demo_worker.rs`, is used by the previous example and illustrates the minimum implementation required to create an MMF worker.
+The following DemoWorker implementation, available in `examples/getting_started/workers/demo_worker.rs`, is used by the previous example and illustrates the minimum implementation required to create an MWF worker.
 
 ```rust,ignore
 use std::time::Duration;
@@ -119,7 +119,7 @@ pub struct DemoWorker {
     parent_id: Option<EntityID>,
 }
 
-/// MMF worker implementation for DemoWorker.
+/// MWF worker implementation for DemoWorker.
 #[async_trait]
 impl Worker for DemoWorker {
     fn worker_type_id() -> WorkerTypeID {
@@ -149,7 +149,7 @@ impl Worker for DemoWorker {
 
             DemoMessages::LONG_CALCULATION => {
                 // Long blocking work should be offloaded to a dedicated thread.
-                MMFWrk::spawn_blocking(|| {
+                MWFWrk::spawn_blocking(|| {
                     std::thread::sleep(Duration::from_millis(1000));
                 })
                 .await?;
@@ -186,7 +186,7 @@ Parallelism is achieved by running multiple workers concurrently, not by process
 
 ### Framework-Agnostic Message Data
 
-MMF transports opaque Message Data (`Bytes`).
+MWF transports opaque Message Data (`Bytes`).
 
 The framework does not know anything about application-specific data structures.
 
@@ -209,13 +209,13 @@ These lifecycle methods are mandatory.
 ### Centralized Error Handling
 
 Errors returned by worker callbacks are automatically
-captured by MMFErr.
+captured by MWFErr.
 
 Applications can monitor error events without requiring
 individual workers to implement their own error reporting
 mechanisms.
 
-MMFErr can also be used by application code to record
+MWFErr can also be used by application code to record
 custom errors, making it suitable as a centralized
 error logging and monitoring system.
 
@@ -223,7 +223,7 @@ error logging and monitoring system.
 
 ### Centralized Logging and Observability
 
-MMF can log all message traffic, including:
+MWF can log all message traffic, including:
 
 * SenderID
 * ReceiverID
@@ -238,7 +238,7 @@ and production.
 ### Worker Type Registration
 
 Before any worker instance can be spawned,
-its worker type must be registered with MMF.
+its worker type must be registered with MWF.
 
 Each worker implementation defines its own unique
 `WorkerTypeID` through the Worker trait.
@@ -247,19 +247,19 @@ Worker types are typically registered once during
 application startup:
 
 ```rust,ignore
-MMF::init()?;
+MWF::init()?;
 
-MMF::register_worker_type::<CameraWorker>()?;
-MMF::register_worker_type::<FFTWorker>()?;
-MMF::register_worker_type::<DisplayWorker>()?;
+MWF::register_worker_type::<CameraWorker>()?;
+MWF::register_worker_type::<FFTWorker>()?;
+MWF::register_worker_type::<DisplayWorker>()?;
 ```
 
 Once registered, worker instances can be spawned normally.
 
-This registration step allows MMF to associate each
+This registration step allows MWF to associate each
 `WorkerTypeID` with its corresponding Rust worker type.
 
-Future MMF features, such as workflow-based worker
+Future MWF features, such as workflow-based worker
 instantiation, will rely on this information.
 
 ---
@@ -268,7 +268,7 @@ instantiation, will rely on this information.
 
 All messaging functions are asynchronous.
 
-MMF uses asynchronous backpressure.
+MWF uses asynchronous backpressure.
 When a worker queue reaches its configured capacity, message senders are suspended asynchronously until space becomes available. 
 This prevents message loss while allowing the Tokio runtime to continue executing other workers.
 Backpressure is transparent to the application and never blocks a Tokio worker thread.
@@ -299,26 +299,26 @@ The caller receives the processing result.
 
 ### Other Messaging Patterns
 
-MMF also provides additional messaging patterns for more
+MWF also provides additional messaging patterns for more
 specialized use cases:
 
 * SendPriorityAndWait
 * SendUnique
 
-See the `MMFWrk` API documentation for the complete semantics
+See the `MWFWrk` API documentation for the complete semantics
 and usage of these messaging functions.
 
 ---
 
 ## 5. Error Handling
 
-MMF provides a centralized error collection system.
+MWF provides a centralized error collection system.
 
 Errors generated by worker callbacks are automatically
-recorded by MMFErr.
+recorded by MWFErr.
 
 Application code may also publish custom error events
-through MMFErr::add_error().
+through MWFErr::add_error().
 
 Supported callback sources include:
 
@@ -342,9 +342,9 @@ Each error event contains:
 
 ## 6. Logging and Observability
 
-MMF provides a centralized logging and observability system.
+MWF provides a centralized logging and observability system.
 
-Framework lifecycle events and message processing are automatically recorded by MMFLog.
+Framework lifecycle events and message processing are automatically recorded by MWFLog.
 
 Supported framework events include:
 
@@ -376,17 +376,17 @@ Each log event contains:
 ### Runtime architecture
 
 ```text
-                           MMF Runtime
+                           MWF Runtime
 
                     ┌────────────────────┐
-                    │        MMF         │
+                    │        MWF         │
                     └─────────┬──────────┘
                               │
       ┌───────────────────────┼────────────────────────┐
       │                       │                        │
       ▼                       ▼                        ▼
 ┌────────────┐        ┌────────────┐          ┌────────────────┐
-│   MMFWrk   │        │   MMFLog   │          │     MMFErr     │
+│   MWFWrk   │        │   MWFLog   │          │     MWFErr     │
 ├────────────┤        ├────────────┤          ├────────────────┤
 │ Registry   │        │ Log buffer │          │ Error buffer   │
 │ Messaging  │        │ Waiters    │          │ Waiters        │
@@ -419,12 +419,12 @@ Each log event contains:
 ```text
                    Application Startup
 
-                       MMF::init()
+                       MWF::init()
                              │
                              ▼
-           MMF::register_worker_type::<CameraWorker>()
-           MMF::register_worker_type::<FFTWorker>()
-           MMF::register_worker_type::<DisplayWorker>()
+           MWF::register_worker_type::<CameraWorker>()
+           MWF::register_worker_type::<FFTWorker>()
+           MWF::register_worker_type::<DisplayWorker>()
                              │
                              ▼
             ──────────── Runtime ────────────
@@ -436,7 +436,7 @@ Each log event contains:
                              │
                              ▼
                     ┌──────────────────┐
-                    │     MMFWrk       │
+                    │     MWFWrk       │
                     └────────┬─────────┘
                              │
                 spawns one Tokio task per worker
@@ -476,12 +476,12 @@ Parallelism is achieved by running multiple workers concurrently, not by process
 
 ## 9. Platform Support
 
-MMF is designed to be fully cross-platform and currently supports:
+MWF is designed to be fully cross-platform and currently supports:
 
 * Windows
 * Linux
 
-No platform-specific application code should be required when developing workers with MMF.
+No platform-specific application code should be required when developing workers with MWF.
 
 To help guarantee cross-platform compatibility, the repository includes a verification script (scripts/verify.ps1) that automatically validates the framework on both Windows and Linux (WSL2). The script performs formatting, linting, testing, example compilation, and documentation generation on each supported platform.
 
@@ -489,7 +489,7 @@ To help guarantee cross-platform compatibility, the repository includes a verifi
 
 ## 10. Quality Requirements
 
-MMF includes automated tests.
+MWF includes automated tests.
 
 A build must fail if a test fails.
 
@@ -514,12 +514,12 @@ workflow support and production hardening.
 
 ## 12. Running Tests
 
-MMF currently uses a global runtime instance.
+MWF currently uses a global runtime instance.
 
 Integration tests that call:
 
-- MMF::init()
-- MMF::close()
+- MWF::init()
+- MWF::close()
 
 must not execute concurrently.
 
@@ -529,18 +529,18 @@ The project uses the `serial_test` crate and integration tests are annotated wit
 #[serial]
 ```
 
-to ensure exclusive access to the MMF runtime during execution.
+to ensure exclusive access to the MWF runtime during execution.
 
 ### Why are integration tests serialized?
 
-MMF uses a global runtime instance stored in a static variable.
+MWF uses a global runtime instance stored in a static variable.
 
 Running multiple integration tests concurrently could cause
 Framework_AlreadyInitialized errors because several tests would
-attempt to initialize the same MMF runtime simultaneously.
+attempt to initialize the same MWF runtime simultaneously.
 
 
-For this reason, integration tests using MMF are marked with
+For this reason, integration tests using MWF are marked with
 ```text
 #[serial]
 ```
@@ -549,7 +549,7 @@ For this reason, integration tests using MMF are marked with
 
 ## 13. Runtime overhead benchmark
 
-MMF includes a runtime stress test that measures the framework overhead
+MWF includes a runtime stress test that measures the framework overhead
 without any application-specific processing.
 
 Run it with:
@@ -577,7 +577,7 @@ Example output:
 
 ```text
 =====================================================
-            MMF runtime overhead benchmark  
+            MWF runtime overhead benchmark  
 =====================================================    
                                               
 Workers : 1000                                             
@@ -591,7 +591,7 @@ Total                   :  8.992ms
 Throughput              : 765345 msg/s
 ```
 
-These measurements represent the runtime overhead of MMF using
+These measurements represent the runtime overhead of MWF using
 `SimulationWorker` with `SimulationBehavior::DoNothing`.
 Actual application performance depends on the work performed by each worker.
 

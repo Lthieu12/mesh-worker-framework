@@ -1,7 +1,7 @@
-# MMF Development Cheat Sheet
+# MWF Development Cheat Sheet
 
 A quick reference for the commands most commonly used while developing
-MMF.
+MWF.
 
 ------------------------------------------------------------------------
 
@@ -83,7 +83,7 @@ Treat warnings as errors:
 cargo clippy -- -D warnings
 ```
 
-MMF verification command:
+MWF verification command:
 
 ``` bash
 cargo clippy --workspace --lib --examples --all-features -- -D warnings
@@ -170,7 +170,7 @@ Remove-Item Env:CARGO_TARGET_DIR
 
 ------------------------------------------------------------------------
 
-# MMF
+# MWF
 
 Run the complete verification script:
 
@@ -224,4 +224,4 @@ cargo test test_name -- --nocapture
 
 This document is intentionally short.
 
-Only add commands that are actually used during MMF development.
+Only add commands that are actually used during MWF development.

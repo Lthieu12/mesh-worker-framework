@@ -1,4 +1,4 @@
-//! Worker registry for MMF.
+//! Worker registry for MWF.
 //!
 //! This file stores all registered workers, their hierarchy,
 //! their execution state and generates unique WorkerIDs.
@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use tokio::task::JoinHandle;
 
 use crate::channel::{WorkerNormalSenderChannel, WorkerPrioritySenderChannel};
-use crate::framework_error::{MMFError, MMFPanic};
+use crate::framework_error::{MWFError, MWFPanic};
 use crate::worker::{EntityID, WorkerID, WorkerInfo, WorkerState, WorkerTypeID};
 
 /// Information associated with a registered worker.
@@ -60,13 +60,13 @@ impl Registry {
     }
 
     /// Get worker registry entry from WorkerID.
-    pub(crate) fn get_registry_entry(&self, worker_id: &WorkerID) -> Result<&RegistryEntry, MMFError> {
-        self.worker_map.get(worker_id).ok_or(MMFError::Worker_NotFound)
+    pub(crate) fn get_registry_entry(&self, worker_id: &WorkerID) -> Result<&RegistryEntry, MWFError> {
+        self.worker_map.get(worker_id).ok_or(MWFError::Worker_NotFound)
     }
 
     /// Get mutable worker registry entry from WorkerID.
-    pub(crate) fn get_registry_entry_mut(&mut self, worker_id: &WorkerID) -> Result<&mut RegistryEntry, MMFError> {
-        self.worker_map.get_mut(worker_id).ok_or(MMFError::Worker_NotFound)
+    pub(crate) fn get_registry_entry_mut(&mut self, worker_id: &WorkerID) -> Result<&mut RegistryEntry, MWFError> {
+        self.worker_map.get_mut(worker_id).ok_or(MWFError::Worker_NotFound)
     }
 
     /// Retrieve information about all workers currently
@@ -85,22 +85,22 @@ impl Registry {
     }
 
     /// Get worker type id from WorkerID.
-    pub(crate) fn get_worker_type_id(&self, worker_id: &WorkerID) -> Result<WorkerTypeID, MMFError> {
+    pub(crate) fn get_worker_type_id(&self, worker_id: &WorkerID) -> Result<WorkerTypeID, MWFError> {
         Ok(self.get_registry_entry(worker_id)?.worker_type_id)
     }
 
     /// Get worker channel from WorkerID.
-    pub(crate) fn get_worker_normal_channel(&self, worker_id: &WorkerID) -> Result<WorkerNormalSenderChannel, MMFError> {
+    pub(crate) fn get_worker_normal_channel(&self, worker_id: &WorkerID) -> Result<WorkerNormalSenderChannel, MWFError> {
         Ok(self.get_registry_entry(worker_id)?.normal_sender_channel.clone())
     }
 
     /// Get worker priority channel from WorkerID.
-    pub(crate) fn get_worker_priority_channel(&self, worker_id: &WorkerID) -> Result<WorkerPrioritySenderChannel, MMFError> {
+    pub(crate) fn get_worker_priority_channel(&self, worker_id: &WorkerID) -> Result<WorkerPrioritySenderChannel, MWFError> {
         Ok(self.get_registry_entry(worker_id)?.priority_sender_channel.clone())
     }
 
     /// Get worker state from WorkerID
-    pub(crate) fn get_worker_state(&self, worker_id: &WorkerID) -> Result<WorkerState, MMFError> {
+    pub(crate) fn get_worker_state(&self, worker_id: &WorkerID) -> Result<WorkerState, MWFError> {
         Ok(self.get_registry_entry(worker_id)?.worker_state)
     }
 
@@ -118,23 +118,23 @@ impl Registry {
     }
 
     /// Register a newly created worker.
-    pub(crate) fn add_worker(&mut self, worker_id: &WorkerID, worker_type_id: WorkerTypeID, parent_id: &EntityID, normal_sender_channel: WorkerNormalSenderChannel, priority_sender_channel: WorkerPrioritySenderChannel, join_handle: JoinHandle<()>) -> Result<(), (MMFError, JoinHandle<()>)> {
+    pub(crate) fn add_worker(&mut self, worker_id: &WorkerID, worker_type_id: WorkerTypeID, parent_id: &EntityID, normal_sender_channel: WorkerNormalSenderChannel, priority_sender_channel: WorkerPrioritySenderChannel, join_handle: JoinHandle<()>) -> Result<(), (MWFError, JoinHandle<()>)> {
         // Prevent duplicate WorkerIDs.
         if self.worker_map.contains_key(worker_id) {
-            return Err((MMFError::Worker_AlreadyExists, join_handle));
+            return Err((MWFError::Worker_AlreadyExists, join_handle));
         }
 
         // Validate the parent entity.
         //
-        // MMF workers must already exist before they can be
+        // MWF workers must already exist before they can be
         // referenced as a parent.
         //
-        // External entities are not managed by MMF and therefore
+        // External entities are not managed by MWF and therefore
         // cannot be validated.
         match parent_id {
             EntityID::Worker(parent_id_ref) => {
                 if !Registry::contains_worker(self, parent_id_ref) {
-                    return Err((MMFError::ParentWorker_NotFound, join_handle));
+                    return Err((MWFError::ParentWorker_NotFound, join_handle));
                 }
             }
             EntityID::External(_) => {}
@@ -156,7 +156,7 @@ impl Registry {
     }
 
     /// Remove a worker from the registry.
-    pub(crate) fn remove_worker(&mut self, worker_id: &WorkerID) -> Result<(), MMFError> {
+    pub(crate) fn remove_worker(&mut self, worker_id: &WorkerID) -> Result<(), MWFError> {
         // Retrieve the Registry entry associated with the worker.
         //
         // The parent_id must be retrieved before removing the worker
@@ -192,7 +192,7 @@ impl Registry {
     }
 
     /// Update the worker state of a registered worker.
-    pub(crate) fn set_worker_state(&mut self, worker_id: &WorkerID, worker_state: WorkerState) -> Result<(), MMFError> {
+    pub(crate) fn set_worker_state(&mut self, worker_id: &WorkerID, worker_state: WorkerState) -> Result<(), MWFError> {
         let registry_entry = self.get_registry_entry_mut(worker_id)?;
         registry_entry.worker_state = worker_state;
         Ok(())
@@ -204,20 +204,20 @@ impl Registry {
     }
 
     /// Get the worker ParentID from WorkerID.
-    pub(crate) fn get_parent_id(&self, worker_id: &WorkerID) -> Result<EntityID, MMFError> {
+    pub(crate) fn get_parent_id(&self, worker_id: &WorkerID) -> Result<EntityID, MWFError> {
         let registry_entry = self.get_registry_entry(worker_id)?;
         Ok(registry_entry.parent_id.clone())
     }
 
     /// Get the child WorkerIDs of an entity.
-    pub(crate) fn get_children_ids(&self, entity_id: &EntityID) -> Result<Vec<WorkerID>, MMFError> {
-        // Validate the worker if the entity is managed by MMF.
+    pub(crate) fn get_children_ids(&self, entity_id: &EntityID) -> Result<Vec<WorkerID>, MWFError> {
+        // Validate the worker if the entity is managed by MWF.
         //
-        // External entities are not managed by MMF and therefore
+        // External entities are not managed by MWF and therefore
         // cannot be validated.
         if let EntityID::Worker(worker_id) = entity_id {
             if !Registry::contains_worker(self, worker_id) {
-                return Err(MMFError::Worker_NotFound);
+                return Err(MWFError::Worker_NotFound);
             }
         }
 
@@ -232,14 +232,14 @@ impl Registry {
     }
 
     /// Get the number of child workers of an entity.
-    pub(crate) fn get_children_count(&self, entity_id: &EntityID) -> Result<usize, MMFError> {
-        // Validate the worker if the entity is managed by MMF.
+    pub(crate) fn get_children_count(&self, entity_id: &EntityID) -> Result<usize, MWFError> {
+        // Validate the worker if the entity is managed by MWF.
         //
-        // External entities are not managed by MMF and therefore
+        // External entities are not managed by MWF and therefore
         // cannot be validated.
         if let EntityID::Worker(worker_id) = entity_id {
             if !Registry::contains_worker(self, worker_id) {
-                return Err(MMFError::Worker_NotFound);
+                return Err(MWFError::Worker_NotFound);
             }
         }
 
@@ -254,9 +254,9 @@ impl Registry {
     }
 
     /// Take ownership of the JoinHandle associated with a worker.
-    pub(crate) fn take_join_handle(&mut self, worker_id: &WorkerID) -> Result<JoinHandle<()>, MMFError> {
+    pub(crate) fn take_join_handle(&mut self, worker_id: &WorkerID) -> Result<JoinHandle<()>, MWFError> {
         let registry_entry = self.get_registry_entry_mut(worker_id)?;
-        let join_handle = registry_entry.join_handle.take().expect(MMFPanic::worker_JoinHandleMissing.message());
+        let join_handle = registry_entry.join_handle.take().expect(MWFPanic::worker_JoinHandleMissing.message());
         Ok(join_handle)
     }
 }

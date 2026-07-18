@@ -1,6 +1,6 @@
 //! # Getting Started
 //!
-//! This example demonstrates the complete lifecycle of a MMF worker.
+//! This example demonstrates the complete lifecycle of a MWF worker.
 //!
 //! It shows how to:
 //! - initialize the framework;
@@ -10,7 +10,7 @@
 //! - gracefully shut down the worker and the framework.
 //!
 //! The `DemoWorker` implementation is intentionally minimal so the
-//! focus remains on the MMF API rather than application logic.
+//! focus remains on the MWF API rather than application logic.
 //!
 //! Run with:
 //!
@@ -25,34 +25,34 @@ use mesh_worker_framework::*;
 mod modules;
 use modules::demo_worker::{DemoMessages, DemoWorker};
 
-// Tokio provides the async runtime used by MMF.
+// Tokio provides the async runtime used by MWF.
 #[tokio::main]
-async fn main() -> Result<(), MMFError> {
+async fn main() -> Result<(), MWFError> {
     let main_entity = EntityID::new_external("MAIN");
 
-    // Initialize MMF.
-    MMF::init()?;
+    // Initialize MWF.
+    MWF::init()?;
 
     // Register available worker types.
-    MMF::register_worker_type::<DemoWorker>()?;
+    MWF::register_worker_type::<DemoWorker>()?;
 
     // Create the worker.
-    let demo_worker_id = MMFWrk::spawn_worker("DemoWorker", &main_entity)?;
+    let demo_worker_id = MWFWrk::spawn_worker("DemoWorker", &main_entity)?;
 
     // Initialize it.
-    MMFWrk::init_worker(&demo_worker_id, Bytes::new()).await?;
-    MMFWrk::wait_worker_init(&demo_worker_id, None).await?;
+    MWFWrk::init_worker(&demo_worker_id, Bytes::new()).await?;
+    MWFWrk::wait_worker_init(&demo_worker_id, None).await?;
 
     // Send a few messages.
-    MMFWrk::send_message(&main_entity, &demo_worker_id, DemoMessages::QUICK_CALCULATION, Bytes::new()).await?;
-    MMFWrk::send_message(&main_entity, &demo_worker_id, DemoMessages::LONG_CALCULATION, Bytes::new()).await?;
+    MWFWrk::send_message(&main_entity, &demo_worker_id, DemoMessages::QUICK_CALCULATION, Bytes::new()).await?;
+    MWFWrk::send_message(&main_entity, &demo_worker_id, DemoMessages::LONG_CALCULATION, Bytes::new()).await?;
 
     // Close the worker.
-    MMFWrk::close_worker(&demo_worker_id, Bytes::new()).await?;
-    MMFWrk::wait_worker_close(&demo_worker_id, None).await?;
+    MWFWrk::close_worker(&demo_worker_id, Bytes::new()).await?;
+    MWFWrk::wait_worker_close(&demo_worker_id, None).await?;
 
     // Shutdown.
-    MMF::close()?;
+    MWF::close()?;
 
     Ok(())
 }

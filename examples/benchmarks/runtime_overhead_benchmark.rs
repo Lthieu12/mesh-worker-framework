@@ -1,4 +1,4 @@
-//! MMF runtime overhead benchmark.
+//! MWF runtime overhead benchmark.
 //!
 //! Run with:
 //!
@@ -23,11 +23,11 @@ const TIMEOUT_MS: u64 = 5000;
 async fn main() {
     let worker_count = std::env::args().nth(1).and_then(|arg| arg.parse::<usize>().ok()).unwrap_or(DEFAULT_WORKER_COUNT);
 
-    MMF::init().unwrap();
+    MWF::init().unwrap();
 
-    MMF::register_worker_type::<SimulationWorker>().unwrap();
+    MWF::register_worker_type::<SimulationWorker>().unwrap();
 
-    MMFLog::set_log_mode(LogMode::NoLog, None).unwrap();
+    MWFLog::set_log_mode(LogMode::NoLog, None).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
 
@@ -44,7 +44,7 @@ async fn main() {
     let mut worker_ids = Vec::with_capacity(worker_count);
 
     for _ in 0..worker_count {
-        let worker_id = MMFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::External("MAIN".into())).unwrap();
+        let worker_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::External("MAIN".into())).unwrap();
 
         worker_ids.push(worker_id);
     }
@@ -58,10 +58,10 @@ async fn main() {
     let timer = Instant::now();
 
     for worker_id in &worker_ids {
-        MMFWrk::init_worker(worker_id, lifecycle_data.clone()).await.unwrap();
+        MWFWrk::init_worker(worker_id, lifecycle_data.clone()).await.unwrap();
     }
 
-    MMFWrk::wait_worker_list_init(&worker_ids, Some(TIMEOUT_MS)).await.unwrap();
+    MWFWrk::wait_worker_list_init(&worker_ids, Some(TIMEOUT_MS)).await.unwrap();
 
     let init_time = timer.elapsed();
 
@@ -74,7 +74,7 @@ async fn main() {
     let sender_id = EntityID::new_external("MAIN");
     let message_id = MessageID::new("PING");
 
-    let futures = worker_ids.iter().map(|worker_id| MMFWrk::send_message_and_wait(&sender_id, worker_id, &message_id, Bytes::new(), Some(TIMEOUT_MS)));
+    let futures = worker_ids.iter().map(|worker_id| MWFWrk::send_message_and_wait(&sender_id, worker_id, &message_id, Bytes::new(), Some(TIMEOUT_MS)));
 
     let results = join_all(futures).await;
 
@@ -91,10 +91,10 @@ async fn main() {
     let timer = Instant::now();
 
     for worker_id in &worker_ids {
-        MMFWrk::close_worker(worker_id, Bytes::new()).await.unwrap();
+        MWFWrk::close_worker(worker_id, Bytes::new()).await.unwrap();
     }
 
-    MMFWrk::wait_children_close(&EntityID::new_external("MAIN"), Some(TIMEOUT_MS)).await.unwrap();
+    MWFWrk::wait_children_close(&EntityID::new_external("MAIN"), Some(TIMEOUT_MS)).await.unwrap();
 
     let close_time = timer.elapsed();
 
@@ -108,7 +108,7 @@ async fn main() {
 
     println!();
     println!("=====================================================");
-    println!("            MMF runtime overhead benchmark");
+    println!("            MWF runtime overhead benchmark");
     println!("=====================================================");
     println!("Workers : {}", worker_count);
     println!();
@@ -128,5 +128,5 @@ async fn main() {
     println!("=====================================================");
     println!();
 
-    MMF::close().unwrap();
+    MWF::close().unwrap();
 }

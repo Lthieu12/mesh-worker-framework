@@ -1,10 +1,10 @@
-# MMF Architecture
+# MWF Architecture
 
 ## Purpose
 
-Mesh Worker Framework (MMF) is a Tokio-based modular runtime for applications composed of independent communicating workers.
+Mesh Worker Framework (MWF) is a Tokio-based modular runtime for applications composed of independent communicating workers.
 
-MMF provides runtime services such as:
+MWF provides runtime services such as:
 
 * Worker lifecycle management
 * Message routing
@@ -12,27 +12,27 @@ MMF provides runtime services such as:
 * Centralized error collection
 * Runtime observability
 
-MMF is intentionally application-agnostic.
+MWF is intentionally application-agnostic.
 
-Application-specific concepts such as workflows, measurements, calculations or business logic are expected to be implemented by workers built on top of MMF.
+Application-specific concepts such as workflows, measurements, calculations or business logic are expected to be implemented by workers built on top of MWF.
 
 Example:
 
 ```text
-MMF
+MWF
  ├── CameraWorker
  ├── FFTWorker
  ├── LoggerWorker
  └── WorkflowWorker
 ```
 
-All workers are considered application code. MMF itself remains unaware of their responsibilities.
+All workers are considered application code. MWF itself remains unaware of their responsibilities.
 
 ---
 
 # Design Principles
 
-MMF intentionally makes several architectural choices that may differ from traditional actor frameworks.
+MWF intentionally makes several architectural choices that may differ from traditional actor frameworks.
 
 These decisions are intended to keep the runtime deterministic, application-agnostic and easy to reason about.
 
@@ -41,15 +41,15 @@ These decisions are intended to keep the runtime deterministic, application-agno
 Workers are registered once during application startup.
 
 ```rust
-MMF::register_worker_type::<CameraWorker>()?;
+MWF::register_worker_type::<CameraWorker>()?;
 ```
 
-MMF associates each WorkerTypeID with a constructor capable of creating new worker instances.
+MWF associates each WorkerTypeID with a constructor capable of creating new worker instances.
 
 Workers are then spawned using their WorkerTypeID rather than concrete Rust types.
 
 ```rust
-let worker_id = MMFWrk::spawn_worker("CameraWorker", &EntityID::External("MAIN".into()))?;
+let worker_id = MWFWrk::spawn_worker("CameraWorker", &EntityID::External("MAIN".into()))?;
 ```
 
 This also decouples application configuration from Rust code. Workflows can be loaded from configuration files, 
@@ -83,21 +83,21 @@ Workers can therefore be created before the resources they require become availa
 
 ## Opaque Binary Data
 
-MMF never interprets application data.
+MWF never interprets application data.
 
 Both lifecycle data and message data are transported as opaque Bytes.
 
-MMF does not require or recommend any particular serialization format.
+MWF does not require or recommend any particular serialization format.
 
 ```rust
-MMFWrk::init_worker(worker_id, lifecycle_data).await?;
+MWFWrk::init_worker(worker_id, lifecycle_data).await?;
 
-MMFWrk::send_message(..., message_data).await?;
+MWFWrk::send_message(..., message_data).await?;
 ```
 
 Serialization and deserialization remain entirely under application control.
 
-This keeps MMF independent from any serialization library or application-specific data model.
+This keeps MWF independent from any serialization library or application-specific data model.
 
 ---
 
@@ -115,9 +115,9 @@ Parallelism is achieved by running multiple workers concurrently rather than pro
 
 ## Explicit Observability
 
-MMF automatically records worker lifecycle events, message processing and framework errors.
+MWF automatically records worker lifecycle events, message processing and framework errors.
 
-Applications can inspect these events through MMFLog and MMFErr without instrumenting their own workers.
+Applications can inspect these events through MWFLog and MWFErr without instrumenting their own workers.
 
 This makes runtime diagnostics available by default while keeping application code focused on business logic.
 
@@ -125,22 +125,22 @@ This makes runtime diagnostics available by default while keeping application co
 
 # Runtime Model
 
-MMF uses one Tokio task per worker.
+MWF uses one Tokio task per worker.
 
 After a worker is spawned:
 
 ```text
-                           MMF Runtime
+                           MWF Runtime
 
                     ┌────────────────────┐
-                    │        MMF         │
+                    │        MWF         │
                     └─────────┬──────────┘
                               │
         ┌─────────────────────┼─────────────────────┐
         │                     │                     │
         ▼                     ▼                     ▼
   ┌────────────┐      ┌────────────┐       ┌────────────┐
-  │   MMFWrk   │      │   MMFLog   │       │   MMFErr   │
+  │   MWFWrk   │      │   MWFLog   │       │   MWFErr   │
   └─────┬──────┘      └────────────┘       └────────────┘
         │
         │ owns
@@ -154,7 +154,7 @@ After a worker is spawned:
           (implements Worker)
 ```
 
-MMF owns:
+MWF owns:
 
 * Communication channels
 * JoinHandles
@@ -166,7 +166,7 @@ WorkerTask owns:
 * Message processing
 * Lifecycle callback execution
 
-MMF never directly calls:
+MWF never directly calls:
 
 ```rust
 on_init()
@@ -182,7 +182,7 @@ These callbacks are always executed inside the Tokio task that owns the worker i
 
 # Worker
 
-A Worker is the fundamental execution unit of MMF.
+A Worker is the fundamental execution unit of MWF.
 
 Every worker owns:
 
@@ -215,7 +215,7 @@ These lifecycle methods are mandatory.
 
              │
              ▼
-        MMF::spawn_worker()
+        MWF::spawn_worker()
 
              │
              ▼
@@ -308,7 +308,7 @@ InitFailed
 CloseFailed
 ```
 
-Lifecycle transitions are controlled by MMF and not by application code.
+Lifecycle transitions are controlled by MWF and not by application code.
 
 ---
 
@@ -332,7 +332,7 @@ User Worker A
       │ send_message()
       ▼
 +-------------+
-|   MMFWrk    |
+|   MWFWrk    |
 +-------------+
       │
       │ route message
@@ -355,7 +355,7 @@ MessageData is transported as:
 Bytes
 ```
 
-MMF never interprets application data.
+MWF never interprets application data.
 
 Serialization and deserialization remain the responsibility of the application.
 
@@ -389,7 +389,7 @@ The processing result is returned to the caller.
 
 # Message Priorities
 
-MMF maintains two independent channels per worker:
+MWF maintains two independent channels per worker:
 
 ```text
 Normal Channel
@@ -428,17 +428,17 @@ Parent
  └── Child B
 ```
 
-MMF maintains this hierarchy through the Registry.
+MWF maintains this hierarchy through the Registry.
 
 The hierarchy is primarily used for coordinated shutdown operations.
 
-MMF provides APIs allowing a parent to wait until all direct children have terminated.
+MWF provides APIs allowing a parent to wait until all direct children have terminated.
 
 ---
 
 # Registry
 
-MMF maintains a runtime registry containing information about active workers.
+MWF maintains a runtime registry containing information about active workers.
 
 Typical information includes:
 
@@ -459,7 +459,7 @@ The Registry is used for:
 
 # Error Handling
 
-MMF provides centralized error collection through MMFErr.
+MWF provides centralized error collection through MWFErr.
 
 Errors returned by:
 
@@ -485,10 +485,10 @@ ErrorSourceChain
 
 Error events are stored in a circular buffer.
 
-Applications may retrieve error events through MMFErr APIs or publish their own error events using:
+Applications may retrieve error events through MWFErr APIs or publish their own error events using:
 
 ```rust
-MMFErr::add_error(...)
+MWFErr::add_error(...)
 ```
 
 This allows framework and application errors to share the same monitoring infrastructure.
@@ -497,7 +497,7 @@ This allows framework and application errors to share the same monitoring infras
 
 # Serialization
 
-MMF transports opaque MessageData values.
+MWF transports opaque MessageData values.
 
 The framework is intentionally unaware of application-specific structures.
 
@@ -515,7 +515,7 @@ Serialization and deserialization remain the responsibility of the application.
 
 # Portability
 
-MMF must compile and run on:
+MWF must compile and run on:
 
 * Windows
 * Linux
@@ -526,7 +526,7 @@ with minimal user configuration.
 
 # Quality Requirements
 
-MMF includes automated tests.
+MWF includes automated tests.
 
 A build must fail if tests fail.
 

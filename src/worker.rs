@@ -1,4 +1,4 @@
-//! worker definitions for MMF.
+//! worker definitions for MWF.
 //!
 //! This file defines the worker trait and the types used
 //! to identify and manage workers within the framework.
@@ -13,9 +13,9 @@ use crate::string_helper;
 /// Function creating a new worker instance.
 ///
 /// Each registered worker type provides a constructor
-/// that MMF stores in the WorkerTypeRegistry.
+/// that MWF stores in the WorkerTypeRegistry.
 ///
-/// Whenever MMF needs to spawn a worker from its
+/// Whenever MWF needs to spawn a worker from its
 /// WorkerTypeID (for example when executing a workflow),
 /// this constructor is invoked to create a fresh worker
 /// instance.
@@ -152,12 +152,12 @@ impl From<&WorkerID> for WorkerID {
 /// on_message() and on_close().
 pub type WorkerError = anyhow::Error;
 
-/// Identifier of an entity interacting with MMF.
+/// Identifier of an entity interacting with MWF.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum EntityID {
-    /// MMF worker entity.
+    /// MWF worker entity.
     Worker(WorkerID),
-    /// External entity not managed by MMF.
+    /// External entity not managed by MWF.
     External(ExternalID),
 }
 
@@ -315,7 +315,7 @@ mod terminal_worker_column {
     pub(crate) const STATE_LEN: usize = 14;
 }
 
-/// List of worker information returned by MMFWrk.
+/// List of worker information returned by MWFWrk.
 #[derive(Debug, Clone)]
 pub struct WorkerList {
     pub worker_info_list: Vec<WorkerInfo>,
@@ -362,12 +362,12 @@ impl WorkerList {
     }
 }
 
-/// Interface implemented by all MMF workers.
+/// Interface implemented by all MWF workers.
 ///
-/// MMF creates worker instances dynamically by calling
+/// MWF creates worker instances dynamically by calling
 /// `worker::new()` on the registered worker type.
 ///
-/// MMF stores worker instances behind `Box<dyn worker>`.
+/// MWF stores worker instances behind `Box<dyn worker>`.
 ///
 /// The `Self: Sized` bounds on `worker_type_id()` and `new()` are
 /// required to keep this trait object-safe. Without these bounds,
@@ -381,7 +381,7 @@ pub trait Worker {
     ///
     /// This associated function is only available on concrete worker
     /// types (`Self: Sized`). It is intentionally excluded from trait
-    /// objects (`dyn worker`) so that MMF can store workers behind
+    /// objects (`dyn worker`) so that MWF can store workers behind
     /// `Box<dyn worker>`.
     fn worker_type_id() -> WorkerTypeID
     where
@@ -389,7 +389,7 @@ pub trait Worker {
 
     /// Creates a new worker instance.
     ///
-    /// MMF calls this function whenever a new worker
+    /// MWF calls this function whenever a new worker
     /// instance must be spawned from its registered
     /// WorkerTypeID.
     ///
@@ -399,7 +399,7 @@ pub trait Worker {
     ///
     /// This associated function is only available on concrete worker
     /// types (`Self: Sized`). It is intentionally excluded from trait
-    /// objects (`dyn worker`) so that MMF can store workers behind
+    /// objects (`dyn worker`) so that MWF can store workers behind
     /// `Box<dyn worker>`.
     fn new() -> Self
     where

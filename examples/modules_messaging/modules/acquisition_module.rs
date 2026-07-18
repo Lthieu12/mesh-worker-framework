@@ -18,7 +18,7 @@ pub struct AcquisitionWorker {
     parent_id: Option<EntityID>,
 }
 
-/// MMF worker implementation for DemoWorker.
+/// MWF worker implementation for DemoWorker.
 #[async_trait]
 impl Worker for AcquisitionWorker {
     fn worker_type_id() -> WorkerTypeID {
@@ -47,7 +47,7 @@ impl Worker for AcquisitionWorker {
 
             DemoMessages::LONG_CALCULATION => {
                 // Long blocking work should be offloaded to a dedicated thread.
-                MMFWrk::spawn_blocking(|| {
+                MWFWrk::spawn_blocking(|| {
                     std::thread::sleep(Duration::from_millis(1000));
                 })
                 .await?;

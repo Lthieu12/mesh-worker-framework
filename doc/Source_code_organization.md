@@ -1,6 +1,6 @@
 # Source Code Architecture
 
-The MMF repository is organized to clearly separate the framework implementation, documentation, examples, development tools and tests.
+The MWF repository is organized to clearly separate the framework implementation, documentation, examples, development tools and tests.
 
 ```
 mesh-worker-framework/
@@ -32,7 +32,7 @@ Typical contents include:
 
 ## `examples/`
 
-Example applications demonstrating how to use MMF.
+Example applications demonstrating how to use MWF.
 
 Examples serve both as:
 
@@ -60,7 +60,7 @@ Current scripts include:
 
 Framework source code.
 
-This directory contains the complete MMF implementation.
+This directory contains the complete MWF implementation.
 
 The source is organized into independent workers, each responsible for a specific framework component.
 
@@ -96,7 +96,7 @@ Integration tests.
 
 These tests validate the framework from a user's perspective through its public API.
 
-Unlike unit tests, integration tests interact with MMF exactly as an external application would.
+Unlike unit tests, integration tests interact with MWF exactly as an external application would.
 
 ---
 
@@ -141,7 +141,7 @@ Defines:
 
 Build script executed automatically by Cargo before compilation.
 
-Used to generate build-time information required by MMF.
+Used to generate build-time information required by MWF.
 
 ---
 
@@ -149,7 +149,7 @@ Used to generate build-time information required by MMF.
 
 Project overview.
 
-Introduces MMF, explains its goals and provides basic usage instructions.
+Introduces MWF, explains its goals and provides basic usage instructions.
 
 ---
 

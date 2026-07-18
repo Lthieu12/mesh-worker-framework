@@ -1,4 +1,4 @@
-//! Validate MMF timeout and recovery mechanisms.
+//! Validate MWF timeout and recovery mechanisms.
 //!
 //! Scenario:
 //! - Simulate a worker that takes too long to initialize.
@@ -6,9 +6,9 @@
 //! - Simulate a worker that takes too long to shutdown.
 //! - Verify wait_worker_close() timeout detection.
 //! - Recover using kill_worker().
-//! - Shutdown MMF cleanly.
+//! - Shutdown MWF cleanly.
 //!
-//! This test validates timeout handling and the ability of MMF
+//! This test validates timeout handling and the ability of MWF
 //! to recover from unresponsive workers.
 
 use bytes::Bytes;
@@ -17,50 +17,50 @@ use serial_test::serial;
 use dev_support::simulation_worker::{SimulationBehavior, SimulationWorker, SimulationWorkerConfig};
 use mesh_worker_framework::*;
 
-// MMF uses a global runtime instance.
+// MWF uses a global runtime instance.
 // Integration tests must run serially.
 #[tokio::test]
 #[serial]
 async fn test_worker_timeout_init() {
-    MMF::init().unwrap();
-    MMF::register_worker_type::<SimulationWorker>().unwrap();
+    MWF::init().unwrap();
+    MWF::register_worker_type::<SimulationWorker>().unwrap();
 
-    let worker_id = MMFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
+    let worker_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
 
     // Very long init
     let configuration = SimulationWorkerConfig { init_delay_ms: 5_000, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MMFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
+    MWFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
 
-    assert!(matches!(MMFWrk::wait_worker_init(&worker_id, Some(100)).await, Err(MMFError::Operation_Timeout)));
+    assert!(matches!(MWFWrk::wait_worker_init(&worker_id, Some(100)).await, Err(MWFError::Operation_Timeout)));
 
-    MMFWrk::abort_worker(&worker_id).unwrap();
-    MMF::close().unwrap();
+    MWFWrk::abort_worker(&worker_id).unwrap();
+    MWF::close().unwrap();
 }
 
-// MMF uses a global runtime instance.
+// MWF uses a global runtime instance.
 // Integration tests must run serially.
 #[tokio::test]
 #[serial]
 async fn test_worker_timeout_close() {
-    MMF::init().unwrap();
-    MMF::register_worker_type::<SimulationWorker>().unwrap();
+    MWF::init().unwrap();
+    MWF::register_worker_type::<SimulationWorker>().unwrap();
 
-    let worker_id = MMFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
+    let worker_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
 
     // Very long close
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 5_000, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MMFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
+    MWFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
 
-    MMFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
+    MWFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
 
-    MMFWrk::close_worker(&worker_id, Bytes::new()).await.unwrap();
+    MWFWrk::close_worker(&worker_id, Bytes::new()).await.unwrap();
 
-    assert!(matches!(MMFWrk::wait_worker_close(&worker_id, Some(100)).await, Err(MMFError::Operation_Timeout)));
+    assert!(matches!(MWFWrk::wait_worker_close(&worker_id, Some(100)).await, Err(MWFError::Operation_Timeout)));
 
-    MMFWrk::abort_worker(&worker_id).unwrap();
-    MMF::close().unwrap();
+    MWFWrk::abort_worker(&worker_id).unwrap();
+    MWF::close().unwrap();
 }

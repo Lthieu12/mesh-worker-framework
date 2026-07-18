@@ -1,13 +1,13 @@
-//! worker type registry for MMF.
+//! worker type registry for MWF.
 //!
-//! This file stores all worker types known by MMF.
+//! This file stores all worker types known by MWF.
 //!
 //! Registered worker types are identified by a WorkerTypeID
 //! and associated with their Rust worker type.
 
 use std::collections::HashMap;
 
-use crate::framework_error::MMFError;
+use crate::framework_error::MWFError;
 use crate::worker::{WorkerConstructor, WorkerTypeID};
 
 /// Information associated with a registered worker type.
@@ -39,8 +39,8 @@ impl WorkerTypeRegistry {
     }
 
     /// Get the Rust type name associated with a WorkerTypeID.
-    pub(crate) fn get_worker_rust_type_name(&self, worker_type_id: WorkerTypeID) -> Result<&'static str, MMFError> {
-        let worker_type_entry = self.worker_type_map.get(worker_type_id).ok_or(MMFError::WorkerType_NotFound)?;
+    pub(crate) fn get_worker_rust_type_name(&self, worker_type_id: WorkerTypeID) -> Result<&'static str, MWFError> {
+        let worker_type_entry = self.worker_type_map.get(worker_type_id).ok_or(MWFError::WorkerType_NotFound)?;
         Ok(worker_type_entry.worker_rust_type_name)
     }
 
@@ -48,8 +48,8 @@ impl WorkerTypeRegistry {
     ///
     /// The returned function creates a new instance of the
     /// corresponding worker type each time it is invoked.
-    pub(crate) fn get_worker_constructor(&self, worker_type_id: WorkerTypeID) -> Result<WorkerConstructor, MMFError> {
-        let worker_type_entry = self.worker_type_map.get(worker_type_id).ok_or(MMFError::WorkerType_NotFound)?;
+    pub(crate) fn get_worker_constructor(&self, worker_type_id: WorkerTypeID) -> Result<WorkerConstructor, MWFError> {
+        let worker_type_entry = self.worker_type_map.get(worker_type_id).ok_or(MWFError::WorkerType_NotFound)?;
         Ok(worker_type_entry.worker_constructor)
     }
 

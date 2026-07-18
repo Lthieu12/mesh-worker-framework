@@ -1,4 +1,4 @@
-//! Generic MMF worker used by integration tests.
+//! Generic MWF worker used by integration tests.
 //!
 //! This configurable worker can simulate various runtime
 //! behaviors without requiring dedicated test workers.
@@ -23,7 +23,7 @@ use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-use crate::MMFWrk;
+use crate::MWFWrk;
 use crate::message::{MessageID, WorkerMessage};
 use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerTypeID};
 
@@ -59,10 +59,10 @@ pub struct SimulationWorkerConfig {
 }
 
 pub struct SimulationWorker {
-    /// Runtime WorkerID assigned by MMF during on_init().
+    /// Runtime WorkerID assigned by MWF during on_init().
     worker_id: Option<WorkerID>,
 
-    /// Runtime ParentID assigned by MMF during on_init().
+    /// Runtime ParentID assigned by MWF during on_init().
     parent_id: Option<EntityID>,
 
     /// Artificial delay applied during on_init().
@@ -108,7 +108,7 @@ impl Worker for SimulationWorker {
         self.wait_children_close = configuration.wait_children_close;
         self.wait_children_close_timeout_ms = configuration.wait_children_close_timeout_ms;
 
-        // Store runtime identifiers provided by MMF.
+        // Store runtime identifiers provided by MWF.
         self.worker_id = Some(worker_id);
         self.parent_id = Some(parent_id);
 
@@ -135,7 +135,7 @@ impl Worker for SimulationWorker {
                     tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
                 }
                 let worker_id = self.worker_id.as_ref().expect("worker_id should be initialized");
-                MMFWrk::send_message_and_wait(&EntityID::new_worker(worker_id.clone()), target_worker_id, message_id, Bytes::new(), *timeout_ms).await.unwrap();
+                MWFWrk::send_message_and_wait(&EntityID::new_worker(worker_id.clone()), target_worker_id, message_id, Bytes::new(), *timeout_ms).await.unwrap();
             }
 
             SimulationBehavior::Message_Wait { message_delay_ms } => {
@@ -165,7 +165,7 @@ impl Worker for SimulationWorker {
         if self.wait_children_close {
             let worker_id = self.worker_id.as_ref().expect("worker_id should be initialized");
 
-            MMFWrk::wait_children_close(&worker_id.as_entity_id(), self.wait_children_close_timeout_ms).await.unwrap();
+            MWFWrk::wait_children_close(&worker_id.as_entity_id(), self.wait_children_close_timeout_ms).await.unwrap();
         }
 
         // Simulate shutdown work.

@@ -1,6 +1,6 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
-#![allow(clippy::expect_fun_call)] // `expect()` keeps MMFPanic messages concise and readable.
+#![allow(clippy::expect_fun_call)] // `expect()` keeps MWFPanic messages concise and readable.
 #![allow(clippy::single_match)] // Keep match statements ready for future behavior extensions.
 #![allow(clippy::collapsible_if)] // Preserve explicit multi-step control flow for readability.
 mod channel;
@@ -25,13 +25,13 @@ pub mod mmf_wrk;
 #[doc(hidden)]
 pub mod dev_support;
 
-// Public MMF API
-pub use mmf::{MMF, MMFConfiguration};
-pub use mmf_err::{ErrorEvent, ErrorInstanceID, ErrorList, ErrorOutputFormat, MMFErr};
-pub use mmf_log::{LogAction, LogEvent, LogInstanceID, LogList, LogMode, LogOutputFormat, LogStatus, MMFLog};
-pub use mmf_wrk::MMFWrk;
+// Public MWF API
+pub use mmf::{MWF, MWFConfiguration};
+pub use mmf_err::{ErrorEvent, ErrorInstanceID, ErrorList, ErrorOutputFormat, MWFErr};
+pub use mmf_log::{LogAction, LogEvent, LogInstanceID, LogList, LogMode, LogOutputFormat, LogStatus, MWFLog};
+pub use mmf_wrk::MWFWrk;
 
-pub use framework_error::MMFError;
+pub use framework_error::MWFError;
 
 pub use worker::WorkerError;
 

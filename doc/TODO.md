@@ -1,4 +1,4 @@
-## Améliorations du MMF
+## Améliorations du MWF
 
 ### 1. Ajouter une macro de dérivation pour les workers
 

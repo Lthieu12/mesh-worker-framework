@@ -1,7 +1,7 @@
-//! A minimal MMF worker used by the Getting Started example.
+//! A minimal MWF worker used by the Getting Started example.
 //!
 //! The implementation intentionally keeps the business logic simple so the
-//! focus remains on the MMF worker lifecycle and messaging API.
+//! focus remains on the MWF worker lifecycle and messaging API.
 //!
 //! It demonstrates:
 //! - worker registration;
@@ -30,7 +30,7 @@ pub struct DemoWorker {
     parent_id: Option<EntityID>,
 }
 
-/// MMF worker implementation for DemoWorker.
+/// MWF worker implementation for DemoWorker.
 #[async_trait]
 impl Worker for DemoWorker {
     fn worker_type_id() -> WorkerTypeID {
@@ -59,7 +59,7 @@ impl Worker for DemoWorker {
 
             DemoMessages::LONG_CALCULATION => {
                 // Long blocking work should be offloaded to a dedicated thread.
-                MMFWrk::spawn_blocking(|| {
+                MWFWrk::spawn_blocking(|| {
                     std::thread::sleep(Duration::from_millis(1000));
                 })
                 .await?;
