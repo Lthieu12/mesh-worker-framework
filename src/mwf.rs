@@ -175,9 +175,9 @@ impl MWF {
         MWF_LOG_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
         MWF_TIMESTAMP_FORMAT.store(mwf_configuration.timestamp_format as u8, Ordering::Relaxed);
 
-        let mut mwf_mod_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
-        *mwf_mod_data_guard = Some(WorkerData::new(&mwf_configuration));
-        drop(mwf_mod_data_guard);
+        let mut mwf_wrk_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
+        *mwf_wrk_data_guard = Some(WorkerData::new(&mwf_configuration));
+        drop(mwf_wrk_data_guard);
 
         let mut mwf_err_data_guard = MWF_ERR_DATA.write().expect(MWFPanic::MWFErrData_WriteLockPoisoned.message());
         *mwf_err_data_guard = Some(ErrorData { error_event_buffer_capacity: mwf_configuration.error_event_buffer_capacity, error_event_list: VecDeque::new() });
@@ -221,9 +221,9 @@ impl MWF {
 
         // Make sure no worker is still running.
         {
-            let mwf_mod_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
-            let mwf_mod_data = mwf_mod_data_guard.as_ref().expect(MWFPanic::MWFWrkData_Missing.message());
-            if !mwf_mod_data.worker_registry.is_empty() {
+            let mwf_wrk_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
+            let mwf_wrk_data = mwf_wrk_data_guard.as_ref().expect(MWFPanic::MWFWrkData_Missing.message());
+            if !mwf_wrk_data.worker_registry.is_empty() {
                 return Err(MWFError::Framework_CannotClose_workersStillRunning);
             }
         }
@@ -232,8 +232,8 @@ impl MWF {
         let mut mwf_data_guard = MWF_DATA.write().expect(MWFPanic::MWFData_WriteLockPoisoned.message());
         *mwf_data_guard = None;
 
-        let mut mwf_mod_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
-        *mwf_mod_data_guard = None;
+        let mut mwf_wrk_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
+        *mwf_wrk_data_guard = None;
 
         let mut mwf_err_data_guard = MWF_ERR_DATA.write().expect(MWFPanic::MWFErrData_WriteLockPoisoned.message());
         *mwf_err_data_guard = None;

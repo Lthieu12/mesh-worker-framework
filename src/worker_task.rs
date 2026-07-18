@@ -1,6 +1,6 @@
 //! Tokio runtime for MWF workers.
 //!
-//! worker_task owns the Tokio task associated with a worker instance.
+//! This file owns the Tokio task associated with a worker instance.
 //!
 //! After a worker is spawned:
 //! - MWF owns the Senders and the JoinHandle.
@@ -13,7 +13,7 @@
 //! - Terminate the worker task when requested.
 //! - Process all worker commands sequentially.
 //!
-//! worker commands are first collected into an internal queue.
+//! Worker commands are first collected into an internal queue.
 //!
 //! Priority commands are inserted using a LIFO policy.
 //! Normal commands are inserted using a FIFO policy.

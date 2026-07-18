@@ -1,4 +1,4 @@
-//! worker type registry for MWF.
+//! Worker type registry for MWF.
 //!
 //! This file stores all worker types known by MWF.
 //!

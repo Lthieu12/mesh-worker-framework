@@ -22,8 +22,8 @@ use mesh_worker_framework::*;
 
 // DemoWorker and DemoMessages are defined in
 // examples/getting_started/workers/demo_worker.rs.
-mod modules;
-use modules::demo_worker::{DemoMessages, DemoWorker};
+mod workers;
+use workers::demo_worker::{DemoMessages, DemoWorker};
 
 // Tokio provides the async runtime used by MWF.
 #[tokio::main]

@@ -13,8 +13,8 @@ pub type WorkerError = anyhow::Error;
 /// - Category_Error
 /// - Examples:
 ///   - Framework_NotInitialized
-///   - worker_NotFound
-///   - worker_ChannelClosed
+///   - Worker_NotFound
+///   - Worker_ChannelClosed
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
 pub enum MWFError {

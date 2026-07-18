@@ -44,8 +44,6 @@ MWF intentionally remains application-agnostic. Business concepts such as workfl
  +----------------+   +----------------+   +----------------+
 ```
 
-Throughout this documentation, "Worker" always refers to an MWF runtime worker, not a text language worker.
-
 ---
 
 ## 2. Quick Start
@@ -430,9 +428,9 @@ Each log event contains:
             ──────────── Runtime ────────────
                              │
                              ▼
-                 CameraWorker::spawn(...)
-                 FFTWorker::spawn(...)
-                 DisplayWorker::spawn(...)
+                CameraWorker::spawn_worker(...)
+                FFTWorker::spawn_worker(...)
+                DisplayWorker::spawn_worker(...)
                              │
                              ▼
                     ┌──────────────────┐
@@ -601,5 +599,5 @@ Actual application performance depends on the work performed by each worker.
 
 Additional design information is available in:
 
-- architecture.md
+- Architecture.md
 

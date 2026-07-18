@@ -62,7 +62,7 @@ Framework source code.
 
 This directory contains the complete MWF implementation.
 
-The source is organized into independent workers, each responsible for a specific framework component.
+The source is organized into independent components., each responsible for a specific framework component.
 
 Examples include:
 

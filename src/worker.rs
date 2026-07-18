@@ -1,4 +1,4 @@
-//! worker definitions for MWF.
+//! Worker definitions for MWF.
 //!
 //! This file defines the worker trait and the types used
 //! to identify and manage workers within the framework.
@@ -29,7 +29,7 @@ pub(crate) type WorkerConstructor = fn() -> Box<dyn Worker + Send>;
 /// Unlike WorkerID, MessageID and ExternalID,
 /// WorkerTypeID intentionally remains a `&'static str`.
 ///
-/// worker types are compile-time constants defined by each
+/// Worker types are compile-time constants defined by each
 /// worker implementation and are never generated dynamically.
 ///
 /// A WorkerTypeID identifies a worker *type*, not a worker instance.

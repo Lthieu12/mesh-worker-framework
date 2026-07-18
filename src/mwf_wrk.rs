@@ -225,13 +225,13 @@ impl MWFWrk {
     ///
     /// Returns:
     /// - Framework_NotInitialized if MWF has not been initialized.
-    /// - worker_NotFound if the worker does not exist.
+    /// - Worker_NotFound if the worker does not exist.
     pub fn get_worker_type_rust_path(worker_id: &WorkerID) -> Result<&'static str, MWFError> {
         // Get the WorkerTypeID associated with the worker.
-        let mwf_mod_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
-        let mwf_mod_data = mwf_mod_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
-        let worker_type_id = mwf_mod_data.worker_registry.get_worker_type_id(worker_id)?;
-        drop(mwf_mod_data_guard);
+        let mwf_wrk_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
+        let mwf_wrk_data = mwf_wrk_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+        let worker_type_id = mwf_wrk_data.worker_registry.get_worker_type_id(worker_id)?;
+        drop(mwf_wrk_data_guard);
 
         // Get the Rust type name associated with the WorkerTypeID.
         let mwf_data_guard = MWF_DATA.read().expect(MWFPanic::MWFData_ReadLockPoisoned.message());
