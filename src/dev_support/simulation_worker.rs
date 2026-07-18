@@ -1,7 +1,7 @@
-//! Generic MMF module used by integration tests.
+//! Generic MMF worker used by integration tests.
 //!
-//! This configurable module can simulate various runtime
-//! behaviors without requiring dedicated test modules.
+//! This configurable worker can simulate various runtime
+//! behaviors without requiring dedicated test workers.
 //!
 //! Supported behaviors include:
 //! - Initialization delays.
@@ -23,9 +23,9 @@ use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-use crate::MMFMod;
-use crate::message::{MessageID, ModuleMessage};
-use crate::module::{EntityID, Module, ModuleError, ModuleID, ModuleTypeID};
+use crate::MMFWrk;
+use crate::message::{MessageID, WorkerMessage};
+use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerTypeID};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(non_camel_case_types)]
@@ -34,7 +34,7 @@ pub enum SimulationBehavior {
 
     Message_Wait { message_delay_ms: u64 },
 
-    Message_SendAndWait { target_module_id: ModuleID, message_id: MessageID, timeout_ms: Option<u64>, message_delay_ms: u64 },
+    Message_SendAndWait { target_worker_id: WorkerID, message_id: MessageID, timeout_ms: Option<u64>, message_delay_ms: u64 },
 
     Init_Fail,
 
@@ -46,7 +46,7 @@ pub enum SimulationBehavior {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct SimulationModuleConfig {
+pub struct SimulationWorkerConfig {
     pub init_delay_ms: u64,
 
     pub close_delay_ms: u64,
@@ -58,12 +58,12 @@ pub struct SimulationModuleConfig {
     pub wait_children_close_timeout_ms: Option<u64>,
 }
 
-pub struct SimulationModule {
-    /// Runtime ModuleID assigned by MMF during on_init().
-    module_id: Option<ModuleID>,
+pub struct SimulationWorker {
+    /// Runtime WorkerID assigned by MMF during on_init().
+    worker_id: Option<WorkerID>,
 
-    /// Runtime FatherID assigned by MMF during on_init().
-    father_id: Option<EntityID>,
+    /// Runtime ParentID assigned by MMF during on_init().
+    parent_id: Option<EntityID>,
 
     /// Artificial delay applied during on_init().
     pub init_delay_ms: u64,
@@ -80,27 +80,27 @@ pub struct SimulationModule {
     pub wait_children_close_timeout_ms: Option<u64>,
 }
 
-/// Defines the unique behavior simulated by this module.
+/// Defines the unique behavior simulated by this worker.
 ///
-/// A SimulationModule always simulates exactly one runtime
+/// A SimulationWorker always simulates exactly one runtime
 /// behavior. The configured behavior is applied to every
-/// message received by the module.
+/// message received by the worker.
 ///
 /// This keeps integration tests deterministic and easy
 /// to understand.
 #[async_trait]
-impl Module for SimulationModule {
-    fn module_type_id() -> ModuleTypeID {
-        "SimulationModule"
+impl Worker for SimulationWorker {
+    fn worker_type_id() -> WorkerTypeID {
+        "SimulationWorker"
     }
 
     fn new() -> Self {
-        Self { module_id: None, father_id: None, init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None }
+        Self { worker_id: None, parent_id: None, init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None }
     }
 
-    async fn on_init(&mut self, module_id: ModuleID, father_id: EntityID, lifecycle_data: Bytes) -> Result<(), ModuleError> {
-        // Deserialize the simulation module configuration.
-        let configuration: SimulationModuleConfig = bincode::deserialize(lifecycle_data.as_ref())?;
+    async fn on_init(&mut self, worker_id: WorkerID, parent_id: EntityID, lifecycle_data: Bytes) -> Result<(), WorkerError> {
+        // Deserialize the simulation worker configuration.
+        let configuration: SimulationWorkerConfig = bincode::deserialize(lifecycle_data.as_ref())?;
 
         self.init_delay_ms = configuration.init_delay_ms;
         self.close_delay_ms = configuration.close_delay_ms;
@@ -109,8 +109,8 @@ impl Module for SimulationModule {
         self.wait_children_close_timeout_ms = configuration.wait_children_close_timeout_ms;
 
         // Store runtime identifiers provided by MMF.
-        self.module_id = Some(module_id);
-        self.father_id = Some(father_id);
+        self.worker_id = Some(worker_id);
+        self.parent_id = Some(parent_id);
 
         // Simulate init work.
         if self.init_delay_ms > 0 {
@@ -127,15 +127,15 @@ impl Module for SimulationModule {
         Ok(())
     }
 
-    async fn on_message(&mut self, _message: ModuleMessage) -> Result<(), ModuleError> {
+    async fn on_message(&mut self, _message: WorkerMessage) -> Result<(), WorkerError> {
         match &self.simulation_behavior {
-            SimulationBehavior::Message_SendAndWait { target_module_id, message_id, timeout_ms, message_delay_ms } => {
+            SimulationBehavior::Message_SendAndWait { target_worker_id, message_id, timeout_ms, message_delay_ms } => {
                 // Simulate message work.
                 if *message_delay_ms > 0 {
                     tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
                 }
-                let module_id = self.module_id.as_ref().expect("module_id should be initialized");
-                MMFMod::send_message_and_wait(&EntityID::new_module(module_id.clone()), target_module_id, message_id, Bytes::new(), *timeout_ms).await.unwrap();
+                let worker_id = self.worker_id.as_ref().expect("worker_id should be initialized");
+                MMFWrk::send_message_and_wait(&EntityID::new_worker(worker_id.clone()), target_worker_id, message_id, Bytes::new(), *timeout_ms).await.unwrap();
             }
 
             SimulationBehavior::Message_Wait { message_delay_ms } => {
@@ -159,13 +159,13 @@ impl Module for SimulationModule {
         Ok(())
     }
 
-    async fn on_close(&mut self, _lifecycle_data: Bytes) -> Result<(), ModuleError> {
+    async fn on_close(&mut self, _lifecycle_data: Bytes) -> Result<(), WorkerError> {
         // Optionally wait until all direct children
         // have been removed from the Registry.
         if self.wait_children_close {
-            let module_id = self.module_id.as_ref().expect("module_id should be initialized");
+            let worker_id = self.worker_id.as_ref().expect("worker_id should be initialized");
 
-            MMFMod::wait_children_close(&module_id.as_entity_id(), self.wait_children_close_timeout_ms).await.unwrap();
+            MMFWrk::wait_children_close(&worker_id.as_entity_id(), self.wait_children_close_timeout_ms).await.unwrap();
         }
 
         // Simulate shutdown work.

@@ -1,8 +1,8 @@
-# Mesh Module Framework (MMF)
+# Mesh Worker Framework (MMF)
 
 ## 1. Why MMF?
 
-Mesh Module Framework (MMF) is a Rust Tokio/Futures-based runtime for building applications composed of long-running software modules that communicate through asynchronous messages.
+Mesh Worker Framework (MMF) is a Rust Tokio/Futures-based runtime for building applications composed of long-running software workers that communicate through asynchronous messages.
 
 Typical applications include:
 
@@ -15,9 +15,9 @@ Typical applications include:
 Unlike general-purpose actor frameworks, MMF focuses on:
 
 - Deterministic execution
-- Explicit module lifecycle management
-- Type-safe module and message identifiers
-- Module-to-module and external-to-module messaging
+- Explicit worker lifecycle management
+- Type-safe worker and message identifiers
+- Worker-to-worker and external-to-worker messaging
 - Message prioritization
 - Parent/child hierarchy management
 - Message completion tracking
@@ -36,7 +36,7 @@ MMF intentionally remains application-agnostic. Business concepts such as workfl
          │                   │                   │
          ▼                   ▼                   ▼
  +----------------+   +----------------+   +----------------+
- |     MMFMod     |   |     MMFLog     |   |     MMFErr     |
+ |     MMFWrk     |   |     MMFLog     |   |     MMFErr     |
  +----------------+   +----------------+   +----------------+
  | Messaging      |   | Log events     |   | Error events   |
  | Lifecycle      |   | Monitoring     |   | Monitoring     |
@@ -44,23 +44,24 @@ MMF intentionally remains application-agnostic. Business concepts such as workfl
  +----------------+   +----------------+   +----------------+
 ```
 
-Throughout this documentation, "Module" always refers to an MMF runtime module, not a text language module.
+Throughout this documentation, "Worker" always refers to an MMF runtime worker, not a text language worker.
 
 ---
 
 ## 2. Quick Start
 
 The complete, compiled version of this example is available in `examples/getting_started`.
-It demonstrates the recommended way to initialize MMF, register a module type, spawn a module, exchange messages and gracefully shut down the framework.
+It demonstrates the recommended way to initialize MMF, register a worker type, spawn a worker, exchange messages and gracefully shut down the framework.
 
 ```rust,ignore
 use bytes::Bytes;
 
-use mesh_module_framework::*;
+use mesh_worker_framework::*;
 
-// DemoModule and DemoMessages are defined in
-// examples/getting_started/modules/demo_module.rs.
-use modules::demo_module::{DemoMessages, DemoModule};
+// DemoWorker and DemoMessages are defined in
+// examples/getting_started/workers/demo_worker.rs.
+mod workers;
+use workers::demo_worker::{DemoMessages, DemoWorker};
 
 // Tokio provides the async runtime used by MMF.
 #[tokio::main]
@@ -70,23 +71,23 @@ async fn main() -> Result<(), MMFError> {
     // Initialize MMF.
     MMF::init()?;
 
-    // Register available module types.
-    MMF::register_module_type::<DemoModule>()?;
+    // Register available worker types.
+    MMF::register_worker_type::<DemoWorker>()?;
 
-    // Create the module.
-    let demo_module_id = MMFMod::spawn_module("DemoModule", &main_entity)?;
+    // Create the worker.
+    let demo_worker_id = MMFWrk::spawn_worker("DemoWorker", &main_entity)?;
 
     // Initialize it.
-    MMFMod::init_module(&demo_module_id, Bytes::new()).await?;
-    MMFMod::wait_module_init(&demo_module_id, None).await?;
+    MMFWrk::init_worker(&demo_worker_id, Bytes::new()).await?;
+    MMFWrk::wait_worker_init(&demo_worker_id, None).await?;
 
     // Send a few messages.
-    MMFMod::send_message(&main_entity, &demo_module_id, DemoMessages::QUICK_CALCULATION, Bytes::new()).await?;
-    MMFMod::send_message(&main_entity, &demo_module_id, DemoMessages::LONG_CALCULATION, Bytes::new()).await?;
+    MMFWrk::send_message(&main_entity, &demo_worker_id, DemoMessages::QUICK_CALCULATION, Bytes::new()).await?;
+    MMFWrk::send_message(&main_entity, &demo_worker_id, DemoMessages::LONG_CALCULATION, Bytes::new()).await?;
 
-    // Close the module.
-    MMFMod::close_module(&demo_module_id, Bytes::new()).await?;
-    MMFMod::wait_module_close(&demo_module_id, None).await?;
+    // Close the worker.
+    MMFWrk::close_worker(&demo_worker_id, Bytes::new()).await?;
+    MMFWrk::wait_worker_close(&demo_worker_id, None).await?;
 
     // Shutdown.
     MMF::close()?;
@@ -95,15 +96,15 @@ async fn main() -> Result<(), MMFError> {
 }
 ```
 
-The following DemoModule implementation, available in `examples/getting_started/modules/demo_module.rs`, is used by the previous example and illustrates the minimum implementation required to create an MMF module.
+The following DemoWorker implementation, available in `examples/getting_started/workers/demo_worker.rs`, is used by the previous example and illustrates the minimum implementation required to create an MMF worker.
 
 ```rust,ignore
 use std::time::Duration;
 use bytes::Bytes;
 use async_trait::async_trait;
-use mesh_module_framework::*;
+use mesh_worker_framework::*;
 
-/// Message identifiers handled by DemoModule.
+/// Message identifiers handled by DemoWorker.
 pub struct DemoMessages;
 
 /// Defines the message identifiers.
@@ -112,43 +113,43 @@ impl DemoMessages {
     pub const LONG_CALCULATION: &'static str = "LONG_CALCULATION";
 }
 
-/// Private data associated with a DemoModule instance.
-pub struct DemoModule {
-    module_id: Option<ModuleID>,
-    father_id: Option<EntityID>,
+/// Private data associated with a DemoWorker instance.
+pub struct DemoWorker {
+    worker_id: Option<WorkerID>,
+    parent_id: Option<EntityID>,
 }
 
-/// MMF module implementation for DemoModule.
+/// MMF worker implementation for DemoWorker.
 #[async_trait]
-impl Module for DemoModule {
-    fn module_type_id() -> ModuleTypeID {
-        "DemoModule"
+impl Worker for DemoWorker {
+    fn worker_type_id() -> WorkerTypeID {
+        "DemoWorker"
     }
 
     fn new() -> Self {
-        Self { module_id: None, father_id: None, }
+        Self { worker_id: None, parent_id: None, }
     }
 
-    async fn on_init(&mut self, module_id: ModuleID, father_id: EntityID, _lifecycle_data: Bytes) -> Result<(), ModuleError> {
+    async fn on_init(&mut self, worker_id: WorkerID, parent_id: EntityID, _lifecycle_data: Bytes) -> Result<(), WorkerError> {
         // Store identifiers for later use (for example to send messages or
-        // spawn child modules from within the module).
-        self.module_id = Some(module_id);
-        self.father_id = Some(father_id);
+        // spawn child workers from within the worker).
+        self.worker_id = Some(worker_id);
+        self.parent_id = Some(parent_id);
 
         Ok(())
     }
 
-    async fn on_message(&mut self, message: ModuleMessage) -> Result<(), ModuleError> {
+    async fn on_message(&mut self, message: WorkerMessage) -> Result<(), WorkerError> {
         
         match message.message_id.as_str() {
             DemoMessages::QUICK_CALCULATION => {
-                // Small blocking work performed directly by the module.
+                // Small blocking work performed directly by the worker.
                 std::thread::sleep(Duration::from_millis(10));
             }
 
             DemoMessages::LONG_CALCULATION => {
                 // Long blocking work should be offloaded to a dedicated thread.
-                MMFMod::spawn_blocking(|| {
+                MMFWrk::spawn_blocking(|| {
                     std::thread::sleep(Duration::from_millis(1000));
                 })
                 .await?;
@@ -162,7 +163,7 @@ impl Module for DemoModule {
         Ok(())
     }
 
-    async fn on_close(&mut self, _lifecycle_data: Bytes) -> Result<(), ModuleError> {
+    async fn on_close(&mut self, _lifecycle_data: Bytes) -> Result<(), WorkerError> {
 
         Ok(())
     }
@@ -173,13 +174,13 @@ impl Module for DemoModule {
 
 ## 3. Core Principles
 
-### One Module = One Message at a Time
+### One Worker = One Message at a Time
 
-A module never processes multiple messages simultaneously.
+A worker never processes multiple messages simultaneously.
 
 This guarantees deterministic behavior and simplifies communication with hardware devices, external APIs and long-running calculations.
 
-Parallelism is achieved by running multiple modules concurrently, not by processing multiple messages concurrently inside a single module.
+Parallelism is achieved by running multiple workers concurrently, not by processing multiple messages concurrently inside a single worker.
 
 ---
 
@@ -195,7 +196,7 @@ Serialization and deserialization are always the responsibility of the applicati
 
 ### Explicit Lifecycle
 
-Every module implements:
+Every worker implements:
 
 * `on_init()`
 * `on_message()`
@@ -207,11 +208,11 @@ These lifecycle methods are mandatory.
 
 ### Centralized Error Handling
 
-Errors returned by module callbacks are automatically
+Errors returned by worker callbacks are automatically
 captured by MMFErr.
 
 Applications can monitor error events without requiring
-individual modules to implement their own error reporting
+individual workers to implement their own error reporting
 mechanisms.
 
 MMFErr can also be used by application code to record
@@ -234,31 +235,31 @@ and production.
 
 ---
 
-### Module Type Registration
+### Worker Type Registration
 
-Before any module instance can be spawned,
-its module type must be registered with MMF.
+Before any worker instance can be spawned,
+its worker type must be registered with MMF.
 
-Each module implementation defines its own unique
-`ModuleTypeID` through the Module trait.
+Each worker implementation defines its own unique
+`WorkerTypeID` through the Worker trait.
 
-Module types are typically registered once during
+Worker types are typically registered once during
 application startup:
 
 ```rust,ignore
 MMF::init()?;
 
-MMF::register_module_type::<CameraModule>()?;
-MMF::register_module_type::<FFTModule>()?;
-MMF::register_module_type::<DisplayModule>()?;
+MMF::register_worker_type::<CameraWorker>()?;
+MMF::register_worker_type::<FFTWorker>()?;
+MMF::register_worker_type::<DisplayWorker>()?;
 ```
 
-Once registered, module instances can be spawned normally.
+Once registered, worker instances can be spawned normally.
 
 This registration step allows MMF to associate each
-`ModuleTypeID` with its corresponding Rust module type.
+`WorkerTypeID` with its corresponding Rust worker type.
 
-Future MMF features, such as workflow-based module
+Future MMF features, such as workflow-based worker
 instantiation, will rely on this information.
 
 ---
@@ -268,8 +269,8 @@ instantiation, will rely on this information.
 All messaging functions are asynchronous.
 
 MMF uses asynchronous backpressure.
-When a module queue reaches its configured capacity, message senders are suspended asynchronously until space becomes available. 
-This prevents message loss while allowing the Tokio runtime to continue executing other modules.
+When a worker queue reaches its configured capacity, message senders are suspended asynchronously until space becomes available. 
+This prevents message loss while allowing the Tokio runtime to continue executing other workers.
 Backpressure is transparent to the application and never blocks a Tokio worker thread.
 
 ### Send
@@ -290,7 +291,7 @@ Priority messages are handled using a Last-In, First-Out
 ### SendAndWait
 
 The current processing flow is suspended until the target
-module finishes processing the message or a timeout occurs.
+worker finishes processing the message or a timeout occurs.
 
 The caller receives the processing result.
 
@@ -304,7 +305,7 @@ specialized use cases:
 * SendPriorityAndWait
 * SendUnique
 
-See the `MMFMod` API documentation for the complete semantics
+See the `MMFWrk` API documentation for the complete semantics
 and usage of these messaging functions.
 
 ---
@@ -313,7 +314,7 @@ and usage of these messaging functions.
 
 MMF provides a centralized error collection system.
 
-Errors generated by module callbacks are automatically
+Errors generated by worker callbacks are automatically
 recorded by MMFErr.
 
 Application code may also publish custom error events
@@ -347,10 +348,10 @@ Framework lifecycle events and message processing are automatically recorded by 
 
 Supported framework events include:
 
-* Module spawn
-* Module initialization
-* Module shutdown
-* Module abort
+* Worker spawn
+* Worker initialization
+* Worker shutdown
+* Worker abort
 * Message reception
 
 Log events are stored in a circular buffer and can be retrieved asynchronously by monitoring tools, loggers or application code.
@@ -359,7 +360,7 @@ Each log event contains:
 
 * LogInstanceID
 * Timestamp
-* ModuleID
+* WorkerID
 * Event
 * SenderID (when applicable)
 * MessageID (when applicable)
@@ -385,7 +386,7 @@ Each log event contains:
       │                       │                        │
       ▼                       ▼                        ▼
 ┌────────────┐        ┌────────────┐          ┌────────────────┐
-│   MMFMod   │        │   MMFLog   │          │     MMFErr     │
+│   MMFWrk   │        │   MMFLog   │          │     MMFErr     │
 ├────────────┤        ├────────────┤          ├────────────────┤
 │ Registry   │        │ Log buffer │          │ Error buffer   │
 │ Messaging  │        │ Waiters    │          │ Waiters        │
@@ -394,16 +395,16 @@ Each log event contains:
       │
       ▼
 ┌──────────────────────────────────────────────────────────────┐
-│                         ModuleTask                           │
+│                         WorkerTask                           │
 │                                                              │
-│  • owns the Module instance                                  │
+│  • owns the Worker instance                                  │
 │  • executes lifecycle callbacks                              │
 └──────────────────────────────┬───────────────────────────────┘
                                │ owns
                                ▼
                    ┌───────────────────────────┐
-                   │        User Module        │
-                   │   (implements Module)     │
+                   │        User Worker        │
+                   │   (implements Worker)     │
                    ├───────────────────────────┤
                    │ on_init()                 │
                    │ on_message()              │
@@ -421,43 +422,43 @@ Each log event contains:
                        MMF::init()
                              │
                              ▼
-           MMF::register_module_type::<CameraModule>()
-           MMF::register_module_type::<FFTModule>()
-           MMF::register_module_type::<DisplayModule>()
+           MMF::register_worker_type::<CameraWorker>()
+           MMF::register_worker_type::<FFTWorker>()
+           MMF::register_worker_type::<DisplayWorker>()
                              │
                              ▼
             ──────────── Runtime ────────────
                              │
                              ▼
-                 CameraModule::spawn(...)
-                 FFTModule::spawn(...)
-                 DisplayModule::spawn(...)
+                 CameraWorker::spawn(...)
+                 FFTWorker::spawn(...)
+                 DisplayWorker::spawn(...)
                              │
                              ▼
                     ┌──────────────────┐
-                    │     MMFMod       │
+                    │     MMFWrk       │
                     └────────┬─────────┘
                              │
-                spawns one Tokio task per module
+                spawns one Tokio task per worker
                              │
                              ▼
         ┌─────────────┬─────────────┬─────────────┐
         ▼             ▼             ▼
    +-----------+ +-----------+ +---------------+
-   |ModuleTask | |ModuleTask | |  ModuleTask   |
+   |WorkerTask | |WorkerTask | |  WorkerTask   |
    +-----┬-----+ +-----┬-----+ +-------┬-------+
          │             │               │
          ▼             ▼               ▼
-   CameraModule    FFTModule     DisplayModule
+   CameraWorker    FFTWorker     DisplayWorker
 ```
 
 ---
 
 ### Architecture main rule
 
-Each module owns its own mailbox and processes messages sequentially.
+Each worker owns its own mailbox and processes messages sequentially.
 
-Parallelism is achieved by running multiple modules concurrently, not by processing multiple messages concurrently inside a single module.
+Parallelism is achieved by running multiple workers concurrently, not by processing multiple messages concurrently inside a single worker.
 
 ---
 
@@ -480,7 +481,7 @@ MMF is designed to be fully cross-platform and currently supports:
 * Windows
 * Linux
 
-No platform-specific application code should be required when developing modules with MMF.
+No platform-specific application code should be required when developing workers with MMF.
 
 To help guarantee cross-platform compatibility, the repository includes a verification script (scripts/verify.ps1) that automatically validates the framework on both Windows and Linux (WSL2). The script performs formatting, linting, testing, example compilation, and documentation generation on each supported platform.
 
@@ -557,7 +558,7 @@ Run it with:
 cargo run --release --example runtime_overhead_benchmark
 ```
 
-The number of modules can optionally be specified:
+The number of workers can optionally be specified:
 
 ```bash
 cargo run --release --example runtime_overhead_benchmark -- 100
@@ -566,10 +567,10 @@ cargo run --release --example runtime_overhead_benchmark -- 10000
 
 The stress test measures:
 
-- Module creation
-- Module initialization
+- Worker creation
+- Worker initialization
 - Parallel `send_message_and_wait()`
-- Module shutdown
+- Worker shutdown
 - Overall throughput
 
 Example output:
@@ -579,20 +580,20 @@ Example output:
             MMF runtime overhead benchmark  
 =====================================================    
                                               
-Modules : 1000                                             
+Workers : 1000                                             
                                                 
-Spawn                   :  3.775ms (3.77 µs/module)
-Init                    : 662.700µs (0.66 µs/module)
+Spawn                   :  3.775ms (3.77 µs/worker)
+Init                    : 662.700µs (0.66 µs/worker)
 SendAndWait (parallel)  :  1.307ms (1.31 µs/message)
-Close                   :  3.248ms (3.25 µs/module)
+Close                   :  3.248ms (3.25 µs/worker)
 
 Total                   :  8.992ms
 Throughput              : 765345 msg/s
 ```
 
 These measurements represent the runtime overhead of MMF using
-`SimulationModule` with `SimulationBehavior::DoNothing`.
-Actual application performance depends on the work performed by each module.
+`SimulationWorker` with `SimulationBehavior::DoNothing`.
+Actual application performance depends on the work performed by each worker.
 
 ---
 

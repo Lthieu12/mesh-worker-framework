@@ -2,14 +2,14 @@
 
 use serial_test::serial;
 
-use mesh_module_framework::*;
+use mesh_worker_framework::*;
 
 #[tokio::test]
 #[serial]
 async fn test_spawn_blocking_ok() {
     MMF::init().unwrap();
 
-    let result = MMFMod::spawn_blocking(|| 42).await.unwrap();
+    let result = MMFWrk::spawn_blocking(|| 42).await.unwrap();
 
     assert_eq!(result, 42);
 
@@ -21,7 +21,7 @@ async fn test_spawn_blocking_ok() {
 async fn test_spawn_blocking_panic() {
     MMF::init().unwrap();
 
-    let result = MMFMod::spawn_blocking(|| {
+    let result = MMFWrk::spawn_blocking(|| {
         panic!("Blocking task panic");
     })
     .await;

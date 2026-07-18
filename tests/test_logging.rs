@@ -1,12 +1,12 @@
 //! Verify proper behavior of MMFLog.
 //!
 //! First test :
-//! Validate module lifecycle logging.
+//! Validate worker lifecycle logging.
 //!
 //! This test verifies that MMFLog records:
-//! - ModuleSpawn
-//! - ModuleInit
-//! - ModuleClose
+//! - workerSpawn
+//! - workerInit
+//! - workerClose
 //!
 //! Second test :
 //! in the expected order with LogStatus::Ok.
@@ -33,29 +33,29 @@ use bytes::Bytes;
 use serial_test::serial;
 
 use dev_support::dev_helper::*;
-use dev_support::simulation_module::{SimulationBehavior, SimulationModule, SimulationModuleConfig};
-use mesh_module_framework::*;
+use dev_support::simulation_worker::{SimulationBehavior, SimulationWorker, SimulationWorkerConfig};
+use mesh_worker_framework::*;
 
 // MMF uses a global runtime instance.
 // Integration tests must run serially.
 #[tokio::test]
 #[serial]
-async fn test_mmf_log_module_lifecycle() {
+async fn test_mmf_log_worker_lifecycle() {
     MMF::init().unwrap();
-    MMF::register_module_type::<SimulationModule>().unwrap();
+    MMF::register_worker_type::<SimulationWorker>().unwrap();
 
     MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
 
-    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::new_external("Test")).unwrap();
+    let worker_id = MMFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
 
-    let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
+    let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MMFMod::init_module(&module_id, lifecycle_data).await.unwrap();
+    MMFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
 
-    MMFMod::wait_module_init(&module_id, Some(1000)).await.unwrap();
-    MMFMod::close_module(&module_id, Bytes::new()).await.unwrap();
-    MMFMod::wait_module_close(&module_id, Some(1000)).await.unwrap();
+    MMFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
+    MMFWrk::close_worker(&worker_id, Bytes::new()).await.unwrap();
+    MMFWrk::wait_worker_close(&worker_id, Some(1000)).await.unwrap();
 
     let log_list = MMFLog::wait_log(None).await.unwrap();
 
@@ -65,13 +65,13 @@ async fn test_mmf_log_module_lifecycle() {
 
     assert_eq!(log_list.log_event_list.len(), 5);
 
-    assert!(matches!(log_list.log_event_list[0].log_action, LogAction::ModuleSpawn));
+    assert!(matches!(log_list.log_event_list[0].log_action, LogAction::WorkerSpawn));
 
-    assert!(matches!(log_list.log_event_list[1].log_action, LogAction::ModuleInit));
-    assert!(matches!(log_list.log_event_list[2].log_action, LogAction::ModuleInit));
+    assert!(matches!(log_list.log_event_list[1].log_action, LogAction::WorkerInit));
+    assert!(matches!(log_list.log_event_list[2].log_action, LogAction::WorkerInit));
 
-    assert!(matches!(log_list.log_event_list[3].log_action, LogAction::ModuleClose));
-    assert!(matches!(log_list.log_event_list[4].log_action, LogAction::ModuleClose));
+    assert!(matches!(log_list.log_event_list[3].log_action, LogAction::WorkerClose));
+    assert!(matches!(log_list.log_event_list[4].log_action, LogAction::WorkerClose));
 
     assert_eq!(log_list.log_event_list[0].log_status, LogStatus::Ok);
 
@@ -90,23 +90,23 @@ async fn test_mmf_log_module_lifecycle() {
 #[serial]
 async fn test_mmf_log_messages() {
     MMF::init().unwrap();
-    MMF::register_module_type::<SimulationModule>().unwrap();
+    MMF::register_worker_type::<SimulationWorker>().unwrap();
 
     MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
 
-    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::new_external("Test")).unwrap();
+    let worker_id = MMFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
 
-    let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
+    let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MMFMod::init_module(&module_id, lifecycle_data).await.unwrap();
-    MMFMod::wait_module_init(&module_id, Some(1000)).await.unwrap();
-    MMFMod::send_message(&EntityID::new_external("Test"), &module_id, "MSG_1", Bytes::new()).await.unwrap();
-    MMFMod::send_priority_message(&EntityID::new_external("Test"), &module_id, "MSG_2", Bytes::new()).await.unwrap();
-    MMFMod::send_message_and_wait(&EntityID::new_external("Test"), &module_id, "MSG_3", Bytes::new(), Some(1000)).await.unwrap();
-    MMFMod::send_priority_message_and_wait(&EntityID::new_external("Test"), &module_id, "MSG_4", Bytes::new(), Some(1000)).await.unwrap();
-    MMFMod::close_module(&module_id, Bytes::new()).await.unwrap();
-    MMFMod::wait_module_close(&module_id, Some(1000)).await.unwrap();
+    MMFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
+    MMFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
+    MMFWrk::send_message(&EntityID::new_external("Test"), &worker_id, "MSG_1", Bytes::new()).await.unwrap();
+    MMFWrk::send_priority_message(&EntityID::new_external("Test"), &worker_id, "MSG_2", Bytes::new()).await.unwrap();
+    MMFWrk::send_message_and_wait(&EntityID::new_external("Test"), &worker_id, "MSG_3", Bytes::new(), Some(1000)).await.unwrap();
+    MMFWrk::send_priority_message_and_wait(&EntityID::new_external("Test"), &worker_id, "MSG_4", Bytes::new(), Some(1000)).await.unwrap();
+    MMFWrk::close_worker(&worker_id, Bytes::new()).await.unwrap();
+    MMFWrk::wait_worker_close(&worker_id, Some(1000)).await.unwrap();
 
     let log_list = MMFLog::wait_log(None).await.unwrap();
 
@@ -121,7 +121,7 @@ async fn test_mmf_log_messages() {
         println!("{:?} {:?}", log_event.log_action, log_event.log_status);
 
         match &log_event.log_action {
-            LogAction::ModuleMessage { priority, wait_completion, .. } => {
+            LogAction::WorkerMessage { priority, wait_completion, .. } => {
                 match (*priority, *wait_completion) {
                     (false, false) => {
                         found_normal = true;
@@ -163,18 +163,18 @@ async fn test_mmf_log_buffer_overflow() {
     let config = MMFConfiguration { log_event_buffer_capacity: 10, ..Default::default() };
 
     MMF::init_with_configuration(config).unwrap();
-    MMF::register_module_type::<SimulationModule>().unwrap();
+    MMF::register_worker_type::<SimulationWorker>().unwrap();
 
     MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
 
-    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::new_external("Test")).unwrap();
+    let worker_id = MMFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
 
-    let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
+    let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MMFMod::init_module(&module_id, lifecycle_data).await.unwrap();
+    MMFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
 
-    MMFMod::wait_module_init(&module_id, Some(1000)).await.unwrap();
+    MMFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
 
     // Consume all logs currently present.
     let log_list = MMFLog::wait_log(None).await.unwrap();
@@ -183,7 +183,7 @@ async fn test_mmf_log_buffer_overflow() {
 
     // Generate more logs than the buffer can hold.
     for index in 0..15 {
-        MMFMod::send_message(&EntityID::new_external("Test"), &module_id, format!("MSG_{index}"), Bytes::new()).await.unwrap();
+        MMFWrk::send_message(&EntityID::new_external("Test"), &worker_id, format!("MSG_{index}"), Bytes::new()).await.unwrap();
     }
 
     let log_list = MMFLog::wait_log(last_log_instance_id).await.unwrap();
@@ -192,8 +192,8 @@ async fn test_mmf_log_buffer_overflow() {
 
     assert_eq!(log_list.log_event_list.len(), 10);
 
-    MMFMod::close_module(&module_id, Bytes::new()).await.unwrap();
-    MMFMod::wait_module_close(&module_id, Some(1000)).await.unwrap();
+    MMFWrk::close_worker(&worker_id, Bytes::new()).await.unwrap();
+    MMFWrk::wait_worker_close(&worker_id, Some(1000)).await.unwrap();
 
     MMF::close().unwrap();
 }

@@ -194,7 +194,7 @@ The project remains stored on the Windows filesystem.
 Example:
 
 ```bash
-cd "/mnt/c/Users/<WindowsUser>/Documents/Dev Rust/mesh-module-framework"
+cd "/mnt/c/Users/<WindowsUser>/Documents/Dev Rust/mesh-worker-framework"
 ```
 
 No duplicate copy of the project is required.

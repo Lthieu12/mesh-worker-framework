@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Mesh Module Framework (MMF) is a Tokio-based modular runtime for applications composed of independent communicating modules.
+Mesh Worker Framework (MMF) is a Tokio-based modular runtime for applications composed of independent communicating workers.
 
 MMF provides runtime services such as:
 
-* Module lifecycle management
+* Worker lifecycle management
 * Message routing
 * Parent/child hierarchy management
 * Centralized error collection
@@ -14,19 +14,19 @@ MMF provides runtime services such as:
 
 MMF is intentionally application-agnostic.
 
-Application-specific concepts such as workflows, measurements, calculations or business logic are expected to be implemented by modules built on top of MMF.
+Application-specific concepts such as workflows, measurements, calculations or business logic are expected to be implemented by workers built on top of MMF.
 
 Example:
 
 ```text
 MMF
- ├── CameraModule
- ├── FFTModule
- ├── LoggerModule
- └── WorkflowModule
+ ├── CameraWorker
+ ├── FFTWorker
+ ├── LoggerWorker
+ └── WorkflowWorker
 ```
 
-All modules are considered application code. MMF itself remains unaware of their responsibilities.
+All workers are considered application code. MMF itself remains unaware of their responsibilities.
 
 ---
 
@@ -36,20 +36,20 @@ MMF intentionally makes several architectural choices that may differ from tradi
 
 These decisions are intended to keep the runtime deterministic, application-agnostic and easy to reason about.
 
-## Registered Module Types
+## Registered Worker Types
 
-Modules are registered once during application startup.
+Workers are registered once during application startup.
 
 ```rust
-MMF::register_module_type::<CameraModule>()?;
+MMF::register_worker_type::<CameraWorker>()?;
 ```
 
-MMF associates each ModuleTypeID with a constructor capable of creating new module instances.
+MMF associates each WorkerTypeID with a constructor capable of creating new worker instances.
 
-Modules are then spawned using their ModuleTypeID rather than concrete Rust types.
+Workers are then spawned using their WorkerTypeID rather than concrete Rust types.
 
 ```rust
-let module_id = MMFMod::spawn_module("CameraModule", &EntityID::External("MAIN".into()))?;
+let worker_id = MMFWrk::spawn_worker("CameraWorker", &EntityID::External("MAIN".into()))?;
 ```
 
 This also decouples application configuration from Rust code. Workflows can be loaded from configuration files, 
@@ -59,25 +59,25 @@ databases or graphical editors without embedding Rust types into application dat
 
 ## Explicit Lifecycle
 
-Creating a module and initializing it are two independent operations.
+Creating a worker and initializing it are two independent operations.
 
 ```text
-spawn_module()
+spawn_worker()
 
 ↓
 
-init_module()
+init_worker()
 
 ↓
 
 on_init()
 ```
 
-Separating creation from initialization gives the application complete control over the module startup sequence.
+Separating creation from initialization gives the application complete control over the worker startup sequence.
 
-For example, multiple modules can be spawned first, then initialized simultaneously or in a specific order.
+For example, multiple workers can be spawned first, then initialized simultaneously or in a specific order.
 
-Modules can therefore be created before the resources they require become available.
+Workers can therefore be created before the resources they require become available.
 
 ---
 
@@ -90,9 +90,9 @@ Both lifecycle data and message data are transported as opaque Bytes.
 MMF does not require or recommend any particular serialization format.
 
 ```rust
-MMFMod::init_module(module_id, lifecycle_data).await?;
+MMFWrk::init_worker(worker_id, lifecycle_data).await?;
 
-MMFMod::send_message(..., message_data).await?;
+MMFWrk::send_message(..., message_data).await?;
 ```
 
 Serialization and deserialization remain entirely under application control.
@@ -103,21 +103,21 @@ This keeps MMF independent from any serialization library or application-specifi
 
 ## One Message at a Time
 
-Each module processes a single message at a time.
+Each worker processes a single message at a time.
 
-Callbacks are never executed concurrently on the same module instance.
+Callbacks are never executed concurrently on the same worker instance.
 
-This greatly simplifies stateful module development, since most modules can safely mutate their internal state without additional synchronization primitives.
+This greatly simplifies stateful worker development, since most workers can safely mutate their internal state without additional synchronization primitives.
 
-Parallelism is achieved by running multiple modules concurrently rather than processing multiple messages simultaneously inside a single module.
+Parallelism is achieved by running multiple workers concurrently rather than processing multiple messages simultaneously inside a single worker.
 
 ---
 
 ## Explicit Observability
 
-MMF automatically records module lifecycle events, message processing and framework errors.
+MMF automatically records worker lifecycle events, message processing and framework errors.
 
-Applications can inspect these events through MMFLog and MMFErr without instrumenting their own modules.
+Applications can inspect these events through MMFLog and MMFErr without instrumenting their own workers.
 
 This makes runtime diagnostics available by default while keeping application code focused on business logic.
 
@@ -125,9 +125,9 @@ This makes runtime diagnostics available by default while keeping application co
 
 # Runtime Model
 
-MMF uses one Tokio task per module.
+MMF uses one Tokio task per worker.
 
-After a module is spawned:
+After a worker is spawned:
 
 ```text
                            MMF Runtime
@@ -140,18 +140,18 @@ After a module is spawned:
         │                     │                     │
         ▼                     ▼                     ▼
   ┌────────────┐      ┌────────────┐       ┌────────────┐
-  │   MMFMod   │      │   MMFLog   │       │   MMFErr   │
+  │   MMFWrk   │      │   MMFLog   │       │   MMFErr   │
   └─────┬──────┘      └────────────┘       └────────────┘
         │
         │ owns
         ▼
   ┌──────────────────────────────────────────────┐
-  │                 ModuleTask                   │
+  │                 WorkerTask                   │
   └──────────────────┬───────────────────────────┘
                      │ owns
                      ▼
-              User Module
-          (implements Module)
+              User Worker
+          (implements Worker)
 ```
 
 MMF owns:
@@ -160,9 +160,9 @@ MMF owns:
 * JoinHandles
 * Runtime metadata
 
-ModuleTask owns:
+WorkerTask owns:
 
-* The module instance
+* The worker instance
 * Message processing
 * Lifecycle callback execution
 
@@ -176,22 +176,22 @@ on_message()
 on_close()
 ```
 
-These callbacks are always executed inside the Tokio task that owns the module instance.
+These callbacks are always executed inside the Tokio task that owns the worker instance.
 
 ---
 
-# Module
+# Worker
 
-A Module is the fundamental execution unit of MMF.
+A Worker is the fundamental execution unit of MMF.
 
-Every module owns:
+Every worker owns:
 
-* A unique ModuleID
+* A unique WorkerID
 * A mailbox
 * A Tokio task
 * A lifecycle state
 
-Every module implements:
+Every worker implements:
 
 ```rust
 on_init()
@@ -206,20 +206,20 @@ These lifecycle methods are mandatory.
 ```text
               User Application
 
-        ex: AcquisitionModule
-        ex: FFTModule
-        ex: DisplayModule
+        ex: AcquisitionWorker
+        ex: FFTWorker
+        ex: DisplayWorker
              │
              ▼
-     implements Module trait
+     implements Worker trait
 
              │
              ▼
-        MMF::spawn_module()
+        MMF::spawn_worker()
 
              │
              ▼
-        creates ModuleTask
+        creates WorkerTask
 
              │
              ▼
@@ -236,10 +236,10 @@ These lifecycle methods are mandatory.
 
 # Execution Model
 
-A module processes one event at a time.
+A worker processes one event at a time.
 
 ```text
-                 ModuleTask
+                 WorkerTask
 
                     │
 
@@ -268,17 +268,17 @@ A module processes one event at a time.
                on_close()
 ```
 
-No two callbacks can execute simultaneously on the same module instance.
+No two callbacks can execute simultaneously on the same worker instance.
 
-Parallelism is achieved by running multiple modules concurrently.
+Parallelism is achieved by running multiple workers concurrently.
 
-This guarantees deterministic module behavior and eliminates the need for internal synchronization inside most modules.
+This guarantees deterministic worker behavior and eliminates the need for internal synchronization inside most workers.
 
 ---
 
-# Module Lifecycle
+# Worker Lifecycle
 
-Modules transition through explicit lifecycle states.
+Workers transition through explicit lifecycle states.
 
 ```text
 Created
@@ -327,24 +327,24 @@ MessageData
 ```
 
 ```text
-User Module A
+User Worker A
       │
       │ send_message()
       ▼
 +-------------+
-|   MMFMod    |
+|   MMFWrk    |
 +-------------+
       │
       │ route message
       ▼
 +-------------+
-| ModuleTask  |
+| WorkerTask  |
 +-------------+
       │
       │ execute callback
       ▼
 +--------------+
-| User Module B|
+| User Worker B|
 | on_message() |
 +--------------+
 ```
@@ -381,7 +381,7 @@ Priority messages use a Last-In First-Out (LIFO) policy.
 
 ## SendAndWait
 
-The sender waits until the target module completes message processing or a timeout occurs.
+The sender waits until the target worker completes message processing or a timeout occurs.
 
 The processing result is returned to the caller.
 
@@ -389,7 +389,7 @@ The processing result is returned to the caller.
 
 # Message Priorities
 
-MMF maintains two independent channels per module:
+MMF maintains two independent channels per worker:
 
 ```text
 Normal Channel
@@ -418,7 +418,7 @@ A
 
 # Parent / Child Hierarchy
 
-Modules may declare a parent entity.
+Workers may declare a parent entity.
 
 Example:
 
@@ -438,11 +438,11 @@ MMF provides APIs allowing a parent to wait until all direct children have termi
 
 # Registry
 
-MMF maintains a runtime registry containing information about active modules.
+MMF maintains a runtime registry containing information about active workers.
 
 Typical information includes:
 
-* ModuleID
+* WorkerID
 * Parent EntityID
 * Lifecycle state
 * Communication channels

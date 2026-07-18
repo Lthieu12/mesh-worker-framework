@@ -9,8 +9,8 @@ use std::sync::atomic::Ordering;
 use crate::MMF;
 use crate::framework_error::{MMFError, MMFPanic};
 use crate::mmf::{MMF_ERR_DATA, MMF_ERR_INSTANCE_COUNTER, MMF_ERR_NOTIFY};
-use crate::module::EntityID;
 use crate::string_helper;
+use crate::worker::EntityID;
 
 /// Unique identifier assigned to each error event.
 pub type ErrorInstanceID = u64;
@@ -27,7 +27,7 @@ mod terminal_error_column {
 
 /// Error event recorded by MMFErr.
 ///
-/// An ErrorEvent is generated whenever a module callback
+/// An ErrorEvent is generated whenever a worker callback
 /// (on_init, on_message or on_close) returns an error.
 ///
 /// Error events are stored in a circular buffer and can
@@ -44,7 +44,7 @@ pub struct ErrorEvent {
     /// Origin of the error.
     pub entity_id: EntityID,
 
-    /// Main error description returned by the module.
+    /// Main error description returned by the worker.
     pub error_description: String,
 
     /// Chain of underlying error causes.
@@ -183,7 +183,7 @@ impl MMFErr {
     ///
     /// This internal function is used by MMF to enrich error
     /// events with framework-specific context, such as the
-    /// module callback where the error occurred.
+    /// worker callback where the error occurred.
     ///
     /// Application code should use `add_error()` instead.
     ///

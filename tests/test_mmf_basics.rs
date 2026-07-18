@@ -9,7 +9,7 @@ use serial_test::serial;
 #[serial]
 mod tests {
 
-    use mesh_module_framework::*;
+    use mesh_worker_framework::*;
 
     #[test]
     fn test_mmf_init_close() {

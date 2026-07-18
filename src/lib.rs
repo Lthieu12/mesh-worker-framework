@@ -7,16 +7,16 @@ mod channel;
 mod framework_error;
 mod log_file;
 mod message;
-mod module;
-mod module_registry;
-mod module_task;
-mod module_type_registry;
 mod string_helper;
+mod worker;
+mod worker_registry;
+mod worker_task;
+mod worker_type_registry;
 
 pub mod mmf;
 pub mod mmf_err;
 pub mod mmf_log;
-pub mod mmf_mod;
+pub mod mmf_wrk;
 
 // only used for tests, examples and debug.
 //
@@ -29,12 +29,12 @@ pub mod dev_support;
 pub use mmf::{MMF, MMFConfiguration};
 pub use mmf_err::{ErrorEvent, ErrorInstanceID, ErrorList, ErrorOutputFormat, MMFErr};
 pub use mmf_log::{LogAction, LogEvent, LogInstanceID, LogList, LogMode, LogOutputFormat, LogStatus, MMFLog};
-pub use mmf_mod::MMFMod;
+pub use mmf_wrk::MMFWrk;
 
 pub use framework_error::MMFError;
 
-pub use module::ModuleError;
+pub use worker::WorkerError;
 
-pub use module::{EntityID, ExternalID, Module, ModuleID, ModuleInfo, ModuleList, ModuleOutputFormat, ModuleState, ModuleStatus, ModuleTypeID};
+pub use worker::{EntityID, ExternalID, Worker, WorkerID, WorkerInfo, WorkerList, WorkerOutputFormat, WorkerState, WorkerStatus, WorkerTypeID};
 
-pub use message::{MessageID, ModuleMessage};
+pub use message::{MessageID, WorkerMessage};

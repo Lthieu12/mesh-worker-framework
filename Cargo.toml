@@ -1,5 +1,5 @@
 [package]
-name = "mesh-module-framework"
+name = "mesh-worker-framework"
 version = "0.9.0"
 edition = "2024"
 

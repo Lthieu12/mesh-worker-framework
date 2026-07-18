@@ -1,1 +1,1 @@
-pub mod demo_module;
+pub mod demo_worker;

@@ -14,7 +14,7 @@ use crate::mmf_log::{LogEvent, LogList, LogOutputFormat, LoggingData};
 /// This header allows MMF to distinguish its own log files
 /// from user-created files sharing the same name.
 const LOG_FILE_HEADER_V1: &str = "############################################################
-# Mesh Module Framework Log File
+# Mesh Worker Framework Log File
 # Format Version : 1
 ############################################################
 ";

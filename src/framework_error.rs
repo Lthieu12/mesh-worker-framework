@@ -1,11 +1,11 @@
 //! Framework error definitions.
 //!
-//! This module contains all errors that can be returned by MMF public APIs.
+//! This file contains all errors that can be returned by MMF public APIs.
 
 use std::error::Error;
 use std::fmt;
 
-pub type ModuleError = anyhow::Error;
+pub type WorkerError = anyhow::Error;
 
 /// Errors returned by MMF functions.
 ///
@@ -13,8 +13,8 @@ pub type ModuleError = anyhow::Error;
 /// - Category_Error
 /// - Examples:
 ///   - Framework_NotInitialized
-///   - Module_NotFound
-///   - Module_ChannelClosed
+///   - worker_NotFound
+///   - worker_ChannelClosed
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
 pub enum MMFError {
@@ -27,53 +27,53 @@ pub enum MMFError {
     /// The framework is already initialized.
     Framework_AlreadyInitialized,
 
-    /// The framework shutdown failed: one or more modules are still running.
-    Framework_CannotClose_ModulesStillRunning,
+    /// The framework shutdown failed: one or more workers are still running.
+    Framework_CannotClose_workersStillRunning,
 
-    /// The requested module type was not found.
+    /// The requested worker type was not found.
     /// Internal registry lookup error.
-    ModuleType_NotFound,
+    WorkerType_NotFound,
 
-    /// ModuleTypeID is already used by another module type.
-    ModuleType_DuplicateModuleTypeID,
+    /// WorkerTypeID is already used by another worker type.
+    WorkerType_DuplicateWorkerTypeID,
 
-    /// The requested module type is already registered.
-    ModuleType_AlreadyRegistered,
+    /// The requested worker type is already registered.
+    WorkerType_AlreadyRegistered,
 
-    /// The requested module type has not been registered.
+    /// The requested worker type has not been registered.
     /// Public API error.
-    ModuleType_NotRegistered,
+    WorkerType_NotRegistered,
 
-    /// A module failed during its initialization.
-    Module_InitializationFailed,
+    /// A worker failed during its initialization.
+    Worker_InitializationFailed,
 
-    /// The requested module was not found.
-    Module_NotFound,
+    /// The requested worker was not found.
+    Worker_NotFound,
 
-    /// A module failed during its closing.
-    Module_CloseFailed,
+    /// A worker failed during its closing.
+    Worker_CloseFailed,
 
-    /// A module communication channel is closed.
-    Module_ChannelClosed,
+    /// A worker communication channel is closed.
+    Worker_ChannelClosed,
 
-    /// The requested module already exists.
-    Module_AlreadyExists,
+    /// The requested worker already exists.
+    Worker_AlreadyExists,
 
-    /// The requested module is already initialized.
-    Module_AlreadyInitialized,
+    /// The requested worker is already initialized.
+    Worker_AlreadyInitialized,
 
-    /// The requested module has not been initialized.
-    Module_NotInitialized,
+    /// The requested worker has not been initialized.
+    Worker_NotInitialized,
 
-    /// A module has panicked.
-    Module_Panicked(anyhow::Error),
+    /// A worker has panicked.
+    Worker_Panicked(anyhow::Error),
 
-    /// Error returned by a module while processing
+    /// Error returned by a worker while processing
     /// a message sent through send_message_and_wait_reply().
-    Module_MessageError(anyhow::Error),
+    Worker_MessageError(anyhow::Error),
 
-    /// The requested father module was not found.
-    FatherModule_NotFound,
+    /// The requested father worker was not found.
+    ParentWorker_NotFound,
 
     /// The MessageInstanceID counter has reached its maximum value
     /// and can no longer generate unique identifiers.
@@ -111,60 +111,60 @@ impl fmt::Display for MMFError {
                 write!(f, "The framework is already initialized.")
             }
 
-            MMFError::Framework_CannotClose_ModulesStillRunning => {
-                write!(f, "The framework shutdown failed: one or more modules are still running.")
+            MMFError::Framework_CannotClose_workersStillRunning => {
+                write!(f, "The framework shutdown failed: one or more workers are still running.")
             }
 
-            MMFError::ModuleType_NotFound => {
-                write!(f, "The requested module type was not found.")
+            MMFError::WorkerType_NotFound => {
+                write!(f, "The requested worker type was not found.")
             }
 
-            MMFError::ModuleType_DuplicateModuleTypeID => {
-                write!(f, "ModuleTypeID is already used by another module type.")
+            MMFError::WorkerType_DuplicateWorkerTypeID => {
+                write!(f, "WorkerTypeID is already used by another worker type.")
             }
 
-            MMFError::ModuleType_AlreadyRegistered => {
-                write!(f, "The requested module type is already registered.")
+            MMFError::WorkerType_AlreadyRegistered => {
+                write!(f, "The requested worker type is already registered.")
             }
 
-            MMFError::ModuleType_NotRegistered => {
-                write!(f, "The requested module type has not been registered.")
+            MMFError::WorkerType_NotRegistered => {
+                write!(f, "The requested worker type has not been registered.")
             }
 
-            MMFError::Module_InitializationFailed => {
-                write!(f, "A module failed during its initialization.")
+            MMFError::Worker_InitializationFailed => {
+                write!(f, "A worker failed during its initialization.")
             }
 
-            MMFError::Module_NotFound => write!(f, "The requested module was not found."),
+            MMFError::Worker_NotFound => write!(f, "The requested worker was not found."),
 
-            MMFError::Module_CloseFailed => write!(f, "A module failed during its closing."),
+            MMFError::Worker_CloseFailed => write!(f, "A worker failed during its closing."),
 
-            MMFError::Module_ChannelClosed => {
-                write!(f, "A module communication channel is closed.")
+            MMFError::Worker_ChannelClosed => {
+                write!(f, "A worker communication channel is closed.")
             }
 
-            MMFError::Module_AlreadyExists => {
-                write!(f, "The requested module already exists.")
+            MMFError::Worker_AlreadyExists => {
+                write!(f, "The requested worker already exists.")
             }
 
-            MMFError::Module_AlreadyInitialized => {
-                write!(f, "The requested module is already initialized.")
+            MMFError::Worker_AlreadyInitialized => {
+                write!(f, "The requested worker is already initialized.")
             }
 
-            MMFError::Module_NotInitialized => {
-                write!(f, "The requested module has not been initialized.")
+            MMFError::Worker_NotInitialized => {
+                write!(f, "The requested worker has not been initialized.")
             }
 
-            MMFError::Module_Panicked(panic_message) => {
-                write!(f, "A module has panicked: {}", panic_message)
+            MMFError::Worker_Panicked(panic_message) => {
+                write!(f, "A worker has panicked: {}", panic_message)
             }
 
-            MMFError::Module_MessageError(error) => {
-                write!(f, "Module message processing failed: {}", error)
+            MMFError::Worker_MessageError(error) => {
+                write!(f, "Worker message processing failed: {}", error)
             }
 
-            MMFError::FatherModule_NotFound => {
-                write!(f, "The requested father module was not found.")
+            MMFError::ParentWorker_NotFound => {
+                write!(f, "The requested father worker was not found.")
             }
 
             MMFError::Message_InstanceIDExhausted => {
@@ -201,20 +201,20 @@ impl Error for MMFError {}
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[allow(non_camel_case_types)]
 pub(crate) enum MMFPanic {
-    Module_PriorityChannelClosed,
-    Module_NormalChannelClosed,
-    Module_PendingCommandsEmpty,
+    Worker_PriorityChannelClosed,
+    Worker_NormalChannelClosed,
+    Worker_PendingCommandsEmpty,
 
     MMFData_ReadLockPoisoned,
     MMFData_WriteLockPoisoned,
 
-    MMFModData_ReadLockPoisoned,
-    MMFModData_WriteLockPoisoned,
-    MMFModData_Missing,
+    MMFWrkData_ReadLockPoisoned,
+    MMFWrkData_WriteLockPoisoned,
+    MMFWrkData_Missing,
 
-    Registry_ModuleMissing,
+    Registry_workerMissing,
 
-    Module_JoinHandleMissing,
+    worker_JoinHandleMissing,
 
     MMFErrData_ReadLockPoisoned,
     MMFErrData_WriteLockPoisoned,
@@ -232,25 +232,25 @@ pub(crate) enum MMFPanic {
 impl MMFPanic {
     pub(crate) fn message(&self) -> &'static str {
         match self {
-            MMFPanic::Module_PriorityChannelClosed => "Internal MMF error: module priority command channel unexpectedly closed.",
+            MMFPanic::Worker_PriorityChannelClosed => "Internal MMF error: worker priority command channel unexpectedly closed.",
 
-            MMFPanic::Module_NormalChannelClosed => "Internal MMF error: module normal command channel unexpectedly closed.",
+            MMFPanic::Worker_NormalChannelClosed => "Internal MMF error: worker normal command channel unexpectedly closed.",
 
-            MMFPanic::Module_PendingCommandsEmpty => "Internal MMF error: module pending commands cannot be empty.",
+            MMFPanic::Worker_PendingCommandsEmpty => "Internal MMF error: worker pending commands cannot be empty.",
 
             MMFPanic::MMFData_ReadLockPoisoned => "Internal MMF error: MMF_DATA read lock poisoned.",
 
             MMFPanic::MMFData_WriteLockPoisoned => "Internal MMF error: MMF_DATA write lock poisoned.",
 
-            MMFPanic::MMFModData_ReadLockPoisoned => "Internal MMF error: MMFMod_DATA read lock poisoned.",
+            MMFPanic::MMFWrkData_ReadLockPoisoned => "Internal MMF error: MMFWrk_DATA read lock poisoned.",
 
-            MMFPanic::MMFModData_WriteLockPoisoned => "Internal MMF error: MMFMod_DATA write lock poisoned.",
+            MMFPanic::MMFWrkData_WriteLockPoisoned => "Internal MMF error: MMFWrk_DATA write lock poisoned.",
 
-            MMFPanic::MMFModData_Missing => "Internal MMF error: MMFMod_DATA is unexpectedly missing",
+            MMFPanic::MMFWrkData_Missing => "Internal MMF error: MMFWrk_DATA is unexpectedly missing",
 
-            MMFPanic::Registry_ModuleMissing => "Internal MMF error: module unexpectedly missing in registry.",
+            MMFPanic::Registry_workerMissing => "Internal MMF error: worker unexpectedly missing in registry.",
 
-            MMFPanic::Module_JoinHandleMissing => "Internal MMF error: JoinHandle unexpectedly missing.",
+            MMFPanic::worker_JoinHandleMissing => "Internal MMF error: JoinHandle unexpectedly missing.",
 
             MMFPanic::MMFErrData_ReadLockPoisoned => "Internal MMF error: MMFErr_DATA read lock poisoned.",
 

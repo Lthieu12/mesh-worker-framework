@@ -1,6 +1,6 @@
 //! Verify that MMFErr records callback failures.
 //!
-//! The first test generates failures from module lifecycle
+//! The first test generates failures from worker lifecycle
 //! callbacks (on_init and on_close) as well as business
 //! message processing (on_message) and verifies that
 //! the resulting error events can be retrieved through
@@ -16,8 +16,8 @@ use serial_test::serial;
 
 use crate::mmf::MMFConfiguration;
 use dev_support::dev_helper::*;
-use dev_support::simulation_module::{SimulationBehavior, SimulationModule, SimulationModuleConfig};
-use mesh_module_framework::*;
+use dev_support::simulation_worker::{SimulationBehavior, SimulationWorker, SimulationWorkerConfig};
+use mesh_worker_framework::*;
 
 fn generate_application_error() -> Result<()> {
     Err(anyhow::anyhow!("config.toml not found")).context("Failed to load configuration")
@@ -27,51 +27,51 @@ fn generate_application_error() -> Result<()> {
 // Integration tests must run serially.
 #[tokio::test]
 #[serial]
-async fn test_mmf_err_module_failures() {
+async fn test_mmf_err_worker_failures() {
     MMF::init().unwrap();
-    MMF::register_module_type::<SimulationModule>().unwrap();
+    MMF::register_worker_type::<SimulationWorker>().unwrap();
 
-    // Generale application error (external error, not related to a module).
+    // Generale application error (external error, not related to a worker).
     let application_error = generate_application_error().unwrap_err();
 
     MMFErr::add_error(&EntityID::new_external("Application"), &application_error).unwrap();
 
-    // Simulation module with error on message
-    let module_a_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::new_external("Test")).unwrap();
+    // Simulation worker with error on message
+    let worker_a_id = MMFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
 
-    let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
+    let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MMFMod::init_module(&module_a_id, lifecycle_data).await.unwrap();
-    MMFMod::wait_module_init(&module_a_id, Some(1000)).await.unwrap();
+    MMFWrk::init_worker(&worker_a_id, lifecycle_data).await.unwrap();
+    MMFWrk::wait_worker_init(&worker_a_id, Some(1000)).await.unwrap();
 
     // Generate multiple message failures.
     for _ in 0..3 {
-        MMFMod::send_message(&EntityID::new_external("Test"), &module_a_id, "TEST", Bytes::new()).await.unwrap();
+        MMFWrk::send_message(&EntityID::new_external("Test"), &worker_a_id, "TEST", Bytes::new()).await.unwrap();
     }
 
-    // Simulation module with error on init
-    let module_b_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::new_external("Test")).unwrap();
+    // Simulation worker with error on init
+    let worker_b_id = MMFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
 
-    let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Init_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
+    let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Init_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MMFMod::init_module(&module_b_id, lifecycle_data).await.unwrap();
-    let result = MMFMod::wait_module_init(&module_b_id, Some(1000)).await;
-    assert!(matches!(result, Err(MMFError::Module_InitializationFailed)));
+    MMFWrk::init_worker(&worker_b_id, lifecycle_data).await.unwrap();
+    let result = MMFWrk::wait_worker_init(&worker_b_id, Some(1000)).await;
+    assert!(matches!(result, Err(MMFError::Worker_InitializationFailed)));
 
-    // Simulation module with error on close
-    let module_c_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::new_external("Test")).unwrap();
+    // Simulation worker with error on close
+    let worker_c_id = MMFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
 
-    let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Close_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
+    let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Close_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MMFMod::init_module(&module_c_id, lifecycle_data).await.unwrap();
-    MMFMod::wait_module_init(&module_c_id, Some(1000)).await.unwrap();
-    MMFMod::close_module(&module_c_id, Bytes::new()).await.unwrap();
+    MMFWrk::init_worker(&worker_c_id, lifecycle_data).await.unwrap();
+    MMFWrk::wait_worker_init(&worker_c_id, Some(1000)).await.unwrap();
+    MMFWrk::close_worker(&worker_c_id, Bytes::new()).await.unwrap();
 
-    let result = MMFMod::wait_module_close(&module_c_id, Some(1000)).await;
-    assert!(matches!(result, Err(MMFError::Module_CloseFailed)));
+    let result = MMFWrk::wait_worker_close(&worker_c_id, Some(1000)).await;
+    assert!(matches!(result, Err(MMFError::Worker_CloseFailed)));
 
     let error_list = MMFErr::wait_error(None).await.unwrap();
 
@@ -105,7 +105,7 @@ async fn test_mmf_err_module_failures() {
                 assert_eq!(entity_id.as_str(), "Application");
             }
 
-            EntityID::Module(_) => {}
+            EntityID::Worker(_) => {}
         }
 
         assert!(!error_event.timestamp_rfc3339.is_empty());
@@ -116,9 +116,9 @@ async fn test_mmf_err_module_failures() {
         assert!(window[0].error_instance_id < window[1].error_instance_id);
     }
 
-    MMFMod::abort_module(&module_a_id).unwrap();
-    MMFMod::abort_module(&module_b_id).unwrap();
-    MMFMod::abort_module(&module_c_id).unwrap();
+    MMFWrk::abort_worker(&worker_a_id).unwrap();
+    MMFWrk::abort_worker(&worker_b_id).unwrap();
+    MMFWrk::abort_worker(&worker_c_id).unwrap();
 
     MMF::close().unwrap();
 }
@@ -134,20 +134,20 @@ async fn test_mmf_err_buffer_overflow() {
     configuration.log_event_buffer_capacity = 10;
 
     MMF::init_with_configuration(configuration).unwrap();
-    MMF::register_module_type::<SimulationModule>().unwrap();
+    MMF::register_worker_type::<SimulationWorker>().unwrap();
 
-    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::new_external("Test")).unwrap();
+    let worker_id = MMFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
 
-    let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
+    let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MMFMod::init_module(&module_id, lifecycle_data).await.unwrap();
+    MMFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
 
-    MMFMod::wait_module_init(&module_id, Some(1000)).await.unwrap();
+    MMFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
 
     // Generate more errors than the buffer can hold.
     for _ in 0..15 {
-        let _ = MMFMod::send_message_and_wait(&EntityID::new_external("Test"), &module_id, "TEST", Bytes::new(), Some(1000)).await;
+        let _ = MMFWrk::send_message_and_wait(&EntityID::new_external("Test"), &worker_id, "TEST", Bytes::new(), Some(1000)).await;
     }
 
     let error_list = MMFErr::wait_error(Some(0)).await.unwrap();
@@ -160,7 +160,7 @@ async fn test_mmf_err_buffer_overflow() {
 
     assert_eq!(error_list.error_event_list.len(), 10);
 
-    MMFMod::abort_children(&EntityID::new_external("Test")).unwrap();
+    MMFWrk::abort_children(&EntityID::new_external("Test")).unwrap();
 
     MMF::close().unwrap();
 }

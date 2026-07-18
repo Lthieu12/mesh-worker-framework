@@ -1,6 +1,6 @@
 //! Development helper functions.
 //!
-//! This module provides utility functions used by
+//! This file provides utility functions used by
 //! examples, integration tests and runtime stress tests.
 //!
 //! These helpers are intended for development only and
@@ -8,16 +8,16 @@
 
 use crate::MMFErr;
 use crate::MMFLog;
-use crate::MMFMod;
+use crate::MMFWrk;
 
 use crate::message::{MessageID, MessageInstanceID};
 use crate::mmf_log::{LogAction, LogEvent, LogList, LogStatus};
-use crate::module::{EntityID, ModuleID};
+use crate::worker::{EntityID, WorkerID};
 
 #[allow(dead_code)]
-pub fn print_module_list() {
-    let module_list = MMFMod::get_module_info_list().unwrap();
-    println!("{module_list}");
+pub fn print_worker_list() {
+    let worker_list = MMFWrk::get_worker_info_list().unwrap();
+    println!("{worker_list}");
 }
 
 #[allow(dead_code)]
@@ -43,19 +43,19 @@ pub struct ReceiveMessageLog<'a> {
     pub log_status: LogStatus,
 }
 
-/// Returns all ReceiveMessage log events received by a module.
+/// Returns all ReceiveMessage log events received by a worker.
 ///
 /// The returned events preserve the original chronological order.
 #[allow(dead_code)]
-pub fn filter_messages<'a>(log_list: &'a LogList, module_id: &ModuleID) -> Vec<ReceiveMessageLog<'a>> {
+pub fn filter_messages<'a>(log_list: &'a LogList, worker_id: &WorkerID) -> Vec<ReceiveMessageLog<'a>> {
     let mut receive_messages = Vec::new();
 
     for log_event in &log_list.log_event_list {
-        if log_event.module_id != *module_id {
+        if log_event.worker_id != *worker_id {
             continue;
         }
 
-        if let LogAction::ModuleMessage { message_instance_id, sender_id, message_id, priority, wait_completion } = &log_event.log_action {
+        if let LogAction::WorkerMessage { message_instance_id, sender_id, message_id, priority, wait_completion } = &log_event.log_action {
             receive_messages.push(ReceiveMessageLog { log_event, message_instance_id, sender_id, message_id, priority: *priority, wait_completion: *wait_completion, log_status: log_event.log_status });
         }
     }

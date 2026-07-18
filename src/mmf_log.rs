@@ -14,8 +14,8 @@ use crate::framework_error::{MMFError, MMFPanic};
 use crate::log_file::write_log_event;
 use crate::message::{MessageID, MessageInstanceID};
 use crate::mmf::{MMF_LOG_DATA, MMF_LOG_INSTANCE_COUNTER, MMF_LOG_MODE, MMF_LOG_NOTIFY};
-use crate::module::{EntityID, ModuleID};
 use crate::string_helper;
+use crate::worker::{EntityID, WorkerID};
 
 /// Unique identifier assigned to each log event.
 pub type LogInstanceID = u64;
@@ -26,9 +26,9 @@ pub type LogInstanceID = u64;
 pub enum LogMode {
     /// Logging disabled.
     NoLog = 0,
-    /// Log all modules.
+    /// Log all workers.
     LogAll = 1,
-    /// Log only selected modules.
+    /// Log only selected workers.
     LogSelected = 2,
 }
 
@@ -43,12 +43,12 @@ pub enum LogStatus {
 /// Logged MMF action.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum LogAction {
-    ModuleSpawn,
-    ModuleInit,
-    ModuleClose,
-    ModuleAbort,
-    ModulePanic,
-    ModuleMessage { message_instance_id: MessageInstanceID, sender_id: EntityID, message_id: MessageID, priority: bool, wait_completion: bool },
+    WorkerSpawn,
+    WorkerInit,
+    WorkerClose,
+    WorkerAbort,
+    WorkerPanic,
+    WorkerMessage { message_instance_id: MessageInstanceID, sender_id: EntityID, message_id: MessageID, priority: bool, wait_completion: bool },
 }
 
 /// Internal MMFLog storage.
@@ -60,8 +60,8 @@ pub(crate) struct LoggingData {
     /// Maximum number of log events retained.
     pub(crate) log_event_buffer_capacity: usize,
 
-    /// Selected modules when LogSelected is active.
-    pub(crate) logged_module_list: Vec<ModuleID>,
+    /// Selected workers when LogSelected is active.
+    pub(crate) logged_worker_list: Vec<WorkerID>,
 
     /// Circular buffer of log events.
     pub(crate) log_event_list: VecDeque<LogEvent>,
@@ -87,7 +87,7 @@ mod terminal_log_column {
 
     pub(crate) const LOG_ID_LEN: usize = 12;
     pub(crate) const TIME_LEN: usize = 12;
-    pub(crate) const MODULE_ID_LEN: usize = 30;
+    pub(crate) const WORKER_ID_LEN: usize = 30;
     pub(crate) const EVENT_LEN: usize = 7;
     pub(crate) const MESSAGE_ID_LEN: usize = 30;
     pub(crate) const SENDER_ID_LEN: usize = 30;
@@ -102,8 +102,8 @@ pub struct LogEvent {
     pub log_instance_id: LogInstanceID,
     /// Event timestamp in RFC3339 format.
     pub timestamp_rfc3339: String,
-    /// Module associated with the event.
-    pub module_id: ModuleID,
+    /// worker associated with the event.
+    pub worker_id: WorkerID,
     /// Logged action.
     pub log_action: LogAction,
     /// Final action status.
@@ -116,12 +116,12 @@ impl LogEvent {
     /// Converts the log event into a human-readable terminal string.
     pub(crate) fn to_terminal_string(&self) -> String {
         let (event, sender_id, message_id, priority, wait) = match &self.log_action {
-            LogAction::ModuleSpawn => ("SPAWN", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
-            LogAction::ModuleInit => ("INIT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
-            LogAction::ModuleClose => ("CLOSE", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
-            LogAction::ModuleAbort => ("ABORT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
-            LogAction::ModulePanic => ("PANIC", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
-            LogAction::ModuleMessage { message_instance_id: _, sender_id, message_id, priority, wait_completion } => {
+            LogAction::WorkerSpawn => ("SPAWN", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
+            LogAction::WorkerInit => ("INIT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
+            LogAction::WorkerClose => ("CLOSE", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
+            LogAction::WorkerAbort => ("ABORT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
+            LogAction::WorkerPanic => ("PANIC", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
+            LogAction::WorkerMessage { message_instance_id: _, sender_id, message_id, priority, wait_completion } => {
                 ("MESSAGE", sender_id.to_short_string(terminal_log_column::SENDER_ID_LEN), message_id.to_short_string(terminal_log_column::MESSAGE_ID_LEN), if *priority { "Y" } else { "N" }.to_string(), if *wait_completion { "Y" } else { "N" }.to_string())
             }
         };
@@ -138,10 +138,10 @@ impl LogEvent {
         };
 
         format!(
-            "{:0width_log$} | {:width_time$} | {:width_module$} | {:width_event$} | {:width_message$} | {:width_sender$} | {} | {} | {:width_status$} | {:width_duration$}",
+            "{:0width_log$} | {:width_time$} | {:width_worker$} | {:width_event$} | {:width_message$} | {:width_sender$} | {} | {} | {:width_status$} | {:width_duration$}",
             self.log_instance_id,
             &self.timestamp_rfc3339[11..23],
-            self.module_id.to_short_string(terminal_log_column::MODULE_ID_LEN),
+            self.worker_id.to_short_string(terminal_log_column::WORKER_ID_LEN),
             event,
             message_id,
             sender_id,
@@ -151,7 +151,7 @@ impl LogEvent {
             duration,
             width_log = terminal_log_column::LOG_ID_LEN,
             width_time = terminal_log_column::TIME_LEN,
-            width_module = terminal_log_column::MODULE_ID_LEN,
+            width_worker = terminal_log_column::WORKER_ID_LEN,
             width_event = terminal_log_column::EVENT_LEN,
             width_message = terminal_log_column::MESSAGE_ID_LEN,
             width_sender = terminal_log_column::SENDER_ID_LEN,
@@ -163,12 +163,12 @@ impl LogEvent {
     /// Converts the log event into a CSV row.
     pub(crate) fn to_csv_string(&self) -> String {
         let (event, message_instance_id, sender_id, message_id, priority, wait) = match &self.log_action {
-            LogAction::ModuleSpawn => ("SPAWN", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
-            LogAction::ModuleInit => ("INIT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
-            LogAction::ModuleClose => ("CLOSE", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
-            LogAction::ModuleAbort => ("ABORT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
-            LogAction::ModulePanic => ("PANIC", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
-            LogAction::ModuleMessage { message_instance_id, sender_id, message_id, priority, wait_completion } => {
+            LogAction::WorkerSpawn => ("SPAWN", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
+            LogAction::WorkerInit => ("INIT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
+            LogAction::WorkerClose => ("CLOSE", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
+            LogAction::WorkerAbort => ("ABORT", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
+            LogAction::WorkerPanic => ("PANIC", "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string(), "-".to_string()),
+            LogAction::WorkerMessage { message_instance_id, sender_id, message_id, priority, wait_completion } => {
                 ("MESSAGE", message_instance_id.to_string(), sender_id.to_string(), message_id.to_string(), if *priority { "Y" } else { "N" }.to_string(), if *wait_completion { "Y" } else { "N" }.to_string())
             }
         };
@@ -188,7 +188,7 @@ impl LogEvent {
             "{},{},{},{},{},{},{},{},{},{},{}",
             self.log_instance_id,
             string_helper::csv_escape(&self.timestamp_rfc3339),
-            string_helper::csv_escape(self.module_id.as_str()),
+            string_helper::csv_escape(self.worker_id.as_str()),
             string_helper::csv_escape(event),
             string_helper::csv_escape(&message_instance_id),
             string_helper::csv_escape(&message_id),
@@ -244,10 +244,10 @@ impl LogList {
         match format {
             LogOutputFormat::Terminal => {
                 let header = format!(
-                    "{:<width_log$} | {:<width_time$} | {:<width_module$} | {:<width_event$} | {:<width_message$} | {:<width_sender$} | P | W | {:<width_status$} | {:<width_duration$}",
+                    "{:<width_log$} | {:<width_time$} | {:<width_worker$} | {:<width_event$} | {:<width_message$} | {:<width_sender$} | P | W | {:<width_status$} | {:<width_duration$}",
                     "LogID",
                     "Time",
-                    "ModuleID",
+                    "WorkerID",
                     "Event",
                     "MessageID",
                     "SenderID",
@@ -255,7 +255,7 @@ impl LogList {
                     "Duration",
                     width_log = terminal_log_column::LOG_ID_LEN,
                     width_time = terminal_log_column::TIME_LEN,
-                    width_module = terminal_log_column::MODULE_ID_LEN,
+                    width_worker = terminal_log_column::WORKER_ID_LEN,
                     width_event = terminal_log_column::EVENT_LEN,
                     width_message = terminal_log_column::MESSAGE_ID_LEN,
                     width_sender = terminal_log_column::SENDER_ID_LEN,
@@ -267,7 +267,7 @@ impl LogList {
                 format!("{header}\n{separator}")
             }
 
-            LogOutputFormat::CSV => String::from("LogID,Time,ModuleID,Event,MessageInstanceID,MessageID,SenderID,Priority,Wait,Status,Duration"),
+            LogOutputFormat::CSV => String::from("LogID,Time,WorkerID,Event,MessageInstanceID,MessageID,SenderID,Priority,Wait,Status,Duration"),
         }
     }
 
@@ -287,19 +287,19 @@ pub struct MMFLog;
 impl MMFLog {
     /// Change the current MMF logging mode.
     ///
-    /// When LogSelected is used, the provided module list
+    /// When LogSelected is used, the provided worker list
     /// replaces the previously configured selection.
     ///
     /// Returns Framework_NotInitialized if MMF has not
     /// been initialized through MMF::init().
-    pub fn set_log_mode(log_mode: LogMode, logged_module_list: Option<Vec<ModuleID>>) -> Result<(), MMFError> {
+    pub fn set_log_mode(log_mode: LogMode, logged_worker_list: Option<Vec<WorkerID>>) -> Result<(), MMFError> {
         let mut mmf_log_data_guard = MMF_LOG_DATA.write().expect(MMFPanic::MMFLogData_WriteLockPoisoned.message());
         let mmf_log_data = mmf_log_data_guard.as_mut().ok_or(MMFError::Framework_NotInitialized)?;
 
         MMF_LOG_MODE.store(log_mode as u8, Ordering::Relaxed);
 
-        if let Some(logged_module_list) = logged_module_list {
-            mmf_log_data.logged_module_list = logged_module_list;
+        if let Some(logged_worker_list) = logged_worker_list {
+            mmf_log_data.logged_worker_list = logged_worker_list;
         }
 
         drop(mmf_log_data_guard);
@@ -329,30 +329,30 @@ impl MMFLog {
         Ok(log_mode)
     }
 
-    /// Retrieve the currently selected module list.
+    /// Retrieve the currently selected worker list.
     ///
     /// Returns Framework_NotInitialized if MMF has not
     /// been initialized through MMF::init().
-    pub fn get_logged_module_list() -> Result<Vec<ModuleID>, MMFError> {
+    pub fn get_logged_worker_list() -> Result<Vec<WorkerID>, MMFError> {
         let mmf_log_data_guard = MMF_LOG_DATA.read().expect(MMFPanic::MMFLogData_ReadLockPoisoned.message());
         let mmf_log_data = mmf_log_data_guard.as_ref().ok_or(MMFError::Framework_NotInitialized)?;
-        let logged_module_list = mmf_log_data.logged_module_list.clone();
+        let logged_worker_list = mmf_log_data.logged_worker_list.clone();
 
         drop(mmf_log_data_guard);
-        Ok(logged_module_list)
+        Ok(logged_worker_list)
     }
 
-    /// Remove a module from the MMFLog selected module list.
+    /// Remove a worker from the MMFLog selected worker list.
     ///
-    /// If the module is not currently present in the
-    /// selected module list, this function does nothing.
+    /// If the worker is not currently present in the
+    /// selected worker list, this function does nothing.
     ///
     /// Returns Framework_NotInitialized if MMF has not
     /// been initialized through MMF::init().
-    pub(crate) fn remove_logged_module(module_id: &ModuleID) -> Result<(), MMFError> {
+    pub(crate) fn remove_logged_worker(worker_id: &WorkerID) -> Result<(), MMFError> {
         let mut mmf_log_data_guard = MMF_LOG_DATA.write().expect(MMFPanic::MMFLogData_WriteLockPoisoned.message());
         let mmf_log_data = mmf_log_data_guard.as_mut().ok_or(MMFError::Framework_NotInitialized)?;
-        mmf_log_data.logged_module_list.retain(|logged_module_id| logged_module_id != module_id);
+        mmf_log_data.logged_worker_list.retain(|logged_worker_id| logged_worker_id != worker_id);
         drop(mmf_log_data_guard);
 
         Ok(())
@@ -368,8 +368,8 @@ impl MMFLog {
         Ok(current_id)
     }
 
-    /// Check whether logging is enabled for a module.
-    pub(crate) fn must_log_module(module_id: &ModuleID) -> Result<bool, MMFError> {
+    /// Check whether logging is enabled for a worker.
+    pub(crate) fn must_log_worker(worker_id: &WorkerID) -> Result<bool, MMFError> {
         let log_mode = MMF_LOG_MODE.load(Ordering::Relaxed);
 
         if log_mode == LogMode::NoLog as u8 {
@@ -383,7 +383,7 @@ impl MMFLog {
         if log_mode == LogMode::LogSelected as u8 {
             let mmf_log_data_guard = MMF_LOG_DATA.read().expect(MMFPanic::MMFLogData_ReadLockPoisoned.message());
             let logging_data = mmf_log_data_guard.as_ref().ok_or(MMFError::Framework_NotInitialized)?;
-            return Ok(logging_data.logged_module_list.iter().any(|logged_module_id| logged_module_id == module_id));
+            return Ok(logging_data.logged_worker_list.iter().any(|logged_worker_id| logged_worker_id == worker_id));
         }
 
         // Invalid value => NoLog
@@ -392,15 +392,15 @@ impl MMFLog {
 
     /// Add a log event to MMFLog.
     ///
-    /// If logging is disabled for the specified module,
+    /// If logging is disabled for the specified worker,
     /// the event is silently ignored.
     ///
     /// Returns Framework_NotInitialized if MMF has
     /// not been initialized through MMF::init().
-    pub(crate) fn add_log(action_start_timer: Instant, module_id: &ModuleID, log_action: LogAction, log_status: LogStatus) -> Result<(), MMFError> {
+    pub(crate) fn add_log(action_start_timer: Instant, worker_id: &WorkerID, log_action: LogAction, log_status: LogStatus) -> Result<(), MMFError> {
         // Skip immediately if logging is disabled
-        // for this module.
-        if !Self::must_log_module(module_id)? {
+        // for this worker.
+        if !Self::must_log_worker(worker_id)? {
             return Ok(());
         }
 
@@ -412,7 +412,7 @@ impl MMFLog {
             LogStatus::Ok | LogStatus::Error => Some(action_start_timer.elapsed().as_millis()),
         };
 
-        let log_event = LogEvent { log_instance_id, timestamp_rfc3339, module_id: module_id.to_owned(), log_action, log_status, duration_ms };
+        let log_event = LogEvent { log_instance_id, timestamp_rfc3339, worker_id: worker_id.to_owned(), log_action, log_status, duration_ms };
 
         let mut mmf_log_data_guard = MMF_LOG_DATA.write().expect(MMFPanic::MMFLogData_WriteLockPoisoned.message());
         let logging_data = mmf_log_data_guard.as_mut().ok_or(MMFError::Framework_NotInitialized)?;

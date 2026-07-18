@@ -3,7 +3,7 @@
 The MMF repository is organized to clearly separate the framework implementation, documentation, examples, development tools and tests.
 
 ```
-mesh-module-framework/
+mesh-worker-framework/
 ├── doc/
 ├── examples/
 ├── scripts/
@@ -62,12 +62,12 @@ Framework source code.
 
 This directory contains the complete MMF implementation.
 
-The source is organized into independent modules, each responsible for a specific framework component.
+The source is organized into independent workers, each responsible for a specific framework component.
 
 Examples include:
 
 - runtime management;
-- module lifecycle;
+- worker lifecycle;
 - messaging;
 - logging;
 - error handling;
@@ -78,13 +78,13 @@ Examples include:
 
 ### `src/dev_support/`
 
-Development-only helper modules.
+Development-only helper workers.
 
 These components are used exclusively for testing and examples and are **not intended for framework users**.
 
 Typical contents include:
 
-- simulation modules;
+- simulation workers;
 - test helpers;
 - development utilities.
 

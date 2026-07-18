@@ -12,10 +12,10 @@ use bytes::Bytes;
 use serial_test::serial;
 use std::time::Duration;
 
-use mesh_module_framework::*;
+use mesh_worker_framework::*;
 
 use dev_support::dev_helper::*;
-use dev_support::simulation_module::{SimulationBehavior, SimulationModule, SimulationModuleConfig};
+use dev_support::simulation_worker::{SimulationBehavior, SimulationWorker, SimulationWorkerConfig};
 
 const MESSAGE_NORMAL_1: &str = "NORMAL_1";
 const MESSAGE_NORMAL_2: &str = "NORMAL_2";
@@ -33,35 +33,35 @@ async fn test_message_priority_order() {
 
     MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
 
-    MMF::register_module_type::<SimulationModule>().unwrap();
+    MMF::register_worker_type::<SimulationWorker>().unwrap();
 
-    let module_a_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::new_external("MAIN")).unwrap();
+    let worker_a_id = MMFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
 
-    let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Wait { message_delay_ms: 100 }, wait_children_close: false, wait_children_close_timeout_ms: None };
+    let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Wait { message_delay_ms: 100 }, wait_children_close: false, wait_children_close_timeout_ms: None };
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MMFMod::init_module(&module_a_id, lifecycle_data).await.unwrap();
+    MMFWrk::init_worker(&worker_a_id, lifecycle_data).await.unwrap();
 
-    MMFMod::wait_module_init(&module_a_id, Some(1000)).await.unwrap();
+    MMFWrk::wait_worker_init(&worker_a_id, Some(1000)).await.unwrap();
 
     // First normal message starts processing.
-    MMFMod::send_message(&EntityID::new_external("MAIN"), &module_a_id, MESSAGE_NORMAL_1, Bytes::new()).await.unwrap();
+    MMFWrk::send_message(&EntityID::new_external("MAIN"), &worker_a_id, MESSAGE_NORMAL_1, Bytes::new()).await.unwrap();
 
-    // Ensure the module is busy before sending the remaining messages.
+    // Ensure the worker is busy before sending the remaining messages.
     tokio::time::sleep(Duration::from_millis(20)).await;
 
-    MMFMod::send_message(&EntityID::new_external("MAIN"), &module_a_id, MESSAGE_NORMAL_2, Bytes::new()).await.unwrap();
+    MMFWrk::send_message(&EntityID::new_external("MAIN"), &worker_a_id, MESSAGE_NORMAL_2, Bytes::new()).await.unwrap();
 
-    MMFMod::send_priority_message(&EntityID::new_external("MAIN"), &module_a_id, MESSAGE_PRIORITY_1, Bytes::new()).await.unwrap();
+    MMFWrk::send_priority_message(&EntityID::new_external("MAIN"), &worker_a_id, MESSAGE_PRIORITY_1, Bytes::new()).await.unwrap();
 
-    MMFMod::send_priority_message(&EntityID::new_external("MAIN"), &module_a_id, MESSAGE_PRIORITY_2, Bytes::new()).await.unwrap();
+    MMFWrk::send_priority_message(&EntityID::new_external("MAIN"), &worker_a_id, MESSAGE_PRIORITY_2, Bytes::new()).await.unwrap();
 
     // Wait until every message has been processed.
     tokio::time::sleep(Duration::from_millis(500)).await;
 
     let log_list = MMFLog::wait_log(None).await.unwrap();
 
-    let messages = filter_messages(&log_list, &module_a_id);
+    let messages = filter_messages(&log_list, &worker_a_id);
 
     print_log_list().await;
 
@@ -111,9 +111,9 @@ async fn test_message_priority_order() {
     assert!(!messages[7].priority);
     assert!(!messages[7].wait_completion);
 
-    MMFMod::close_module(&module_a_id, Bytes::new()).await.unwrap();
+    MMFWrk::close_worker(&worker_a_id, Bytes::new()).await.unwrap();
 
-    MMFMod::wait_children_close(&EntityID::new_external("MAIN"), Some(1000)).await.unwrap();
+    MMFWrk::wait_children_close(&EntityID::new_external("MAIN"), Some(1000)).await.unwrap();
 
     MMF::close().unwrap();
 }
@@ -127,44 +127,44 @@ async fn test_send_message_and_wait() {
 
     MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
 
-    MMF::register_module_type::<SimulationModule>().unwrap();
+    MMF::register_worker_type::<SimulationWorker>().unwrap();
 
     //
-    // Spawn module B.
+    // Spawn worker B.
     //
-    let module_b_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::new_external("MAIN")).unwrap();
+    let worker_b_id = MMFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
 
-    let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Wait { message_delay_ms: 100 }, wait_children_close: false, wait_children_close_timeout_ms: None };
+    let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Wait { message_delay_ms: 100 }, wait_children_close: false, wait_children_close_timeout_ms: None };
 
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MMFMod::init_module(&module_b_id, lifecycle_data).await.unwrap();
+    MMFWrk::init_worker(&worker_b_id, lifecycle_data).await.unwrap();
 
-    MMFMod::wait_module_init(&module_b_id, Some(1000)).await.unwrap();
+    MMFWrk::wait_worker_init(&worker_b_id, Some(1000)).await.unwrap();
 
     //
-    // Spawn module A.
+    // Spawn worker A.
     //
-    let module_a_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::new_external("MAIN")).unwrap();
+    let worker_a_id = MMFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
 
-    let configuration = SimulationModuleConfig {
+    let configuration = SimulationWorkerConfig {
         init_delay_ms: 0,
         close_delay_ms: 0,
-        simulation_behavior: SimulationBehavior::Message_SendAndWait { target_module_id: module_b_id.clone(), message_id: MESSAGE_CHAIN.into(), timeout_ms: Some(1000), message_delay_ms: 0 },
+        simulation_behavior: SimulationBehavior::Message_SendAndWait { target_worker_id: worker_b_id.clone(), message_id: MESSAGE_CHAIN.into(), timeout_ms: Some(1000), message_delay_ms: 0 },
         wait_children_close: false,
         wait_children_close_timeout_ms: None,
     };
 
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MMFMod::init_module(&module_a_id, lifecycle_data).await.unwrap();
+    MMFWrk::init_worker(&worker_a_id, lifecycle_data).await.unwrap();
 
-    MMFMod::wait_module_init(&module_a_id, Some(1000)).await.unwrap();
+    MMFWrk::wait_worker_init(&worker_a_id, Some(1000)).await.unwrap();
 
     //
     // Trigger the chain.
     //
-    MMFMod::send_message(&EntityID::new_external("MAIN"), &module_a_id, MESSAGE_CHAIN, Bytes::new()).await.unwrap();
+    MMFWrk::send_message(&EntityID::new_external("MAIN"), &worker_a_id, MESSAGE_CHAIN, Bytes::new()).await.unwrap();
 
     //
     // Wait until processing completes.
@@ -173,13 +173,13 @@ async fn test_send_message_and_wait() {
 
     let log_list = MMFLog::wait_log(None).await.unwrap();
 
-    let messages_a = filter_messages(&log_list, &module_a_id);
-    let messages_b = filter_messages(&log_list, &module_b_id);
+    let messages_a = filter_messages(&log_list, &worker_a_id);
+    let messages_b = filter_messages(&log_list, &worker_b_id);
 
     print_log_list().await;
 
     //
-    // Module A.
+    // worker A.
     //
     assert_eq!(messages_a.len(), 2);
 
@@ -192,7 +192,7 @@ async fn test_send_message_and_wait() {
     assert_eq!(messages_a[1].log_status, LogStatus::Ok);
 
     //
-    // Module B.
+    // worker B.
     //
     assert_eq!(messages_b.len(), 2);
 
@@ -201,15 +201,15 @@ async fn test_send_message_and_wait() {
     assert!(!messages_b[0].priority);
     assert!(messages_b[0].wait_completion);
 
-    assert_eq!(messages_b[0].sender_id, &EntityID::Module(module_a_id.clone()));
+    assert_eq!(messages_b[0].sender_id, &EntityID::Worker(worker_a_id.clone()));
 
     assert_eq!(messages_b[1].message_id.as_str(), MESSAGE_CHAIN);
     assert_eq!(messages_b[1].log_status, LogStatus::Ok);
 
-    MMFMod::close_module(&module_a_id, Bytes::new()).await.unwrap();
-    MMFMod::close_module(&module_b_id, Bytes::new()).await.unwrap();
+    MMFWrk::close_worker(&worker_a_id, Bytes::new()).await.unwrap();
+    MMFWrk::close_worker(&worker_b_id, Bytes::new()).await.unwrap();
 
-    MMFMod::wait_children_close(&EntityID::new_external("MAIN"), Some(1000)).await.unwrap();
+    MMFWrk::wait_children_close(&EntityID::new_external("MAIN"), Some(1000)).await.unwrap();
 
     MMF::close().unwrap();
 }
@@ -224,39 +224,39 @@ async fn test_send_unique_message() {
 
     MMFLog::set_log_mode(LogMode::LogAll, None).unwrap();
 
-    MMF::register_module_type::<SimulationModule>().unwrap();
+    MMF::register_worker_type::<SimulationWorker>().unwrap();
 
-    // Spawn and initialize the simulation module.
-    let module_id = MMFMod::spawn_module(SimulationModule::module_type_id(), &EntityID::new_external("MAIN")).unwrap();
+    // Spawn and initialize the simulation worker.
+    let worker_id = MMFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
 
-    let configuration = SimulationModuleConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Wait { message_delay_ms: 100 }, wait_children_close: false, wait_children_close_timeout_ms: None };
+    let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Wait { message_delay_ms: 100 }, wait_children_close: false, wait_children_close_timeout_ms: None };
 
     let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MMFMod::init_module(&module_id, lifecycle_data).await.unwrap();
-    MMFMod::wait_module_init(&module_id, Some(1000)).await.unwrap();
+    MMFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
+    MMFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
 
-    // Send a blocking message to keep the module busy.
-    MMFMod::send_message(&EntityID::new_external("MAIN"), &module_id, MESSAGE_CHAIN, Bytes::new()).await.unwrap();
+    // Send a blocking message to keep the worker busy.
+    MMFWrk::send_message(&EntityID::new_external("MAIN"), &worker_id, MESSAGE_CHAIN, Bytes::new()).await.unwrap();
 
-    // Give the module enough time to start processing
+    // Give the worker enough time to start processing
     // the blocking message.
-    MMFMod::sleep(Duration::from_millis(20)).await;
+    MMFWrk::sleep(Duration::from_millis(20)).await;
 
     // Send several equivalent unique messages.
     for _ in 0..5 {
-        MMFMod::send_unique_message(&EntityID::new_external("MAIN"), &module_id, MESSAGE_CHAIN, Bytes::new()).await.unwrap();
+        MMFWrk::send_unique_message(&EntityID::new_external("MAIN"), &worker_id, MESSAGE_CHAIN, Bytes::new()).await.unwrap();
     }
 
     // Wait until all messages have been processed.
-    MMFMod::sleep(Duration::from_millis(300)).await;
+    MMFWrk::sleep(Duration::from_millis(300)).await;
 
     // Verify that only the first and the last unique
     // messages have been processed.
     let log_list = MMFLog::wait_log(None).await.unwrap();
     print_log_list().await;
 
-    let messages = filter_messages(&log_list, &module_id);
+    let messages = filter_messages(&log_list, &worker_id);
 
     assert_eq!(messages.len(), 4);
 
@@ -282,8 +282,8 @@ async fn test_send_unique_message() {
 
     assert_eq!(*messages[3].message_instance_id, *messages[2].message_instance_id);
 
-    MMFMod::close_module(&module_id, Bytes::new()).await.unwrap();
-    MMFMod::wait_module_close(&module_id, Some(1000)).await.unwrap();
+    MMFWrk::close_worker(&worker_id, Bytes::new()).await.unwrap();
+    MMFWrk::wait_worker_close(&worker_id, Some(1000)).await.unwrap();
 
     MMF::close().unwrap();
 }

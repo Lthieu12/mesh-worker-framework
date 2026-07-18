@@ -1,14 +1,14 @@
 //! Message definitions for MMF.
 //!
-//! This module contains the structures exchanged between modules.
+//! This file contains the structures exchanged between workers.
 //! All communications within the framework are performed using
-//! FrameworkMessage instances.
+//! WorkerMessage instances.
 
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
-use crate::module::{EntityID, ModuleID};
 use crate::string_helper;
+use crate::worker::{EntityID, WorkerID};
 
 /// Identifies the functional purpose of a message
 /// (e.g. "Start", "Stop", "AcquisitionDone").
@@ -67,13 +67,13 @@ impl From<&MessageID> for MessageID {
 pub type MessageInstanceID = u64;
 
 #[derive(Debug, Clone)]
-/// Message exchanged between modules through MMF.
-pub struct ModuleMessage {
+/// Message exchanged between workers through MMF.
+pub struct WorkerMessage {
     /// Identifier of the sender entity.
     pub sender_id: EntityID,
 
-    /// Identifier of the receiver module.
-    pub receiver_id: ModuleID,
+    /// Identifier of the receiver worker.
+    pub receiver_id: WorkerID,
 
     /// Functional identifier of the message.
     pub message_id: MessageID,
@@ -85,9 +85,9 @@ pub struct ModuleMessage {
     pub message_data: Bytes,
 }
 
-impl ModuleMessage {
-    /// Create a new module message.
-    pub(crate) fn new(sender_id: EntityID, receiver_id: ModuleID, message_id: MessageID, message_instance_id: MessageInstanceID, message_data: Bytes) -> Self {
+impl WorkerMessage {
+    /// Create a new worker message.
+    pub(crate) fn new(sender_id: EntityID, receiver_id: WorkerID, message_id: MessageID, message_instance_id: MessageInstanceID, message_data: Bytes) -> Self {
         Self { sender_id, receiver_id, message_id, message_instance_id, message_data }
     }
 }

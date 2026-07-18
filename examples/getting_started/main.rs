@@ -1,15 +1,15 @@
 //! # Getting Started
 //!
-//! This example demonstrates the complete lifecycle of a MMF module.
+//! This example demonstrates the complete lifecycle of a MMF worker.
 //!
 //! It shows how to:
 //! - initialize the framework;
-//! - register a module type;
-//! - spawn and initialize a module;
+//! - register a worker type;
+//! - spawn and initialize a worker;
 //! - exchange messages;
-//! - gracefully shut down the module and the framework.
+//! - gracefully shut down the worker and the framework.
 //!
-//! The `DemoModule` implementation is intentionally minimal so the
+//! The `DemoWorker` implementation is intentionally minimal so the
 //! focus remains on the MMF API rather than application logic.
 //!
 //! Run with:
@@ -18,12 +18,12 @@
 
 use bytes::Bytes;
 
-use mesh_module_framework::*;
+use mesh_worker_framework::*;
 
-// DemoModule and DemoMessages are defined in
-// examples/getting_started/modules/demo_module.rs.
+// DemoWorker and DemoMessages are defined in
+// examples/getting_started/workers/demo_worker.rs.
 mod modules;
-use modules::demo_module::{DemoMessages, DemoModule};
+use modules::demo_worker::{DemoMessages, DemoWorker};
 
 // Tokio provides the async runtime used by MMF.
 #[tokio::main]
@@ -33,23 +33,23 @@ async fn main() -> Result<(), MMFError> {
     // Initialize MMF.
     MMF::init()?;
 
-    // Register available module types.
-    MMF::register_module_type::<DemoModule>()?;
+    // Register available worker types.
+    MMF::register_worker_type::<DemoWorker>()?;
 
-    // Create the module.
-    let demo_module_id = MMFMod::spawn_module("DemoModule", &main_entity)?;
+    // Create the worker.
+    let demo_worker_id = MMFWrk::spawn_worker("DemoWorker", &main_entity)?;
 
     // Initialize it.
-    MMFMod::init_module(&demo_module_id, Bytes::new()).await?;
-    MMFMod::wait_module_init(&demo_module_id, None).await?;
+    MMFWrk::init_worker(&demo_worker_id, Bytes::new()).await?;
+    MMFWrk::wait_worker_init(&demo_worker_id, None).await?;
 
     // Send a few messages.
-    MMFMod::send_message(&main_entity, &demo_module_id, DemoMessages::QUICK_CALCULATION, Bytes::new()).await?;
-    MMFMod::send_message(&main_entity, &demo_module_id, DemoMessages::LONG_CALCULATION, Bytes::new()).await?;
+    MMFWrk::send_message(&main_entity, &demo_worker_id, DemoMessages::QUICK_CALCULATION, Bytes::new()).await?;
+    MMFWrk::send_message(&main_entity, &demo_worker_id, DemoMessages::LONG_CALCULATION, Bytes::new()).await?;
 
-    // Close the module.
-    MMFMod::close_module(&demo_module_id, Bytes::new()).await?;
-    MMFMod::wait_module_close(&demo_module_id, None).await?;
+    // Close the worker.
+    MMFWrk::close_worker(&demo_worker_id, Bytes::new()).await?;
+    MMFWrk::wait_worker_close(&demo_worker_id, None).await?;
 
     // Shutdown.
     MMF::close()?;

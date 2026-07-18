@@ -15,25 +15,25 @@ use crate::log_file;
 use crate::mmf::TimestampFormat::LocalTime;
 use crate::mmf_err::ErrorData;
 use crate::mmf_log::{LogMode, LoggingData};
-use crate::mmf_mod::ModuleData;
-use crate::module::{Module, ModuleConstructor};
-use crate::module_type_registry::ModuleTypeRegistry;
+use crate::mmf_wrk::WorkerData;
+use crate::worker::{Worker, WorkerConstructor};
+use crate::worker_type_registry::WorkerTypeRegistry;
 
 /// Global MMF runtime storage shared by all
 /// framework components.
 pub(crate) static MMF_DATA: LazyLock<RwLock<Option<MMFData>>> = LazyLock::new(|| RwLock::new(None));
 
-/// Global MMF module runtime storage.
-pub(crate) static MMF_MOD_DATA: LazyLock<RwLock<Option<ModuleData>>> = LazyLock::new(|| RwLock::new(None));
+/// Global MMF worker runtime storage.
+pub(crate) static MMF_WRK_DATA: LazyLock<RwLock<Option<WorkerData>>> = LazyLock::new(|| RwLock::new(None));
 
-/// Global MMF notifier used to signal child module initialized.
-pub(crate) static MMF_MOD_INIT_NOTIFY: LazyLock<Notify> = LazyLock::new(Notify::new);
+/// Global MMF notifier used to signal child worker initialized.
+pub(crate) static MMF_WRK_INIT_NOTIFY: LazyLock<Notify> = LazyLock::new(Notify::new);
 
-/// Global MMF notifier used to signal child module closures.
-pub(crate) static MMF_MOD_CLOSE_NOTIFY: LazyLock<Notify> = LazyLock::new(Notify::new);
+/// Global MMF notifier used to signal child worker closures.
+pub(crate) static MMF_WRK_CLOSE_NOTIFY: LazyLock<Notify> = LazyLock::new(Notify::new);
 
-/// Global MMF message instance counter used to identify messages sent to modules.
-pub(crate) static MMF_MOD_MESSAGE_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
+/// Global MMF message instance counter used to identify messages sent to workers.
+pub(crate) static MMF_WRK_MESSAGE_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 /// Global MMF error event storage.
 pub(crate) static MMF_ERR_DATA: LazyLock<RwLock<Option<ErrorData>>> = LazyLock::new(|| RwLock::new(None));
@@ -69,7 +69,7 @@ pub enum TimestampFormat {
     UtcTime = 1,
 }
 
-/// Information about the Mesh Module Framework.
+/// Information about the Mesh Worker Framework.
 #[derive(Debug, Clone, Copy)]
 pub struct MMFInfo {
     /// crate name.
@@ -101,24 +101,24 @@ impl std::fmt::Display for MMFInfo {
 /// Internal MMF runtime data.
 #[derive(Debug)]
 pub(crate) struct MMFData {
-    /// Registered module types.
-    pub(crate) module_type_registry: ModuleTypeRegistry,
+    /// Registered worker types.
+    pub(crate) worker_type_registry: WorkerTypeRegistry,
 }
 
 impl MMFData {
     pub(crate) fn new() -> Self {
-        Self { module_type_registry: ModuleTypeRegistry::new() }
+        Self { worker_type_registry: WorkerTypeRegistry::new() }
     }
 }
 
 /// MMF startup configuration.
 #[derive(Debug, Clone)]
 pub struct MMFConfiguration {
-    /// Capacity of normal module event queues.
-    pub module_normal_channel_capacity: usize,
+    /// Capacity of normal worker event queues.
+    pub worker_normal_channel_capacity: usize,
 
-    /// Capacity of priority module event queues.
-    pub module_priority_channel_capacity: usize,
+    /// Capacity of priority worker event queues.
+    pub worker_priority_channel_capacity: usize,
 
     /// Timestamp format used by MMF.
     pub timestamp_format: TimestampFormat,
@@ -143,7 +143,7 @@ impl Default for MMFConfiguration {
 
         let log_file_max_size_bytes = 10 * 1024 * 1024;
 
-        Self { module_normal_channel_capacity: 50, module_priority_channel_capacity: 10, timestamp_format: LocalTime, error_event_buffer_capacity: 100, log_event_buffer_capacity: 100, log_file_path, log_file_max_size_bytes }
+        Self { worker_normal_channel_capacity: 50, worker_priority_channel_capacity: 10, timestamp_format: LocalTime, error_event_buffer_capacity: 100, log_event_buffer_capacity: 100, log_file_path, log_file_max_size_bytes }
     }
 }
 
@@ -151,7 +151,7 @@ impl Default for MMFConfiguration {
 pub struct MMF;
 
 impl MMF {
-    /// Returns information about the Mesh Module Framework.
+    /// Returns information about the Mesh Worker Framework.
     pub fn get_info() -> MMFInfo {
         MMFInfo { crate_name: env!("CARGO_PKG_NAME"), crate_version: env!("CARGO_PKG_VERSION"), crate_git_commit: env!("MMF_GIT_COMMIT"), build_profile: if cfg!(debug_assertions) { "debug" } else { "release" } }
     }
@@ -170,13 +170,13 @@ impl MMF {
         *mmf_data_guard = Some(MMFData::new());
         drop(mmf_data_guard);
 
-        MMF_MOD_MESSAGE_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
+        MMF_WRK_MESSAGE_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
         MMF_ERR_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
         MMF_LOG_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
         MMF_TIMESTAMP_FORMAT.store(mmf_configuration.timestamp_format as u8, Ordering::Relaxed);
 
-        let mut mmf_mod_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
-        *mmf_mod_data_guard = Some(ModuleData::new(&mmf_configuration));
+        let mut mmf_mod_data_guard = MMF_WRK_DATA.write().expect(MMFPanic::MMFWrkData_WriteLockPoisoned.message());
+        *mmf_mod_data_guard = Some(WorkerData::new(&mmf_configuration));
         drop(mmf_mod_data_guard);
 
         let mut mmf_err_data_guard = MMF_ERR_DATA.write().expect(MMFPanic::MMFErrData_WriteLockPoisoned.message());
@@ -188,7 +188,7 @@ impl MMF {
         let mut mmf_log_data_guard = MMF_LOG_DATA.write().expect(MMFPanic::MMFLogData_WriteLockPoisoned.message());
         *mmf_log_data_guard = Some(LoggingData {
             log_event_buffer_capacity: mmf_configuration.log_event_buffer_capacity,
-            logged_module_list: Vec::new(),
+            logged_worker_list: Vec::new(),
             log_event_list: VecDeque::new(),
             log_file_enabled: false,
             log_file_path: mmf_configuration.log_file_path,
@@ -203,14 +203,14 @@ impl MMF {
 
     /// Shutdown the MMF framework and release all resources.
     ///
-    /// All modules must be closed before calling this function.
+    /// All workers must be closed before calling this function.
     ///
-    /// If one or more modules are still running,
-    /// FrameworkError::Module_StillRunning is returned.
+    /// If one or more workers are still running,
+    /// FrameworkError::worker_StillRunning is returned.
     ///
-    /// Use MMFMod::close_module() to terminate modules
-    /// gracefully, or MMFMod::abort_module() as a last
-    /// resort if a module becomes unresponsive.
+    /// Use MMFWrk::close_worker() to terminate workers
+    /// gracefully, or MMFWrk::abort_worker() as a last
+    /// resort if a worker becomes unresponsive.
     pub fn close() -> Result<(), MMFError> {
         // Check that MMF has been initialized.
         let mmf_data_guard = MMF_DATA.read().expect(MMFPanic::MMFData_ReadLockPoisoned.message());
@@ -219,12 +219,12 @@ impl MMF {
         }
         drop(mmf_data_guard);
 
-        // Make sure no module is still running.
+        // Make sure no worker is still running.
         {
-            let mmf_mod_data_guard = MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message());
-            let mmf_mod_data = mmf_mod_data_guard.as_ref().expect(MMFPanic::MMFModData_Missing.message());
-            if !mmf_mod_data.module_registry.is_empty() {
-                return Err(MMFError::Framework_CannotClose_ModulesStillRunning);
+            let mmf_mod_data_guard = MMF_WRK_DATA.read().expect(MMFPanic::MMFWrkData_ReadLockPoisoned.message());
+            let mmf_mod_data = mmf_mod_data_guard.as_ref().expect(MMFPanic::MMFWrkData_Missing.message());
+            if !mmf_mod_data.worker_registry.is_empty() {
+                return Err(MMFError::Framework_CannotClose_workersStillRunning);
             }
         }
 
@@ -232,7 +232,7 @@ impl MMF {
         let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
         *mmf_data_guard = None;
 
-        let mut mmf_mod_data_guard = MMF_MOD_DATA.write().expect(MMFPanic::MMFModData_WriteLockPoisoned.message());
+        let mut mmf_mod_data_guard = MMF_WRK_DATA.write().expect(MMFPanic::MMFWrkData_WriteLockPoisoned.message());
         *mmf_mod_data_guard = None;
 
         let mut mmf_err_data_guard = MMF_ERR_DATA.write().expect(MMFPanic::MMFErrData_WriteLockPoisoned.message());
@@ -249,58 +249,58 @@ impl MMF {
 
     /// Check whether the framework is initialized.
     pub fn is_initialized() -> bool {
-        MMF_MOD_DATA.read().expect(MMFPanic::MMFModData_ReadLockPoisoned.message()).is_some()
+        MMF_WRK_DATA.read().expect(MMFPanic::MMFWrkData_ReadLockPoisoned.message()).is_some()
     }
 
-    /// Register a module type.
+    /// Register a worker type.
     ///
-    /// Module types must be registered before they can be
+    /// worker types must be registered before they can be
     /// instantiated by MMF.
     ///
-    /// Registration associates the module's ModuleTypeID
+    /// Registration associates the worker's WorkerTypeID
     /// with:
     /// - its Rust type name, used for diagnostics;
     /// - a constructor function used by MMF to create new
-    ///   module instances dynamically.
+    ///   worker instances dynamically.
     ///
     /// The registered constructor creates a new default
-    /// instance of the module each time MMF spawns it.
+    /// instance of the worker each time MMF spawns it.
     ///
     /// Returns:
     /// - Framework_NotInitialized if MMF has not been initialized.
-    /// - ModuleType_AlreadyRegistered if the module type has
+    /// - workerType_AlreadyRegistered if the worker type has
     ///   already been registered.
-    /// - Module_DuplicateModuleTypeID if the ModuleTypeID is
-    ///   already associated with a different Rust module type.
-    pub fn register_module_type<T>() -> Result<(), MMFError>
+    /// - worker_DuplicateWorkerTypeID if the WorkerTypeID is
+    ///   already associated with a different Rust worker type.
+    pub fn register_worker_type<T>() -> Result<(), MMFError>
     where
-        T: Module + Send + 'static,
+        T: Worker + Send + 'static,
     {
         let mut mmf_data_guard = MMF_DATA.write().expect(MMFPanic::MMFData_WriteLockPoisoned.message());
         let mmf_data = mmf_data_guard.as_mut().ok_or(MMFError::Framework_NotInitialized)?;
         let rust_type_name = std::any::type_name::<T>();
 
-        match mmf_data.module_type_registry.get_module_rust_type_name(T::module_type_id()) {
+        match mmf_data.worker_type_registry.get_worker_rust_type_name(T::worker_type_id()) {
             Ok(registered_rust_type_name) => {
                 if registered_rust_type_name == rust_type_name {
-                    return Err(MMFError::ModuleType_AlreadyRegistered);
+                    return Err(MMFError::WorkerType_AlreadyRegistered);
                 }
 
-                return Err(MMFError::ModuleType_DuplicateModuleTypeID);
+                return Err(MMFError::WorkerType_DuplicateWorkerTypeID);
             }
 
-            Err(MMFError::ModuleType_NotFound) => {
-                // Create the constructor associated with this module type.
+            Err(MMFError::WorkerType_NotFound) => {
+                // Create the constructor associated with this worker type.
                 //
-                // The constructor is stored in the ModuleTypeRegistry and
-                // invoked by MMF whenever a new instance of this module
+                // The constructor is stored in the WorkerTypeRegistry and
+                // invoked by MMF whenever a new instance of this worker
                 // type must be spawned.
                 //
                 // Note that T::new() is not executed here.
                 // Instead, a function calling T::new() is created and
                 // stored for later use.
-                let module_constructor: ModuleConstructor = || Box::new(T::new());
-                mmf_data.module_type_registry.add_module_type(T::module_type_id(), rust_type_name, module_constructor);
+                let worker_constructor: WorkerConstructor = || Box::new(T::new());
+                mmf_data.worker_type_registry.add_worker_type(T::worker_type_id(), rust_type_name, worker_constructor);
             }
 
             Err(error) => return Err(error),
