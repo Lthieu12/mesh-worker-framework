@@ -97,10 +97,10 @@ async fn main() -> Result<(), MWFError> {
 The following DemoWorker implementation, available in `examples/getting_started/workers/demo_worker.rs`, is used by the previous example and illustrates the minimum implementation required to create an MWF worker.
 
 ```rust,ignore
-use std::time::Duration;
-use bytes::Bytes;
 use async_trait::async_trait;
+use bytes::Bytes;
 use mesh_worker_framework::*;
+use std::time::Duration;
 
 /// Message identifiers handled by DemoWorker.
 pub struct DemoMessages;
@@ -125,7 +125,7 @@ impl Worker for DemoWorker {
     }
 
     fn new() -> Self {
-        Self { worker_id: None, parent_id: None, }
+        Self { worker_id: None, parent_id: None }
     }
 
     async fn on_init(&mut self, worker_id: WorkerID, parent_id: EntityID, _lifecycle_data: Bytes) -> Result<(), WorkerError> {
@@ -138,7 +138,6 @@ impl Worker for DemoWorker {
     }
 
     async fn on_message(&mut self, message: WorkerMessage) -> Result<(), WorkerError> {
-        
         match message.message_id.as_str() {
             DemoMessages::QUICK_CALCULATION => {
                 // Small blocking work performed directly by the worker.
@@ -162,7 +161,6 @@ impl Worker for DemoWorker {
     }
 
     async fn on_close(&mut self, _lifecycle_data: Bytes) -> Result<(), WorkerError> {
-
         Ok(())
     }
 }
