@@ -11,7 +11,7 @@ Actuellement, il faut écrire :
 pub struct FileSearch {}
 
 #[async_trait]
-impl mmf::Worker for FileSearch {
+impl mwf::Worker for FileSearch {
     // ...
 }
 ```
@@ -27,7 +27,7 @@ impl FileSearch {
 }
 ```
 
-La macro `Worker` devrait générer automatiquement l’implémentation nécessaire du trait `mmf::Worker`.
+La macro `Worker` devrait générer automatiquement l’implémentation nécessaire du trait `mwf::Worker`.
 
 ### 2. Accepter `&str` à la place de `&String`
 

@@ -11,7 +11,7 @@ use crate::MWFLog;
 use crate::MWFWrk;
 
 use crate::message::{MessageID, MessageInstanceID};
-use crate::mmf_log::{LogAction, LogEvent, LogList, LogStatus};
+use crate::mwf_log::{LogAction, LogEvent, LogList, LogStatus};
 use crate::worker::{EntityID, WorkerID};
 
 #[allow(dead_code)]

@@ -12,7 +12,7 @@ mod tests {
     use mesh_worker_framework::*;
 
     #[test]
-    fn test_mmf_init_close() {
+    fn test_mwf_init_close() {
         let info = MWF::get_info();
         println!("{}", info);
 
@@ -28,7 +28,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mmf_double_init() {
+    fn test_mwf_double_init() {
         assert!(MWF::init().is_ok());
 
         assert!(matches!(MWF::init(), Err(MWFError::Framework_AlreadyInitialized)));
@@ -37,7 +37,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mmf_double_close() {
+    fn test_mwf_double_close() {
         assert!(matches!(MWF::close(), Err(MWFError::Framework_NotInitialized)));
     }
 }

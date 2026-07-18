@@ -12,10 +12,10 @@ use tokio::sync::Notify;
 
 use crate::framework_error::{MWFError, MWFPanic};
 use crate::log_file;
-use crate::mmf::TimestampFormat::LocalTime;
-use crate::mmf_err::ErrorData;
-use crate::mmf_log::{LogMode, LoggingData};
-use crate::mmf_wrk::WorkerData;
+use crate::mwf::TimestampFormat::LocalTime;
+use crate::mwf_err::ErrorData;
+use crate::mwf_log::{LogMode, LoggingData};
+use crate::mwf_wrk::WorkerData;
 use crate::worker::{Worker, WorkerConstructor};
 use crate::worker_type_registry::WorkerTypeRegistry;
 
@@ -138,8 +138,8 @@ pub struct MWFConfiguration {
 
 impl Default for MWFConfiguration {
     fn default() -> Self {
-        let mut log_file_path = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("mmf.exe"));
-        log_file_path.set_file_name("mmf.log");
+        let mut log_file_path = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("mwf.exe"));
+        log_file_path.set_file_name("mwf.log");
 
         let log_file_max_size_bytes = 10 * 1024 * 1024;
 
@@ -162,41 +162,41 @@ impl MWF {
     }
 
     /// Initialize the MWF framework with custom configuration.
-    pub fn init_with_configuration(mut mmf_configuration: MWFConfiguration) -> Result<(), MWFError> {
-        let mut mmf_data_guard = MWF_DATA.write().expect(MWFPanic::MWFData_WriteLockPoisoned.message());
-        if mmf_data_guard.is_some() {
+    pub fn init_with_configuration(mut mwf_configuration: MWFConfiguration) -> Result<(), MWFError> {
+        let mut mwf_data_guard = MWF_DATA.write().expect(MWFPanic::MWFData_WriteLockPoisoned.message());
+        if mwf_data_guard.is_some() {
             return Err(MWFError::Framework_AlreadyInitialized);
         }
-        *mmf_data_guard = Some(MWFData::new());
-        drop(mmf_data_guard);
+        *mwf_data_guard = Some(MWFData::new());
+        drop(mwf_data_guard);
 
         MWF_WRK_MESSAGE_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
         MWF_ERR_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
         MWF_LOG_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
-        MWF_TIMESTAMP_FORMAT.store(mmf_configuration.timestamp_format as u8, Ordering::Relaxed);
+        MWF_TIMESTAMP_FORMAT.store(mwf_configuration.timestamp_format as u8, Ordering::Relaxed);
 
-        let mut mmf_mod_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
-        *mmf_mod_data_guard = Some(WorkerData::new(&mmf_configuration));
-        drop(mmf_mod_data_guard);
+        let mut mwf_mod_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
+        *mwf_mod_data_guard = Some(WorkerData::new(&mwf_configuration));
+        drop(mwf_mod_data_guard);
 
-        let mut mmf_err_data_guard = MWF_ERR_DATA.write().expect(MWFPanic::MWFErrData_WriteLockPoisoned.message());
-        *mmf_err_data_guard = Some(ErrorData { error_event_buffer_capacity: mmf_configuration.error_event_buffer_capacity, error_event_list: VecDeque::new() });
-        drop(mmf_err_data_guard);
+        let mut mwf_err_data_guard = MWF_ERR_DATA.write().expect(MWFPanic::MWFErrData_WriteLockPoisoned.message());
+        *mwf_err_data_guard = Some(ErrorData { error_event_buffer_capacity: mwf_configuration.error_event_buffer_capacity, error_event_list: VecDeque::new() });
+        drop(mwf_err_data_guard);
 
         // Initialize the MWF log file.
-        let log_file = log_file::init_log_file(&mut mmf_configuration)?;
-        let mut mmf_log_data_guard = MWF_LOG_DATA.write().expect(MWFPanic::MWFLogData_WriteLockPoisoned.message());
-        *mmf_log_data_guard = Some(LoggingData {
-            log_event_buffer_capacity: mmf_configuration.log_event_buffer_capacity,
+        let log_file = log_file::init_log_file(&mut mwf_configuration)?;
+        let mut mwf_log_data_guard = MWF_LOG_DATA.write().expect(MWFPanic::MWFLogData_WriteLockPoisoned.message());
+        *mwf_log_data_guard = Some(LoggingData {
+            log_event_buffer_capacity: mwf_configuration.log_event_buffer_capacity,
             logged_worker_list: Vec::new(),
             log_event_list: VecDeque::new(),
             log_file_enabled: false,
-            log_file_path: mmf_configuration.log_file_path,
+            log_file_path: mwf_configuration.log_file_path,
             log_file: Some(log_file),
-            log_file_max_size_bytes: mmf_configuration.log_file_max_size_bytes,
+            log_file_max_size_bytes: mwf_configuration.log_file_max_size_bytes,
             log_file_current_size_bytes: 0,
         });
-        drop(mmf_log_data_guard);
+        drop(mwf_log_data_guard);
 
         Ok(())
     }
@@ -213,36 +213,36 @@ impl MWF {
     /// resort if a worker becomes unresponsive.
     pub fn close() -> Result<(), MWFError> {
         // Check that MWF has been initialized.
-        let mmf_data_guard = MWF_DATA.read().expect(MWFPanic::MWFData_ReadLockPoisoned.message());
-        if mmf_data_guard.is_none() {
+        let mwf_data_guard = MWF_DATA.read().expect(MWFPanic::MWFData_ReadLockPoisoned.message());
+        if mwf_data_guard.is_none() {
             return Err(MWFError::Framework_NotInitialized);
         }
-        drop(mmf_data_guard);
+        drop(mwf_data_guard);
 
         // Make sure no worker is still running.
         {
-            let mmf_mod_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
-            let mmf_mod_data = mmf_mod_data_guard.as_ref().expect(MWFPanic::MWFWrkData_Missing.message());
-            if !mmf_mod_data.worker_registry.is_empty() {
+            let mwf_mod_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
+            let mwf_mod_data = mwf_mod_data_guard.as_ref().expect(MWFPanic::MWFWrkData_Missing.message());
+            if !mwf_mod_data.worker_registry.is_empty() {
                 return Err(MWFError::Framework_CannotClose_workersStillRunning);
             }
         }
 
         // Destroy MWF data.
-        let mut mmf_data_guard = MWF_DATA.write().expect(MWFPanic::MWFData_WriteLockPoisoned.message());
-        *mmf_data_guard = None;
+        let mut mwf_data_guard = MWF_DATA.write().expect(MWFPanic::MWFData_WriteLockPoisoned.message());
+        *mwf_data_guard = None;
 
-        let mut mmf_mod_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
-        *mmf_mod_data_guard = None;
+        let mut mwf_mod_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
+        *mwf_mod_data_guard = None;
 
-        let mut mmf_err_data_guard = MWF_ERR_DATA.write().expect(MWFPanic::MWFErrData_WriteLockPoisoned.message());
-        *mmf_err_data_guard = None;
+        let mut mwf_err_data_guard = MWF_ERR_DATA.write().expect(MWFPanic::MWFErrData_WriteLockPoisoned.message());
+        *mwf_err_data_guard = None;
 
         // Destroy MWF logging data.
         //
         // Dropping LoggingData also closes the MWF log file.
-        let mut mmf_log_data_guard = MWF_LOG_DATA.write().expect(MWFPanic::MWFLogData_WriteLockPoisoned.message());
-        *mmf_log_data_guard = None;
+        let mut mwf_log_data_guard = MWF_LOG_DATA.write().expect(MWFPanic::MWFLogData_WriteLockPoisoned.message());
+        *mwf_log_data_guard = None;
 
         Ok(())
     }
@@ -276,11 +276,11 @@ impl MWF {
     where
         T: Worker + Send + 'static,
     {
-        let mut mmf_data_guard = MWF_DATA.write().expect(MWFPanic::MWFData_WriteLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
+        let mut mwf_data_guard = MWF_DATA.write().expect(MWFPanic::MWFData_WriteLockPoisoned.message());
+        let mwf_data = mwf_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
         let rust_type_name = std::any::type_name::<T>();
 
-        match mmf_data.worker_type_registry.get_worker_rust_type_name(T::worker_type_id()) {
+        match mwf_data.worker_type_registry.get_worker_rust_type_name(T::worker_type_id()) {
             Ok(registered_rust_type_name) => {
                 if registered_rust_type_name == rust_type_name {
                     return Err(MWFError::WorkerType_AlreadyRegistered);
@@ -300,7 +300,7 @@ impl MWF {
                 // Instead, a function calling T::new() is created and
                 // stored for later use.
                 let worker_constructor: WorkerConstructor = || Box::new(T::new());
-                mmf_data.worker_type_registry.add_worker_type(T::worker_type_id(), rust_type_name, worker_constructor);
+                mwf_data.worker_type_registry.add_worker_type(T::worker_type_id(), rust_type_name, worker_constructor);
             }
 
             Err(error) => return Err(error),

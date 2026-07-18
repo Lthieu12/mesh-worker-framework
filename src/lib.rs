@@ -13,10 +13,10 @@ mod worker_registry;
 mod worker_task;
 mod worker_type_registry;
 
-pub mod mmf;
-pub mod mmf_err;
-pub mod mmf_log;
-pub mod mmf_wrk;
+pub mod mwf;
+pub mod mwf_err;
+pub mod mwf_log;
+pub mod mwf_wrk;
 
 // only used for tests, examples and debug.
 //
@@ -26,10 +26,10 @@ pub mod mmf_wrk;
 pub mod dev_support;
 
 // Public MWF API
-pub use mmf::{MWF, MWFConfiguration};
-pub use mmf_err::{ErrorEvent, ErrorInstanceID, ErrorList, ErrorOutputFormat, MWFErr};
-pub use mmf_log::{LogAction, LogEvent, LogInstanceID, LogList, LogMode, LogOutputFormat, LogStatus, MWFLog};
-pub use mmf_wrk::MWFWrk;
+pub use mwf::{MWF, MWFConfiguration};
+pub use mwf_err::{ErrorEvent, ErrorInstanceID, ErrorList, ErrorOutputFormat, MWFErr};
+pub use mwf_log::{LogAction, LogEvent, LogInstanceID, LogList, LogMode, LogOutputFormat, LogStatus, MWFLog};
+pub use mwf_wrk::MWFWrk;
 
 pub use framework_error::MWFError;
 

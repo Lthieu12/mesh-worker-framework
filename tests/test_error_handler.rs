@@ -14,7 +14,7 @@ use anyhow::{Context, Result};
 use bytes::Bytes;
 use serial_test::serial;
 
-use crate::mmf::MWFConfiguration;
+use crate::mwf::MWFConfiguration;
 use dev_support::dev_helper::*;
 use dev_support::simulation_worker::{SimulationBehavior, SimulationWorker, SimulationWorkerConfig};
 use mesh_worker_framework::*;
@@ -27,7 +27,7 @@ fn generate_application_error() -> Result<()> {
 // Integration tests must run serially.
 #[tokio::test]
 #[serial]
-async fn test_mmf_err_worker_failures() {
+async fn test_mwf_err_worker_failures() {
     MWF::init().unwrap();
     MWF::register_worker_type::<SimulationWorker>().unwrap();
 
@@ -127,7 +127,7 @@ async fn test_mmf_err_worker_failures() {
 // Integration tests must run serially.
 #[tokio::test]
 #[serial]
-async fn test_mmf_err_buffer_overflow() {
+async fn test_mwf_err_buffer_overflow() {
     let mut configuration = MWFConfiguration::default();
 
     configuration.error_event_buffer_capacity = 10;

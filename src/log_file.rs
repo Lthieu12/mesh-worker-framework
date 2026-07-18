@@ -6,8 +6,8 @@ use std::io::{BufRead, BufReader, Error, Write};
 use std::path::{Path, PathBuf};
 
 use crate::framework_error::MWFError;
-use crate::mmf::MWFConfiguration;
-use crate::mmf_log::{LogEvent, LogList, LogOutputFormat, LoggingData};
+use crate::mwf::MWFConfiguration;
+use crate::mwf_log::{LogEvent, LogList, LogOutputFormat, LoggingData};
 
 /// Header written at the beginning of every MWF log file.
 ///
@@ -59,7 +59,7 @@ fn find_log_file_path(log_file_path: &Path) -> Result<PathBuf, MWFError> {
         }
 
         // Candidate log file belongs to MWF.
-        if is_mmf_log_file(&candidate_log_file_path)? {
+        if is_mwf_log_file(&candidate_log_file_path)? {
             return Ok(candidate_log_file_path);
         }
 
@@ -80,7 +80,7 @@ fn find_log_file_path(log_file_path: &Path) -> Result<PathBuf, MWFError> {
 }
 
 /// Returns whether the specified file is an MWF log file.
-fn is_mmf_log_file(log_file_path: &Path) -> Result<bool, MWFError> {
+fn is_mwf_log_file(log_file_path: &Path) -> Result<bool, MWFError> {
     let log_file = File::open(log_file_path).map_err(|error| log_file_access_failed(error, log_file_path))?;
 
     let mut reader = BufReader::new(log_file);

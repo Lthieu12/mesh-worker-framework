@@ -40,7 +40,7 @@ use mesh_worker_framework::*;
 // Integration tests must run serially.
 #[tokio::test]
 #[serial]
-async fn test_mmf_log_worker_lifecycle() {
+async fn test_mwf_log_worker_lifecycle() {
     MWF::init().unwrap();
     MWF::register_worker_type::<SimulationWorker>().unwrap();
 
@@ -88,7 +88,7 @@ async fn test_mmf_log_worker_lifecycle() {
 // Integration tests must run serially.
 #[tokio::test]
 #[serial]
-async fn test_mmf_log_messages() {
+async fn test_mwf_log_messages() {
     MWF::init().unwrap();
     MWF::register_worker_type::<SimulationWorker>().unwrap();
 
@@ -159,7 +159,7 @@ async fn test_mmf_log_messages() {
 // Integration tests must run serially.
 #[tokio::test]
 #[serial]
-async fn test_mmf_log_buffer_overflow() {
+async fn test_mwf_log_buffer_overflow() {
     let config = MWFConfiguration { log_event_buffer_capacity: 10, ..Default::default() };
 
     MWF::init_with_configuration(config).unwrap();

@@ -20,7 +20,7 @@ use tokio::sync::oneshot;
 
 use crate::framework_error::{MWFError, MWFPanic, WorkerError};
 use crate::message::{MessageID, WorkerMessage};
-use crate::mmf::MWF_WRK_DATA;
+use crate::mwf::MWF_WRK_DATA;
 use crate::worker::{EntityID, WorkerID, WorkerState};
 
 pub(crate) type WorkerSenderChannel = Sender<WorkerCommand>;
@@ -74,9 +74,9 @@ pub(crate) fn get_sender_channel(sender_id: &EntityID, receiver_id: &WorkerID, c
         //
         // send_message() only requires a read lock because it does
         // not modify the Registry or workerState.
-        let mmf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
+        let mwf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
 
-        let mmf_data = mmf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+        let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
 
         // Validate the sender.
         //
@@ -86,7 +86,7 @@ pub(crate) fn get_sender_channel(sender_id: &EntityID, receiver_id: &WorkerID, c
         // External senders are not validated.
         match sender_id {
             EntityID::Worker(worker_id) => {
-                let worker_state = mmf_data.worker_registry.get_worker_state(worker_id)?;
+                let worker_state = mwf_data.worker_registry.get_worker_state(worker_id)?;
                 if worker_state != WorkerState::Initialized {
                     return Err(MWFError::Worker_NotInitialized);
                 }
@@ -97,7 +97,7 @@ pub(crate) fn get_sender_channel(sender_id: &EntityID, receiver_id: &WorkerID, c
         // Validate the receiver worker state.
         //
         // Messages can only be sent to initialized workers.
-        let worker_state = mmf_data.worker_registry.get_worker_state(receiver_id)?;
+        let worker_state = mwf_data.worker_registry.get_worker_state(receiver_id)?;
         if worker_state != WorkerState::Initialized {
             return Err(MWFError::Worker_NotInitialized);
         }
@@ -109,8 +109,8 @@ pub(crate) fn get_sender_channel(sender_id: &EntityID, receiver_id: &WorkerID, c
         // under the same lock to avoid race conditions with
         // close_worker().
         match channel {
-            WorkerChannel::Normal => mmf_data.worker_registry.get_worker_normal_channel(receiver_id),
-            WorkerChannel::Priority => mmf_data.worker_registry.get_worker_priority_channel(receiver_id),
+            WorkerChannel::Normal => mwf_data.worker_registry.get_worker_normal_channel(receiver_id),
+            WorkerChannel::Priority => mwf_data.worker_registry.get_worker_priority_channel(receiver_id),
         }?
     };
     Ok(sender_channel)

@@ -13,7 +13,7 @@ use crate::MWF;
 use crate::framework_error::{MWFError, MWFPanic};
 use crate::log_file::write_log_event;
 use crate::message::{MessageID, MessageInstanceID};
-use crate::mmf::{MWF_LOG_DATA, MWF_LOG_INSTANCE_COUNTER, MWF_LOG_MODE, MWF_LOG_NOTIFY};
+use crate::mwf::{MWF_LOG_DATA, MWF_LOG_INSTANCE_COUNTER, MWF_LOG_MODE, MWF_LOG_NOTIFY};
 use crate::string_helper;
 use crate::worker::{EntityID, WorkerID};
 
@@ -66,19 +66,19 @@ pub(crate) struct LoggingData {
     /// Circular buffer of log events.
     pub(crate) log_event_list: VecDeque<LogEvent>,
 
-    /// mmf.log file activation
+    /// mwf.log file activation
     pub(crate) log_file_enabled: bool,
 
-    /// mmf.log file path
+    /// mwf.log file path
     pub(crate) log_file_path: PathBuf,
 
-    /// mmf.log file reference
+    /// mwf.log file reference
     pub(crate) log_file: Option<File>,
 
-    /// mmf.log file max size (bytes)
+    /// mwf.log file max size (bytes)
     pub(crate) log_file_max_size_bytes: u64,
 
-    /// mmf.log file current size (bytes)
+    /// mwf.log file current size (bytes)
     pub(crate) log_file_current_size_bytes: u64,
 }
 
@@ -293,16 +293,16 @@ impl MWFLog {
     /// Returns Framework_NotInitialized if MWF has not
     /// been initialized through MWF::init().
     pub fn set_log_mode(log_mode: LogMode, logged_worker_list: Option<Vec<WorkerID>>) -> Result<(), MWFError> {
-        let mut mmf_log_data_guard = MWF_LOG_DATA.write().expect(MWFPanic::MWFLogData_WriteLockPoisoned.message());
-        let mmf_log_data = mmf_log_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
+        let mut mwf_log_data_guard = MWF_LOG_DATA.write().expect(MWFPanic::MWFLogData_WriteLockPoisoned.message());
+        let mwf_log_data = mwf_log_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
 
         MWF_LOG_MODE.store(log_mode as u8, Ordering::Relaxed);
 
         if let Some(logged_worker_list) = logged_worker_list {
-            mmf_log_data.logged_worker_list = logged_worker_list;
+            mwf_log_data.logged_worker_list = logged_worker_list;
         }
 
-        drop(mmf_log_data_guard);
+        drop(mwf_log_data_guard);
         Ok(())
     }
 
@@ -311,9 +311,9 @@ impl MWFLog {
     /// Returns Framework_NotInitialized if MWF has not
     /// been initialized through MWF::init().
     pub fn get_log_mode() -> Result<LogMode, MWFError> {
-        let mmf_log_data_guard = MWF_LOG_DATA.read().expect(MWFPanic::MWFLogData_ReadLockPoisoned.message());
+        let mwf_log_data_guard = MWF_LOG_DATA.read().expect(MWFPanic::MWFLogData_ReadLockPoisoned.message());
 
-        if mmf_log_data_guard.is_none() {
+        if mwf_log_data_guard.is_none() {
             return Err(MWFError::Framework_NotInitialized);
         }
 
@@ -325,7 +325,7 @@ impl MWFLog {
             _ => LogMode::NoLog,
         };
 
-        drop(mmf_log_data_guard);
+        drop(mwf_log_data_guard);
         Ok(log_mode)
     }
 
@@ -334,11 +334,11 @@ impl MWFLog {
     /// Returns Framework_NotInitialized if MWF has not
     /// been initialized through MWF::init().
     pub fn get_logged_worker_list() -> Result<Vec<WorkerID>, MWFError> {
-        let mmf_log_data_guard = MWF_LOG_DATA.read().expect(MWFPanic::MWFLogData_ReadLockPoisoned.message());
-        let mmf_log_data = mmf_log_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
-        let logged_worker_list = mmf_log_data.logged_worker_list.clone();
+        let mwf_log_data_guard = MWF_LOG_DATA.read().expect(MWFPanic::MWFLogData_ReadLockPoisoned.message());
+        let mwf_log_data = mwf_log_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+        let logged_worker_list = mwf_log_data.logged_worker_list.clone();
 
-        drop(mmf_log_data_guard);
+        drop(mwf_log_data_guard);
         Ok(logged_worker_list)
     }
 
@@ -350,10 +350,10 @@ impl MWFLog {
     /// Returns Framework_NotInitialized if MWF has not
     /// been initialized through MWF::init().
     pub(crate) fn remove_logged_worker(worker_id: &WorkerID) -> Result<(), MWFError> {
-        let mut mmf_log_data_guard = MWF_LOG_DATA.write().expect(MWFPanic::MWFLogData_WriteLockPoisoned.message());
-        let mmf_log_data = mmf_log_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
-        mmf_log_data.logged_worker_list.retain(|logged_worker_id| logged_worker_id != worker_id);
-        drop(mmf_log_data_guard);
+        let mut mwf_log_data_guard = MWF_LOG_DATA.write().expect(MWFPanic::MWFLogData_WriteLockPoisoned.message());
+        let mwf_log_data = mwf_log_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
+        mwf_log_data.logged_worker_list.retain(|logged_worker_id| logged_worker_id != worker_id);
+        drop(mwf_log_data_guard);
 
         Ok(())
     }
@@ -381,8 +381,8 @@ impl MWFLog {
         }
 
         if log_mode == LogMode::LogSelected as u8 {
-            let mmf_log_data_guard = MWF_LOG_DATA.read().expect(MWFPanic::MWFLogData_ReadLockPoisoned.message());
-            let logging_data = mmf_log_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+            let mwf_log_data_guard = MWF_LOG_DATA.read().expect(MWFPanic::MWFLogData_ReadLockPoisoned.message());
+            let logging_data = mwf_log_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
             return Ok(logging_data.logged_worker_list.iter().any(|logged_worker_id| logged_worker_id == worker_id));
         }
 
@@ -414,8 +414,8 @@ impl MWFLog {
 
         let log_event = LogEvent { log_instance_id, timestamp_rfc3339, worker_id: worker_id.to_owned(), log_action, log_status, duration_ms };
 
-        let mut mmf_log_data_guard = MWF_LOG_DATA.write().expect(MWFPanic::MWFLogData_WriteLockPoisoned.message());
-        let logging_data = mmf_log_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
+        let mut mwf_log_data_guard = MWF_LOG_DATA.write().expect(MWFPanic::MWFLogData_WriteLockPoisoned.message());
+        let logging_data = mwf_log_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
 
         // Write the log event to the log file if enabled.
         write_log_event(logging_data, &log_event)?;
@@ -426,7 +426,7 @@ impl MWFLog {
         }
         logging_data.log_event_list.push_back(log_event);
 
-        drop(mmf_log_data_guard);
+        drop(mwf_log_data_guard);
 
         // Notify all waiters that a new log event
         // has been added to the buffer.
@@ -487,11 +487,11 @@ impl MWFLog {
     /// Returns Framework_NotInitialized if MWFLog has
     /// not been initialized through MWF::init().
     fn get_log_list(last_log_instance_id: Option<LogInstanceID>) -> Result<LogList, MWFError> {
-        let mmf_log_data_guard = MWF_LOG_DATA.read().expect(MWFPanic::MWFLogData_ReadLockPoisoned.message());
-        let mmf_log_data = mmf_log_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+        let mwf_log_data_guard = MWF_LOG_DATA.read().expect(MWFPanic::MWFLogData_ReadLockPoisoned.message());
+        let mwf_log_data = mwf_log_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
 
         // No log event is currently stored in MWFLog.
-        if mmf_log_data.log_event_list.is_empty() {
+        if mwf_log_data.log_event_list.is_empty() {
             return Ok(LogList { first_log_instance_id: None, last_log_instance_id: None, missing_log_count: 0, log_event_list: Vec::new() });
         }
 
@@ -500,8 +500,8 @@ impl MWFLog {
         // The first and last LogInstanceID are used to detect
         // whether older events have been overwritten before
         // the caller could retrieve them.
-        let first_log_event = mmf_log_data.log_event_list.front().expect(MWFPanic::LogBuffer_Inconsistency.message());
-        let last_log_event = mmf_log_data.log_event_list.back().expect(MWFPanic::LogBuffer_Inconsistency.message());
+        let first_log_event = mwf_log_data.log_event_list.front().expect(MWFPanic::LogBuffer_Inconsistency.message());
+        let last_log_event = mwf_log_data.log_event_list.back().expect(MWFPanic::LogBuffer_Inconsistency.message());
 
         let first_buffer_log_instance_id = first_log_event.log_instance_id;
         let last_buffer_log_instance_id = last_log_event.log_instance_id;
@@ -528,9 +528,9 @@ impl MWFLog {
         // Return only the events that have not yet been
         // received by the caller.
         let log_event_list = match last_log_instance_id {
-            None => mmf_log_data.log_event_list.iter().cloned().collect(),
+            None => mwf_log_data.log_event_list.iter().cloned().collect(),
 
-            Some(last_seen) => mmf_log_data.log_event_list.iter().filter(|log_event| log_event.log_instance_id > last_seen).cloned().collect(),
+            Some(last_seen) => mwf_log_data.log_event_list.iter().filter(|log_event| log_event.log_instance_id > last_seen).cloned().collect(),
         };
 
         Ok(LogList { first_log_instance_id: Some(first_buffer_log_instance_id), last_log_instance_id: Some(last_buffer_log_instance_id), missing_log_count, log_event_list })
@@ -543,9 +543,9 @@ impl MWFLog {
     /// native DLL failures, but introduces additional disk I/O and may reduce
     /// overall framework performance.
     pub fn set_log_file_enabled(enabled: bool) -> Result<(), MWFError> {
-        let mut mmf_log_data_guard = MWF_LOG_DATA.write().expect(MWFPanic::MWFLogData_WriteLockPoisoned.message());
+        let mut mwf_log_data_guard = MWF_LOG_DATA.write().expect(MWFPanic::MWFLogData_WriteLockPoisoned.message());
 
-        let logging_data = mmf_log_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
+        let logging_data = mwf_log_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
 
         logging_data.log_file_enabled = enabled;
 
@@ -554,9 +554,9 @@ impl MWFLog {
 
     /// Returns the current MWF log file path.
     pub fn get_log_file_path() -> Result<PathBuf, MWFError> {
-        let mmf_log_data_guard = MWF_LOG_DATA.read().expect(MWFPanic::MWFLogData_ReadLockPoisoned.message());
+        let mwf_log_data_guard = MWF_LOG_DATA.read().expect(MWFPanic::MWFLogData_ReadLockPoisoned.message());
 
-        let logging_data = mmf_log_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+        let logging_data = mwf_log_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
 
         Ok(logging_data.log_file_path.clone())
     }

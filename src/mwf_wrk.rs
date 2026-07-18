@@ -11,8 +11,8 @@ use crate::MWFLog;
 use crate::channel::{WorkerChannel, WorkerCommand, get_sender_channel};
 use crate::framework_error::{MWFError, MWFPanic};
 use crate::message::{MessageID, MessageInstanceID, WorkerMessage};
-use crate::mmf::{MWF_DATA, MWF_WRK_CLOSE_NOTIFY, MWF_WRK_DATA, MWF_WRK_INIT_NOTIFY, MWF_WRK_MESSAGE_INSTANCE_COUNTER, MWFConfiguration};
-use crate::mmf_log::{LogAction, LogStatus};
+use crate::mwf::{MWF_DATA, MWF_WRK_CLOSE_NOTIFY, MWF_WRK_DATA, MWF_WRK_INIT_NOTIFY, MWF_WRK_MESSAGE_INSTANCE_COUNTER, MWFConfiguration};
+use crate::mwf_log::{LogAction, LogStatus};
 use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerList, WorkerState, WorkerStatus, WorkerTypeID};
 use crate::worker_registry::Registry;
 use crate::worker_task::spawn_worker_task;
@@ -32,8 +32,8 @@ pub(crate) struct WorkerData {
 
 impl WorkerData {
     /// Create a new MWF runtime instance.
-    pub(crate) fn new(mmf_configuration: &MWFConfiguration) -> Self {
-        Self { worker_registry: Registry::new(), worker_normal_channel_capacity: mmf_configuration.worker_normal_channel_capacity, worker_priority_channel_capacity: mmf_configuration.worker_priority_channel_capacity }
+    pub(crate) fn new(mwf_configuration: &MWFConfiguration) -> Self {
+        Self { worker_registry: Registry::new(), worker_normal_channel_capacity: mwf_configuration.worker_normal_channel_capacity, worker_priority_channel_capacity: mwf_configuration.worker_priority_channel_capacity }
     }
 }
 
@@ -60,21 +60,21 @@ impl MWFWrk {
     /// creates a new worker instance, then spawns it.
     pub fn spawn_worker(worker_type_id: WorkerTypeID, parent_id: &EntityID) -> Result<WorkerID, MWFError> {
         // Ensure the framework has been initialized.
-        let mmf_data_guard = MWF_DATA.read().expect(MWFPanic::MWFData_ReadLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+        let mwf_data_guard = MWF_DATA.read().expect(MWFPanic::MWFData_ReadLockPoisoned.message());
+        let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
 
         // Ensure the worker type has been registered.
-        if !mmf_data.worker_type_registry.contains_worker_type(worker_type_id) {
+        if !mwf_data.worker_type_registry.contains_worker_type(worker_type_id) {
             return Err(MWFError::WorkerType_NotRegistered);
         }
 
         // Retrieve the constructor associated with the WorkerTypeID.
-        let worker_constructor = mmf_data.worker_type_registry.get_worker_constructor(worker_type_id)?;
+        let worker_constructor = mwf_data.worker_type_registry.get_worker_constructor(worker_type_id)?;
 
         // Create a new worker instance.
         let worker = worker_constructor();
 
-        drop(mmf_data_guard);
+        drop(mwf_data_guard);
 
         MWFWrk::spawn_worker_instance(worker_type_id, worker, parent_id)
     }
@@ -94,8 +94,8 @@ impl MWFWrk {
     /// - MWF owns the WorkerID, channels and JoinHandle.
     /// - The Tokio task owns the worker instance itself.
     pub(crate) fn spawn_worker_instance(worker_type_id: WorkerTypeID, worker: Box<dyn Worker + Send>, parent_id: &EntityID) -> Result<WorkerID, MWFError> {
-        let mut mmf_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
+        let mut mwf_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
+        let mwf_data = mwf_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
 
         // Child workers can only be attached to an
         // initialized parent worker.
@@ -104,7 +104,7 @@ impl MWFWrk {
         // while the parent is starting up or shutting down.
         match parent_id {
             EntityID::Worker(parent_id_ref) => {
-                let worker_state = mmf_data.worker_registry.get_worker_state(parent_id_ref)?;
+                let worker_state = mwf_data.worker_registry.get_worker_state(parent_id_ref)?;
 
                 if worker_state != WorkerState::Initialized {
                     return Err(MWFError::Worker_NotInitialized);
@@ -114,14 +114,14 @@ impl MWFWrk {
             EntityID::External(_) => {}
         }
 
-        let worker_id = mmf_data.worker_registry.generate_worker_id(worker_type_id);
+        let worker_id = mwf_data.worker_registry.generate_worker_id(worker_type_id);
 
         let action_start_timer = Instant::now();
 
         // Channel used to send worker commands (like Init and Close) and messages to the worker.
-        let (normal_sender_channel, normal_receiver_channel) = tokio::sync::mpsc::channel(mmf_data.worker_normal_channel_capacity);
+        let (normal_sender_channel, normal_receiver_channel) = tokio::sync::mpsc::channel(mwf_data.worker_normal_channel_capacity);
         // Channel used to send priority commands and messages to the worker.
-        let (priority_sender_channel, priority_receiver_channel) = tokio::sync::mpsc::channel(mmf_data.worker_priority_channel_capacity);
+        let (priority_sender_channel, priority_receiver_channel) = tokio::sync::mpsc::channel(mwf_data.worker_priority_channel_capacity);
 
         // Spawn the Tokio task that will own the worker instance.
         //
@@ -137,7 +137,7 @@ impl MWFWrk {
         // - worker state.
         // - Communication channels.
         // - JoinHandle associated with the Tokio task.
-        match mmf_data.worker_registry.add_worker(&worker_id, worker_type_id, parent_id, normal_sender_channel, priority_sender_channel, join_handle) {
+        match mwf_data.worker_registry.add_worker(&worker_id, worker_type_id, parent_id, normal_sender_channel, priority_sender_channel, join_handle) {
             Ok(()) => {}
 
             Err((error, join_handle)) => {
@@ -153,7 +153,7 @@ impl MWFWrk {
 
         MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerSpawn, LogStatus::Ok)?;
 
-        drop(mmf_data_guard);
+        drop(mwf_data_guard);
 
         Ok(worker_id)
     }
@@ -182,11 +182,11 @@ impl MWFWrk {
 
     /// Get the current status of a worker.
     pub fn get_worker_status(worker_id: &WorkerID) -> Result<WorkerStatus, MWFError> {
-        let mmf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
-        let registry_entry = mmf_data.worker_registry.get_registry_entry(worker_id)?;
-        let normal_channel_capacity = mmf_data.worker_normal_channel_capacity;
-        let priority_channel_capacity = mmf_data.worker_priority_channel_capacity;
+        let mwf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
+        let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+        let registry_entry = mwf_data.worker_registry.get_registry_entry(worker_id)?;
+        let normal_channel_capacity = mwf_data.worker_normal_channel_capacity;
+        let priority_channel_capacity = mwf_data.worker_priority_channel_capacity;
         let normal_channel_size = normal_channel_capacity - registry_entry.normal_sender_channel.capacity();
         let priority_channel_size = priority_channel_capacity - registry_entry.priority_sender_channel.capacity();
 
@@ -209,10 +209,10 @@ impl MWFWrk {
     /// Returns Framework_NotInitialized if MWF has not
     /// been initialized through MWF::init().
     pub fn get_worker_info_list() -> Result<WorkerList, MWFError> {
-        let mmf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+        let mwf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
+        let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
 
-        Ok(WorkerList { worker_info_list: mmf_data.worker_registry.get_worker_info_list() })
+        Ok(WorkerList { worker_info_list: mwf_data.worker_registry.get_worker_info_list() })
     }
 
     /// Returns the fully qualified Rust type path associated with a worker.
@@ -228,15 +228,15 @@ impl MWFWrk {
     /// - worker_NotFound if the worker does not exist.
     pub fn get_worker_type_rust_path(worker_id: &WorkerID) -> Result<&'static str, MWFError> {
         // Get the WorkerTypeID associated with the worker.
-        let mmf_mod_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
-        let mmf_mod_data = mmf_mod_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
-        let worker_type_id = mmf_mod_data.worker_registry.get_worker_type_id(worker_id)?;
-        drop(mmf_mod_data_guard);
+        let mwf_mod_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
+        let mwf_mod_data = mwf_mod_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+        let worker_type_id = mwf_mod_data.worker_registry.get_worker_type_id(worker_id)?;
+        drop(mwf_mod_data_guard);
 
         // Get the Rust type name associated with the WorkerTypeID.
-        let mmf_data_guard = MWF_DATA.read().expect(MWFPanic::MWFData_ReadLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
-        let worker_rust_type_name = mmf_data.worker_type_registry.get_worker_rust_type_name(worker_type_id)?;
+        let mwf_data_guard = MWF_DATA.read().expect(MWFPanic::MWFData_ReadLockPoisoned.message());
+        let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+        let worker_rust_type_name = mwf_data.worker_type_registry.get_worker_rust_type_name(worker_type_id)?;
 
         Ok(worker_rust_type_name)
     }
@@ -253,15 +253,15 @@ impl MWFWrk {
         //
         // Only workers in the Created state can be initialized.
         let normal_sender_channel = {
-            let mut mmf_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
-            let mmf_data = mmf_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
-            let worker_state = mmf_data.worker_registry.get_worker_state(worker_id)?;
+            let mut mwf_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
+            let mwf_data = mwf_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
+            let worker_state = mwf_data.worker_registry.get_worker_state(worker_id)?;
             if worker_state != WorkerState::Created {
                 return Err(MWFError::Worker_AlreadyInitialized);
             }
-            mmf_data.worker_registry.set_worker_state(worker_id, WorkerState::Initializing)?;
+            mwf_data.worker_registry.set_worker_state(worker_id, WorkerState::Initializing)?;
 
-            mmf_data.worker_registry.get_worker_normal_channel(worker_id)?
+            mwf_data.worker_registry.get_worker_normal_channel(worker_id)?
         };
 
         // Send the Init command to WorkerTask.
@@ -282,14 +282,14 @@ impl MWFWrk {
         //
         // Only workers in the Initialized state can be closed.
         let normal_sender_channel = {
-            let mut mmf_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
-            let mmf_data = mmf_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
-            let worker_state = mmf_data.worker_registry.get_worker_state(worker_id)?;
+            let mut mwf_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
+            let mwf_data = mwf_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
+            let worker_state = mwf_data.worker_registry.get_worker_state(worker_id)?;
             if worker_state != WorkerState::Initialized {
                 return Err(MWFError::Worker_NotInitialized);
             }
-            mmf_data.worker_registry.set_worker_state(worker_id, WorkerState::Closing)?;
-            mmf_data.worker_registry.get_worker_normal_channel(worker_id)?
+            mwf_data.worker_registry.set_worker_state(worker_id, WorkerState::Closing)?;
+            mwf_data.worker_registry.get_worker_normal_channel(worker_id)?
         };
 
         // Send the Close command to WorkerTask.
@@ -300,28 +300,28 @@ impl MWFWrk {
 
     /// Get the ParentID of a worker.
     pub fn get_parent_id(worker_id: &WorkerID) -> Result<EntityID, MWFError> {
-        let mmf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
-        let parent_id = mmf_data.worker_registry.get_parent_id(worker_id)?;
-        drop(mmf_data_guard);
+        let mwf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
+        let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+        let parent_id = mwf_data.worker_registry.get_parent_id(worker_id)?;
+        drop(mwf_data_guard);
 
         Ok(parent_id)
     }
 
     /// Get the child WorkerIDs of an entity.
     pub fn get_children_ids(entity_id: &EntityID) -> Result<Vec<WorkerID>, MWFError> {
-        let mmf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+        let mwf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
+        let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
 
-        mmf_data.worker_registry.get_children_ids(entity_id)
+        mwf_data.worker_registry.get_children_ids(entity_id)
     }
 
     /// Get the number of child workers of an entity.
     pub fn get_children_count(entity_id: &EntityID) -> Result<usize, MWFError> {
-        let mmf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
-        let children_count = mmf_data.worker_registry.get_children_count(entity_id)?;
-        drop(mmf_data_guard);
+        let mwf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
+        let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+        let children_count = mwf_data.worker_registry.get_children_count(entity_id)?;
+        drop(mwf_data_guard);
         Ok(children_count)
     }
 
@@ -342,8 +342,8 @@ impl MWFWrk {
                 // The lock must be released before awaiting the
                 // next notification.
                 let (all_init_finished, one_init_failed) = {
-                    let mmf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
-                    let mmf_data = mmf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+                    let mwf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
+                    let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
 
                     let mut all_init_finished = true;
                     let mut one_init_failed = false;
@@ -351,7 +351,7 @@ impl MWFWrk {
                     // Initialization is complete only when all workers
                     // have reached the Initialized or InitFailed state.
                     for worker_id in worker_ids {
-                        match mmf_data.worker_registry.get_worker_state(worker_id)? {
+                        match mwf_data.worker_registry.get_worker_state(worker_id)? {
                             WorkerState::Initialized => {}
 
                             WorkerState::InitFailed => {
@@ -427,8 +427,8 @@ impl MWFWrk {
                 // The lock must be released before awaiting the
                 // next notification.
                 let (all_close_finished, one_close_failed) = {
-                    let mmf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
-                    let mmf_data = mmf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+                    let mwf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
+                    let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
 
                     let mut all_close_finished = true;
                     let mut one_close_failed = false;
@@ -437,7 +437,7 @@ impl MWFWrk {
                     // have either been removed from the Registry
                     // or reached the CloseFailed or the Panicked state.
                     for worker_id in worker_ids {
-                        match mmf_data.worker_registry.get_worker_state(worker_id) {
+                        match mwf_data.worker_registry.get_worker_state(worker_id) {
                             // A worker not found has been properly closed.
                             Err(MWFError::Worker_NotFound) => {}
 
@@ -507,13 +507,13 @@ impl MWFWrk {
     /// This function should only be used as a recovery mechanism
     /// when normal shutdown has failed.
     pub fn abort_worker_list(worker_ids: &Vec<WorkerID>) -> Result<(), MWFError> {
-        let mut mmf_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
-        let mmf_data = mmf_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
+        let mut mwf_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
+        let mwf_data = mwf_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
 
         for worker_id in worker_ids {
             let action_start_timer = Instant::now();
 
-            let join_handle = match mmf_data.worker_registry.take_join_handle(worker_id) {
+            let join_handle = match mwf_data.worker_registry.take_join_handle(worker_id) {
                 Ok(join_handle) => join_handle,
 
                 Err(error) => {
@@ -526,7 +526,7 @@ impl MWFWrk {
             join_handle.abort();
 
             // Remove the worker from the Registry.
-            if let Err(error) = mmf_data.worker_registry.remove_worker(worker_id) {
+            if let Err(error) = mwf_data.worker_registry.remove_worker(worker_id) {
                 MWFLog::add_log(action_start_timer, worker_id, LogAction::WorkerAbort, LogStatus::Error)?;
                 return Err(error);
             }
@@ -535,7 +535,7 @@ impl MWFWrk {
             let _ = MWFLog::remove_logged_worker(worker_id);
         }
 
-        drop(mmf_data_guard);
+        drop(mwf_data_guard);
 
         // Wake up all waiters interested in worker
         // shutdown events.

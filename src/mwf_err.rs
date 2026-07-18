@@ -8,7 +8,7 @@ use std::sync::atomic::Ordering;
 
 use crate::MWF;
 use crate::framework_error::{MWFError, MWFPanic};
-use crate::mmf::{MWF_ERR_DATA, MWF_ERR_INSTANCE_COUNTER, MWF_ERR_NOTIFY};
+use crate::mwf::{MWF_ERR_DATA, MWF_ERR_INSTANCE_COUNTER, MWF_ERR_NOTIFY};
 use crate::string_helper;
 use crate::worker::EntityID;
 
@@ -215,16 +215,16 @@ impl MWFErr {
         // When the configured capacity is reached,
         // the oldest error events are discarded to make
         // room for newer ones.
-        let mut mmf_err_data_guard = MWF_ERR_DATA.write().expect(MWFPanic::MWFErrData_WriteLockPoisoned.message());
-        let mmf_err_data = mmf_err_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
-        let error_event_buffer_capacity = mmf_err_data.error_event_buffer_capacity;
+        let mut mwf_err_data_guard = MWF_ERR_DATA.write().expect(MWFPanic::MWFErrData_WriteLockPoisoned.message());
+        let mwf_err_data = mwf_err_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
+        let error_event_buffer_capacity = mwf_err_data.error_event_buffer_capacity;
 
-        while mmf_err_data.error_event_list.len() >= error_event_buffer_capacity {
-            mmf_err_data.error_event_list.pop_front();
+        while mwf_err_data.error_event_list.len() >= error_event_buffer_capacity {
+            mwf_err_data.error_event_list.pop_front();
         }
 
-        mmf_err_data.error_event_list.push_back(error_event);
-        drop(mmf_err_data_guard);
+        mwf_err_data.error_event_list.push_back(error_event);
+        drop(mwf_err_data_guard);
 
         // Notify all waiters that a new error event
         // has been added to the buffer.
@@ -300,11 +300,11 @@ impl MWFErr {
     /// Returns Framework_NotInitialized if MWFErr has
     /// not been initialized through MWF::init().
     fn get_error_list(last_error_instance_id: Option<ErrorInstanceID>) -> Result<ErrorList, MWFError> {
-        let mmf_err_data_guard = MWF_ERR_DATA.read().expect(MWFPanic::MWFErrData_ReadLockPoisoned.message());
-        let mmf_err_data = mmf_err_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+        let mwf_err_data_guard = MWF_ERR_DATA.read().expect(MWFPanic::MWFErrData_ReadLockPoisoned.message());
+        let mwf_err_data = mwf_err_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
 
         // No error event is currently stored in MWFErr.
-        if mmf_err_data.error_event_list.is_empty() {
+        if mwf_err_data.error_event_list.is_empty() {
             return Ok(ErrorList { first_error_instance_id: None, last_error_instance_id: None, missing_error_count: 0, error_event_list: Vec::new() });
         }
 
@@ -313,8 +313,8 @@ impl MWFErr {
         // The first and last ErrorInstanceID are used to detect
         // whether older events have been overwritten before
         // the caller could retrieve them.
-        let first_error_event = mmf_err_data.error_event_list.front().expect(MWFPanic::ErrorBuffer_Inconsistency.message());
-        let last_error_event = mmf_err_data.error_event_list.back().expect(MWFPanic::ErrorBuffer_Inconsistency.message());
+        let first_error_event = mwf_err_data.error_event_list.front().expect(MWFPanic::ErrorBuffer_Inconsistency.message());
+        let last_error_event = mwf_err_data.error_event_list.back().expect(MWFPanic::ErrorBuffer_Inconsistency.message());
 
         let first_buffer_error_instance_id = first_error_event.error_instance_id;
         let last_buffer_error_instance_id = last_error_event.error_instance_id;
@@ -341,9 +341,9 @@ impl MWFErr {
         // Return only the events that have not yet been
         // received by the caller.
         let error_event_list = match last_error_instance_id {
-            None => mmf_err_data.error_event_list.iter().cloned().collect(),
+            None => mwf_err_data.error_event_list.iter().cloned().collect(),
 
-            Some(last_seen) => mmf_err_data.error_event_list.iter().filter(|error_event| error_event.error_instance_id > last_seen).cloned().collect(),
+            Some(last_seen) => mwf_err_data.error_event_list.iter().filter(|error_event| error_event.error_instance_id > last_seen).cloned().collect(),
         };
 
         Ok(ErrorList { first_error_instance_id: Some(first_buffer_error_instance_id), last_error_instance_id: Some(last_buffer_error_instance_id), missing_error_count, error_event_list })
