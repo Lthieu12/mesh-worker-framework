@@ -81,23 +81,19 @@ Workers can therefore be created before the resources they require become availa
 
 ---
 
-## Opaque Binary Data
+## Typed MessageData
 
 MWF never interprets application data.
 
-Both lifecycle data and message data are transported as opaque Bytes.
-
-MWF does not require or recommend any particular serialization format.
+Both init/close data and message data are transported as MessageData.
 
 ```rust
-MWFWrk::init_worker(worker_id, lifecycle_data).await?;
+MWFWrk::init_worker(worker_id, init_data).await?;
 
 MWFWrk::send_message(..., message_data).await?;
 ```
 
-Serialization and deserialization remain entirely under application control.
-
-This keeps MWF independent from any serialization library or application-specific data model.
+MWF remains completely independent from application-specific data types and never interprets the transported values.
 
 ---
 
@@ -349,15 +345,13 @@ User Worker A
 +--------------+
 ```
 
-MessageData is transported as:
+MWF transports opaque MessageData values.
 
-```rust
-Bytes
-```
+MessageData can contain any Rust type implementing Clone + Send + Sync + 'static.
 
-MWF never interprets application data.
+MWF never interprets the contained value and simply transports it between workers or lifecycle callbacks.
 
-Serialization and deserialization remain the responsibility of the application.
+Large shared objects should typically be transported using Arc<T> to avoid unnecessary copies.
 
 ---
 
@@ -495,21 +489,26 @@ This allows framework and application errors to share the same monitoring infras
 
 ---
 
-# Serialization
+### Typed MessageData
 
-MWF transports opaque MessageData values.
+MWF transports application data using the `MessageData` container.
 
-The framework is intentionally unaware of application-specific structures.
-
-Example:
-
-```rust
-Measurement::to_bytes()
-
-Measurement::from_bytes()
+`MessageData` can store any Rust type implementing:
+```rust,ignore
+Clone + Send + Sync + 'static
 ```
 
-Serialization and deserialization remain the responsibility of the application.
+The framework never interprets the contained value.
+
+Workers retrieve the original type using:
+
+```rust,ignore
+let configuration = init_data.into::<SimulationConfiguration>()?;
+
+let parameters = message.message_data.into::<HistogramParameters>()?;
+```
+
+Large shared objects should typically be transported using Arc<T> to avoid unnecessary copies.
 
 ---
 

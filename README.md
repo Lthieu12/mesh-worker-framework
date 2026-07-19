@@ -177,13 +177,41 @@ Parallelism is achieved by running multiple workers concurrently, not by process
 
 ---
 
-### Framework-Agnostic Message Data
+### Framework-Agnostic Typed Message Data
 
-MWF transports opaque Message Data (`Bytes`).
+MWF transports opaque MessageData values.
 
-The framework does not know anything about application-specific data structures.
+MessageData can contain any Rust type implementing `Clone + Send + Sync + 'static`.
 
-Serialization and deserialization are always the responsibility of the application.
+MWF never interprets the contained value and simply transports it between workers or lifecycle callbacks.
+
+**`MessageData` stores a clone of the value provided by the application.** The original value remains owned by the caller while MWF owns an independent copy used during message transport.
+
+Large shared objects should typically be transported using `Arc<T>` to avoid unnecessary copies.
+
+Example:
+
+```rust,ignore
+struct HistogramParameters {
+    bins: usize,
+}
+
+MWFWrk::send_message(
+    &sender,
+    &worker,
+    &HistogramMessages::Compute,
+    &HistogramParameters {
+        bins: 256,
+    },
+)
+.await?;
+```
+
+Inside the worker, retrieve the original type with:
+
+```rust,ignore
+let parameters = message.message_data.into::<HistogramParameters>()?;
+```
 
 ---
 
