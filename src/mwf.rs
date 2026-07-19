@@ -51,8 +51,8 @@ pub(crate) static MWF_LOG_DATA: LazyLock<RwLock<Option<LoggingData>>> = LazyLock
 /// Current logging mode.
 pub(crate) static MWF_LOG_MODE: AtomicU8 = AtomicU8::new(LogMode::NoLog as u8);
 
-/// MWF error notification emitted whenever a new error event
-/// is added to MWFErr.
+/// MWF log notification emitted whenever a new log event
+/// is added to MWFLog.
 pub(crate) static MWF_LOG_NOTIFY: LazyLock<Notify> = LazyLock::new(Notify::new);
 
 /// Global log event counter.
