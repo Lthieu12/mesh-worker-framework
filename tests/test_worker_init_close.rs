@@ -47,7 +47,7 @@ async fn test_worker_init_invalid_data_type() {
 
     MWF::register_worker_type::<SimulationWorker>().unwrap();
 
-    let worker_id = MWFWrk::spawn_worker("SimulationWorker", &EntityID::new_external("MAIN")).unwrap();
+    let worker_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
 
     // Intentionally send the wrong initialization data type.
     MWFWrk::init_worker(&worker_id, &()).await.unwrap();
