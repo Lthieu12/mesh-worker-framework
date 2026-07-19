@@ -256,7 +256,6 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
- "bytes",
  "chrono",
  "futures",
  "serde",

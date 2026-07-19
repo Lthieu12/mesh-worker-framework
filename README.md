@@ -52,8 +52,6 @@ The complete, compiled version of this example is available in `examples/getting
 It demonstrates the recommended way to initialize MWF, register a worker type, spawn a worker, exchange messages and gracefully shut down the framework.
 
 ```rust,ignore
-use bytes::Bytes;
-
 use mesh_worker_framework::*;
 
 // DemoWorker and DemoMessages are defined in
@@ -76,15 +74,15 @@ async fn main() -> Result<(), MWFError> {
     let demo_worker_id = MWFWrk::spawn_worker("DemoWorker", &main_entity)?;
 
     // Initialize it.
-    MWFWrk::init_worker(&demo_worker_id, Bytes::new()).await?;
+    MWFWrk::init_worker(&demo_worker_id, &()).await?;
     MWFWrk::wait_worker_init(&demo_worker_id, None).await?;
 
     // Send a few messages.
-    MWFWrk::send_message(&main_entity, &demo_worker_id, DemoMessages::QUICK_CALCULATION, Bytes::new()).await?;
-    MWFWrk::send_message(&main_entity, &demo_worker_id, DemoMessages::LONG_CALCULATION, Bytes::new()).await?;
+    MWFWrk::send_message(&main_entity, &demo_worker_id, &DemoMessages::QUICK_CALCULATION, &()).await?;
+    MWFWrk::send_message(&main_entity, &demo_worker_id, &DemoMessages::LONG_CALCULATION, &()).await?;
 
     // Close the worker.
-    MWFWrk::close_worker(&demo_worker_id, Bytes::new()).await?;
+    MWFWrk::close_worker(&demo_worker_id, &()).await?;
     MWFWrk::wait_worker_close(&demo_worker_id, None).await?;
 
     // Shutdown.
@@ -98,7 +96,6 @@ The following DemoWorker implementation, available in `examples/getting_started/
 
 ```rust,ignore
 use async_trait::async_trait;
-use bytes::Bytes;
 use mesh_worker_framework::*;
 use std::time::Duration;
 
@@ -128,7 +125,7 @@ impl Worker for DemoWorker {
         Self { worker_id: None, parent_id: None }
     }
 
-    async fn on_init(&mut self, worker_id: WorkerID, parent_id: EntityID, _lifecycle_data: Bytes) -> Result<(), WorkerError> {
+    async fn on_init(&mut self, worker_id: WorkerID, parent_id: EntityID, _init_data: MessageData) -> Result<(), WorkerError> {
         // Store identifiers for later use (for example to send messages or
         // spawn child workers from within the worker).
         self.worker_id = Some(worker_id);
@@ -160,7 +157,7 @@ impl Worker for DemoWorker {
         Ok(())
     }
 
-    async fn on_close(&mut self, _lifecycle_data: Bytes) -> Result<(), WorkerError> {
+    async fn on_close(&mut self, _close_data: MessageData) -> Result<(), WorkerError> {
         Ok(())
     }
 }
