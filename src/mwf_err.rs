@@ -244,8 +244,8 @@ impl MWFErr {
     ///
     /// Error events are stored in a circular buffer and
     /// notify all MWFErr waiters.
-    pub fn add_error(entity_id: &EntityID, error: &anyhow::Error) -> Result<(), MWFError> {
-        MWFErr::add_error_internal(entity_id, None, error)
+    pub fn add_error(error_source: &EntityID, error: &anyhow::Error) -> Result<(), MWFError> {
+        MWFErr::add_error_internal(error_source, None, error)
     }
 
     /// Wait until new error events are available.
