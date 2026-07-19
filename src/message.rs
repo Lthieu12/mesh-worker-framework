@@ -67,6 +67,13 @@ impl From<&MessageID> for MessageID {
 /// tracing and request/reply correlation.
 pub type MessageInstanceID = u64;
 
+/// Opaque container transporting application-defined data.
+///
+/// `MessageData` can store any Rust type implementing
+/// `Clone + Send + Sync + 'static`.
+///
+/// The contained value can later be recovered using
+/// `MessageData::into()`.
 pub struct MessageData {
     /// Stored message data.
     value: Box<dyn Any + Send + Sync>,
