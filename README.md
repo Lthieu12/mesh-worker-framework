@@ -463,14 +463,14 @@ Each log event contains:
                 spawns one Tokio task per worker
                              │
                              ▼
-        ┌─────────────┬─────────────┬─────────────┐
-        ▼             ▼             ▼
-   +-----------+ +-----------+ +---------------+
-   |WorkerTask | |WorkerTask | |  WorkerTask   |
-   +-----┬-----+ +-----┬-----+ +-------┬-------+
-         │             │               │
+         ┌─────────────┬───────────────┬───────────┐
          ▼             ▼               ▼
-   CameraWorker    FFTWorker     DisplayWorker
+   +------------+ +------------+ +------------+
+   | WorkerTask | | WorkerTask | | WorkerTask |
+   +-----┬------+ +-----┬------+ +-------┬----+
+         │              │                │
+         ▼              ▼                ▼
+   CameraWorker     FFTWorker      DisplayWorker
 ```
 
 ---
