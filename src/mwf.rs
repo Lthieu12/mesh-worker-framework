@@ -269,9 +269,9 @@ impl MWF {
     ///
     /// Returns:
     /// - Framework_NotInitialized if MWF has not been initialized.
-    /// - workerType_AlreadyRegistered if the worker type has
+    /// - WorkerType_AlreadyRegistered if the worker type has
     ///   already been registered.
-    /// - worker_DuplicateWorkerTypeID if the WorkerTypeID is
+    /// - Worker_DuplicateWorkerTypeID if the WorkerTypeID is
     ///   already associated with a different Rust worker type.
     pub fn register_worker_type<T>() -> Result<(), MWFError>
     where
