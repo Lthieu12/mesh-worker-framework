@@ -10,7 +10,6 @@
 
 use std::time::Instant;
 
-use bytes::Bytes;
 use futures::future::join_all;
 
 use mesh_worker_framework::dev_support::simulation_worker::{SimulationBehavior, SimulationWorker, SimulationWorkerConfig};
@@ -30,8 +29,6 @@ async fn main() {
     MWFLog::set_log_mode(LogMode::NoLog, None).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
-
-    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
     //--------------------------------------------------
     // Spawn
@@ -58,7 +55,7 @@ async fn main() {
     let timer = Instant::now();
 
     for worker_id in &worker_ids {
-        MWFWrk::init_worker(worker_id, lifecycle_data.clone()).await.unwrap();
+        MWFWrk::init_worker(worker_id, &configuration).await.unwrap();
     }
 
     MWFWrk::wait_worker_list_init(&worker_ids, Some(TIMEOUT_MS)).await.unwrap();
@@ -91,7 +88,7 @@ async fn main() {
     let timer = Instant::now();
 
     for worker_id in &worker_ids {
-        MWFWrk::close_worker(worker_id, Bytes::new()).await.unwrap();
+        MWFWrk::close_worker(worker_id, &()).await.unwrap();
     }
 
     MWFWrk::wait_children_close(&EntityID::new_external("MAIN"), Some(TIMEOUT_MS)).await.unwrap();

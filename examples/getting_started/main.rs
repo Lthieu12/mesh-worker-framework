@@ -16,8 +16,6 @@
 //!
 //! cargo run --release --example getting_started
 
-use bytes::Bytes;
-
 use mesh_worker_framework::*;
 
 // DemoWorker and DemoMessages are defined in
@@ -40,7 +38,7 @@ async fn main() -> Result<(), MWFError> {
     let demo_worker_id = MWFWrk::spawn_worker("DemoWorker", &main_entity)?;
 
     // Initialize it.
-    MWFWrk::init_worker(&demo_worker_id, Bytes::new()).await?;
+    MWFWrk::init_worker(&demo_worker_id, &()).await?;
     MWFWrk::wait_worker_init(&demo_worker_id, None).await?;
 
     // Send a few messages.
@@ -48,7 +46,7 @@ async fn main() -> Result<(), MWFError> {
     MWFWrk::send_message(&main_entity, &demo_worker_id, &DemoMessages::LONG_CALCULATION, &()).await?;
 
     // Close the worker.
-    MWFWrk::close_worker(&demo_worker_id, Bytes::new()).await?;
+    MWFWrk::close_worker(&demo_worker_id, &()).await?;
     MWFWrk::wait_worker_close(&demo_worker_id, None).await?;
 
     // Shutdown.

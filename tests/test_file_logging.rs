@@ -12,7 +12,6 @@ use mesh_worker_framework::*;
 #[tokio::test]
 #[serial]
 async fn test_file_logging() {
-    use bytes::Bytes;
     use std::fs;
 
     // Configure MWF.
@@ -29,11 +28,9 @@ async fn test_file_logging() {
 
     let simulation_configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
 
-    let lifecycle_data = Bytes::from(bincode::serialize(&simulation_configuration).unwrap());
-
     let worker_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
 
-    MWFWrk::init_worker(&worker_id, lifecycle_data.clone()).await.unwrap();
+    MWFWrk::init_worker(&worker_id, &simulation_configuration).await.unwrap();
 
     MWFWrk::wait_worker_init(&worker_id, None).await.unwrap();
 
@@ -42,7 +39,7 @@ async fn test_file_logging() {
         MWFWrk::send_message(&EntityID::new_external("Test"), &worker_id, &format!("Message{index}"), &()).await.unwrap();
     }
 
-    MWFWrk::close_worker(&worker_id, lifecycle_data).await.unwrap();
+    MWFWrk::close_worker(&worker_id, &()).await.unwrap();
 
     MWFWrk::wait_worker_close(&worker_id, None).await.unwrap();
 

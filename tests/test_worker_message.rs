@@ -8,7 +8,6 @@
 //! - send_message_and_wait().
 //! - send_unique_message().
 
-use bytes::Bytes;
 use serial_test::serial;
 use std::time::Duration;
 
@@ -38,9 +37,8 @@ async fn test_message_priority_order() {
     let worker_a_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Wait { message_delay_ms: 100 }, wait_children_close: false, wait_children_close_timeout_ms: None };
-    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MWFWrk::init_worker(&worker_a_id, lifecycle_data).await.unwrap();
+    MWFWrk::init_worker(&worker_a_id, &configuration).await.unwrap();
 
     MWFWrk::wait_worker_init(&worker_a_id, Some(1000)).await.unwrap();
 
@@ -111,7 +109,7 @@ async fn test_message_priority_order() {
     assert!(!messages[7].priority);
     assert!(!messages[7].wait_completion);
 
-    MWFWrk::close_worker(&worker_a_id, Bytes::new()).await.unwrap();
+    MWFWrk::close_worker(&worker_a_id, &()).await.unwrap();
 
     MWFWrk::wait_children_close(&EntityID::new_external("MAIN"), Some(1000)).await.unwrap();
 
@@ -136,9 +134,7 @@ async fn test_send_message_and_wait() {
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Wait { message_delay_ms: 100 }, wait_children_close: false, wait_children_close_timeout_ms: None };
 
-    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
-
-    MWFWrk::init_worker(&worker_b_id, lifecycle_data).await.unwrap();
+    MWFWrk::init_worker(&worker_b_id, &configuration).await.unwrap();
 
     MWFWrk::wait_worker_init(&worker_b_id, Some(1000)).await.unwrap();
 
@@ -155,9 +151,7 @@ async fn test_send_message_and_wait() {
         wait_children_close_timeout_ms: None,
     };
 
-    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
-
-    MWFWrk::init_worker(&worker_a_id, lifecycle_data).await.unwrap();
+    MWFWrk::init_worker(&worker_a_id, &configuration).await.unwrap();
 
     MWFWrk::wait_worker_init(&worker_a_id, Some(1000)).await.unwrap();
 
@@ -206,8 +200,8 @@ async fn test_send_message_and_wait() {
     assert_eq!(messages_b[1].message_id.as_str(), MESSAGE_CHAIN);
     assert_eq!(messages_b[1].log_status, LogStatus::Ok);
 
-    MWFWrk::close_worker(&worker_a_id, Bytes::new()).await.unwrap();
-    MWFWrk::close_worker(&worker_b_id, Bytes::new()).await.unwrap();
+    MWFWrk::close_worker(&worker_a_id, &()).await.unwrap();
+    MWFWrk::close_worker(&worker_b_id, &()).await.unwrap();
 
     MWFWrk::wait_children_close(&EntityID::new_external("MAIN"), Some(1000)).await.unwrap();
 
@@ -231,9 +225,7 @@ async fn test_send_unique_message() {
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Wait { message_delay_ms: 100 }, wait_children_close: false, wait_children_close_timeout_ms: None };
 
-    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
-
-    MWFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
+    MWFWrk::init_worker(&worker_id, &configuration).await.unwrap();
     MWFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
 
     // Send a blocking message to keep the worker busy.
@@ -282,7 +274,7 @@ async fn test_send_unique_message() {
 
     assert_eq!(*messages[3].message_instance_id, *messages[2].message_instance_id);
 
-    MWFWrk::close_worker(&worker_id, Bytes::new()).await.unwrap();
+    MWFWrk::close_worker(&worker_id, &()).await.unwrap();
     MWFWrk::wait_worker_close(&worker_id, Some(1000)).await.unwrap();
 
     MWF::close().unwrap();

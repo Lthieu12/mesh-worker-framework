@@ -4,10 +4,9 @@
 //! to identify and manage workers within the framework.
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
-use crate::message::WorkerMessage;
+use crate::message::{MessageData, WorkerMessage};
 use crate::string_helper;
 
 /// Function creating a new worker instance.
@@ -406,11 +405,11 @@ pub trait Worker {
         Self: Sized;
 
     /// Called once when the worker is initialized.
-    async fn on_init(&mut self, worker_id: WorkerID, parent_id: EntityID, lifecycle_data: Bytes) -> Result<(), WorkerError>;
+    async fn on_init(&mut self, worker_id: WorkerID, parent_id: EntityID, init_data: MessageData) -> Result<(), WorkerError>;
 
     /// Called when a message is received by the worker.
     async fn on_message(&mut self, message: WorkerMessage) -> Result<(), WorkerError>;
 
     /// Called once before the worker is closed.
-    async fn on_close(&mut self, lifecycle_data: Bytes) -> Result<(), WorkerError>;
+    async fn on_close(&mut self, close_data: MessageData) -> Result<(), WorkerError>;
 }

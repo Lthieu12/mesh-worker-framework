@@ -11,7 +11,6 @@
 //! This test validates timeout handling and the ability of MWF
 //! to recover from unresponsive workers.
 
-use bytes::Bytes;
 use serial_test::serial;
 
 use dev_support::simulation_worker::{SimulationBehavior, SimulationWorker, SimulationWorkerConfig};
@@ -29,9 +28,8 @@ async fn test_worker_timeout_init() {
 
     // Very long init
     let configuration = SimulationWorkerConfig { init_delay_ms: 5_000, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
-    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MWFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
+    MWFWrk::init_worker(&worker_id, &configuration).await.unwrap();
 
     assert!(matches!(MWFWrk::wait_worker_init(&worker_id, Some(100)).await, Err(MWFError::Operation_Timeout)));
 
@@ -51,13 +49,12 @@ async fn test_worker_timeout_close() {
 
     // Very long close
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 5_000, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
-    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MWFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
+    MWFWrk::init_worker(&worker_id, &configuration).await.unwrap();
 
     MWFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
 
-    MWFWrk::close_worker(&worker_id, Bytes::new()).await.unwrap();
+    MWFWrk::close_worker(&worker_id, &()).await.unwrap();
 
     assert!(matches!(MWFWrk::wait_worker_close(&worker_id, Some(100)).await, Err(MWFError::Operation_Timeout)));
 

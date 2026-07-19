@@ -19,15 +19,14 @@
 #![allow(dead_code)]
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 use crate::MWFWrk;
-use crate::message::{MessageID, WorkerMessage};
+use crate::message::{MessageData, MessageID, WorkerMessage};
 use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerTypeID};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(non_camel_case_types)]
 pub enum SimulationBehavior {
     DoNothing,
@@ -45,7 +44,7 @@ pub enum SimulationBehavior {
     Message_Panic,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimulationWorkerConfig {
     pub init_delay_ms: u64,
 
@@ -98,9 +97,9 @@ impl Worker for SimulationWorker {
         Self { worker_id: None, parent_id: None, init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None }
     }
 
-    async fn on_init(&mut self, worker_id: WorkerID, parent_id: EntityID, lifecycle_data: Bytes) -> Result<(), WorkerError> {
+    async fn on_init(&mut self, worker_id: WorkerID, parent_id: EntityID, init_data: MessageData) -> Result<(), WorkerError> {
         // Deserialize the simulation worker configuration.
-        let configuration: SimulationWorkerConfig = bincode::deserialize(lifecycle_data.as_ref())?;
+        let configuration = init_data.into::<SimulationWorkerConfig>()?;
 
         self.init_delay_ms = configuration.init_delay_ms;
         self.close_delay_ms = configuration.close_delay_ms;
@@ -159,7 +158,7 @@ impl Worker for SimulationWorker {
         Ok(())
     }
 
-    async fn on_close(&mut self, _lifecycle_data: Bytes) -> Result<(), WorkerError> {
+    async fn on_close(&mut self, _close_data: MessageData) -> Result<(), WorkerError> {
         // Optionally wait until all direct children
         // have been removed from the Registry.
         if self.wait_children_close {

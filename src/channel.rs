@@ -13,13 +13,12 @@
 //! This guarantees that commands are processed by a worker in the
 //! same order they are accepted by MWF.
 
-use bytes::Bytes;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
 use crate::framework_error::{MWFError, MWFPanic, WorkerError};
-use crate::message::{MessageID, WorkerMessage};
+use crate::message::{MessageData, MessageID, WorkerMessage};
 use crate::mwf::MWF_WRK_DATA;
 use crate::worker::{EntityID, WorkerID, WorkerState};
 
@@ -39,10 +38,10 @@ pub(crate) enum WorkerChannel {
 /// Command processed by a WorkerTask.
 #[derive(Debug)]
 pub(crate) enum WorkerCommand {
-    Init { lifecycle_data: Bytes },
+    Init { init_data: MessageData },
     Message { message: WorkerMessage, priority: bool, unique: bool },
     MessageAndWaitCompletion { reply_sender: oneshot::Sender<Result<(), WorkerError>>, message: WorkerMessage, priority: bool },
-    Close { lifecycle_data: Bytes },
+    Close { close_data: MessageData },
 }
 
 impl WorkerCommand {

@@ -4,7 +4,6 @@
 //! the panic must be reported, and the runtime must remain
 //! operational.
 
-use bytes::Bytes;
 use serial_test::serial;
 
 use dev_support::simulation_worker::{SimulationBehavior, SimulationWorker, SimulationWorkerConfig};
@@ -23,9 +22,8 @@ async fn test_worker_message_panic() {
     let worker_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Panic, wait_children_close: false, wait_children_close_timeout_ms: None };
-    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MWFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
+    MWFWrk::init_worker(&worker_id, &configuration).await.unwrap();
 
     MWFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
 

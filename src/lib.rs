@@ -37,4 +37,4 @@ pub use worker::WorkerError;
 
 pub use worker::{EntityID, ExternalID, Worker, WorkerID, WorkerInfo, WorkerList, WorkerOutputFormat, WorkerState, WorkerStatus, WorkerTypeID};
 
-pub use message::{MessageID, WorkerMessage};
+pub use message::{MessageData, MessageID, WorkerMessage};

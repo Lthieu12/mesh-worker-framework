@@ -29,7 +29,6 @@
 //! - missing_log_count is correctly reported
 //! - only the most recent log events are retained
 
-use bytes::Bytes;
 use serial_test::serial;
 
 use dev_support::dev_helper::*;
@@ -49,12 +48,11 @@ async fn test_mwf_log_worker_lifecycle() {
     let worker_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
-    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MWFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
+    MWFWrk::init_worker(&worker_id, &configuration).await.unwrap();
 
     MWFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
-    MWFWrk::close_worker(&worker_id, Bytes::new()).await.unwrap();
+    MWFWrk::close_worker(&worker_id, &()).await.unwrap();
     MWFWrk::wait_worker_close(&worker_id, Some(1000)).await.unwrap();
 
     let log_list = MWFLog::wait_log(None).await.unwrap();
@@ -97,15 +95,14 @@ async fn test_mwf_log_messages() {
     let worker_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
-    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MWFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
+    MWFWrk::init_worker(&worker_id, &configuration).await.unwrap();
     MWFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
     MWFWrk::send_message(&EntityID::new_external("Test"), &worker_id, &"MSG_1", &()).await.unwrap();
     MWFWrk::send_priority_message(&EntityID::new_external("Test"), &worker_id, &"MSG_2", &()).await.unwrap();
     MWFWrk::send_message_and_wait(&EntityID::new_external("Test"), &worker_id, &"MSG_3", &(), Some(1000)).await.unwrap();
     MWFWrk::send_priority_message_and_wait(&EntityID::new_external("Test"), &worker_id, &"MSG_4", &(), Some(1000)).await.unwrap();
-    MWFWrk::close_worker(&worker_id, Bytes::new()).await.unwrap();
+    MWFWrk::close_worker(&worker_id, &()).await.unwrap();
     MWFWrk::wait_worker_close(&worker_id, Some(1000)).await.unwrap();
 
     let log_list = MWFLog::wait_log(None).await.unwrap();
@@ -170,9 +167,8 @@ async fn test_mwf_log_buffer_overflow() {
     let worker_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
-    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MWFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
+    MWFWrk::init_worker(&worker_id, &configuration).await.unwrap();
 
     MWFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
 
@@ -192,7 +188,7 @@ async fn test_mwf_log_buffer_overflow() {
 
     assert_eq!(log_list.log_event_list.len(), 10);
 
-    MWFWrk::close_worker(&worker_id, Bytes::new()).await.unwrap();
+    MWFWrk::close_worker(&worker_id, &()).await.unwrap();
     MWFWrk::wait_worker_close(&worker_id, Some(1000)).await.unwrap();
 
     MWF::close().unwrap();

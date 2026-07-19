@@ -3,14 +3,13 @@
 //! This API exposes the framework entry points used to
 //! manage workers and send messages.
 
-use bytes::Bytes;
 use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
 use crate::MWFLog;
 use crate::channel::{WorkerChannel, WorkerCommand, get_sender_channel};
 use crate::framework_error::{MWFError, MWFPanic};
-use crate::message::{MessageID, MessageInstanceID, WorkerMessage};
+use crate::message::{MessageData, MessageID, MessageInstanceID, WorkerMessage};
 use crate::mwf::{MWF_DATA, MWF_WRK_CLOSE_NOTIFY, MWF_WRK_DATA, MWF_WRK_INIT_NOTIFY, MWF_WRK_MESSAGE_INSTANCE_COUNTER, MWFConfiguration};
 use crate::mwf_log::{LogAction, LogStatus};
 use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerList, WorkerState, WorkerStatus, WorkerTypeID};
@@ -246,7 +245,10 @@ impl MWFWrk {
     /// The worker state is immediately changed to Initializing.
     /// This function only queues the Init command and does not wait
     /// for on_init() completion.
-    pub async fn init_worker(worker_id: &WorkerID, lifecycle_data: Bytes) -> Result<(), MWFError> {
+    pub async fn init_worker<TInitData>(worker_id: &WorkerID, init_data: &TInitData) -> Result<(), MWFError>
+    where
+        TInitData: Clone + Send + Sync + 'static,
+    {
         // Change worker state to Initializing
         // and read MWF data to retrieve the worker channel
         // associated with the target worker.
@@ -265,7 +267,7 @@ impl MWFWrk {
         };
 
         // Send the Init command to WorkerTask.
-        normal_sender_channel.send(WorkerCommand::Init { lifecycle_data }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
+        normal_sender_channel.send(WorkerCommand::Init { init_data: MessageData::new(init_data) }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
 
         Ok(())
     }
@@ -275,7 +277,10 @@ impl MWFWrk {
     /// The worker state is immediately changed to Closing.
     /// This function only queues the Close command and does not wait
     /// for on_close() completion.
-    pub async fn close_worker(worker_id: &WorkerID, lifecycle_data: Bytes) -> Result<(), MWFError> {
+    pub async fn close_worker<TCloseData>(worker_id: &WorkerID, close_data: &TCloseData) -> Result<(), MWFError>
+    where
+        TCloseData: Clone + Send + Sync + 'static,
+    {
         // Change worker state to Closing
         // and read MWF data to retrieve the worker channel
         // associated with the target worker.
@@ -293,7 +298,7 @@ impl MWFWrk {
         };
 
         // Send the Close command to WorkerTask.
-        normal_sender_channel.send(WorkerCommand::Close { lifecycle_data }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
+        normal_sender_channel.send(WorkerCommand::Close { close_data: MessageData::new(close_data) }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
 
         Ok(())
     }

@@ -12,7 +12,6 @@
 //! including hierarchy management, initialization, shutdown and
 //! synchronization helpers.
 
-use bytes::Bytes;
 use serial_test::serial;
 
 use dev_support::dev_helper::*;
@@ -30,25 +29,22 @@ async fn test_worker_hierarchy() {
     let worker_a_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 100, close_delay_ms: 100, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: true, wait_children_close_timeout_ms: Some(500) };
-    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MWFWrk::init_worker(&worker_a_id, lifecycle_data).await.unwrap();
+    MWFWrk::init_worker(&worker_a_id, &configuration).await.unwrap();
 
     MWFWrk::wait_worker_init(&worker_a_id, Some(500)).await.unwrap();
 
     let worker_b_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::Worker(worker_a_id.clone())).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 200, close_delay_ms: 200, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
-    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MWFWrk::init_worker(&worker_b_id, lifecycle_data).await.unwrap();
+    MWFWrk::init_worker(&worker_b_id, &configuration).await.unwrap();
 
     let worker_c_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::Worker(worker_a_id.clone())).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 300, close_delay_ms: 300, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
-    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MWFWrk::init_worker(&worker_c_id, lifecycle_data).await.unwrap();
+    MWFWrk::init_worker(&worker_c_id, &configuration).await.unwrap();
 
     MWFWrk::wait_worker_list_init(&vec![worker_b_id.clone(), worker_c_id.clone()], Some(1000)).await.unwrap();
 
@@ -86,9 +82,9 @@ async fn test_worker_hierarchy() {
     println!("MAIN children(s) = {:?}", MWFWrk::get_children_ids(&EntityID::new_external("MAIN")));
     println!("worker_a children(s) = {:?}", MWFWrk::get_children_ids(&EntityID::Worker(worker_a_id.clone())));
 
-    MWFWrk::close_worker(&worker_a_id, Bytes::new()).await.unwrap();
-    MWFWrk::close_worker(&worker_b_id, Bytes::new()).await.unwrap();
-    MWFWrk::close_worker(&worker_c_id, Bytes::new()).await.unwrap();
+    MWFWrk::close_worker(&worker_a_id, &()).await.unwrap();
+    MWFWrk::close_worker(&worker_b_id, &()).await.unwrap();
+    MWFWrk::close_worker(&worker_c_id, &()).await.unwrap();
 
     MWFWrk::wait_children_close(&EntityID::new_external("MAIN"), Some(1000)).await.unwrap();
 

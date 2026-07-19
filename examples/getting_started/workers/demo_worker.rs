@@ -11,7 +11,6 @@
 //! - graceful shutdown through `on_close()`.
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use mesh_worker_framework::*;
 use std::time::Duration;
 
@@ -41,7 +40,7 @@ impl Worker for DemoWorker {
         Self { worker_id: None, parent_id: None }
     }
 
-    async fn on_init(&mut self, worker_id: WorkerID, parent_id: EntityID, _lifecycle_data: Bytes) -> Result<(), WorkerError> {
+    async fn on_init(&mut self, worker_id: WorkerID, parent_id: EntityID, _init_data: MessageData) -> Result<(), WorkerError> {
         // Store identifiers for later use (for example to send messages or
         // spawn child workers from within the worker).
         self.worker_id = Some(worker_id);
@@ -73,7 +72,7 @@ impl Worker for DemoWorker {
         Ok(())
     }
 
-    async fn on_close(&mut self, _lifecycle_data: Bytes) -> Result<(), WorkerError> {
+    async fn on_close(&mut self, _close_data: MessageData) -> Result<(), WorkerError> {
         Ok(())
     }
 }

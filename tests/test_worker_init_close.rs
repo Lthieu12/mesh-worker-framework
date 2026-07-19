@@ -5,7 +5,6 @@
 //! - Initialization failures are correctly propagated.
 //! - Shutdown failures are correctly propagated.
 
-use bytes::Bytes;
 use serial_test::serial;
 
 use dev_support::simulation_worker::{SimulationBehavior, SimulationWorker, SimulationWorkerConfig};
@@ -27,9 +26,8 @@ async fn test_worker_init_failed() {
     let worker_id = MWFWrk::spawn_worker("SimulationWorker", &EntityID::new_external("MAIN")).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Init_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
-    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MWFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
+    MWFWrk::init_worker(&worker_id, &configuration).await.unwrap();
 
     let worker_id = MWFWrk::wait_worker_list_init(&vec![worker_id.clone()], Some(1000)).await;
     println!("Result: {:?}", worker_id);
@@ -52,13 +50,12 @@ async fn test_worker_close_failed() {
     let worker_id = MWFWrk::spawn_worker("SimulationWorker", &EntityID::new_external("MAIN")).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Close_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
-    let lifecycle_data = Bytes::from(bincode::serialize(&configuration).unwrap());
 
-    MWFWrk::init_worker(&worker_id, lifecycle_data).await.unwrap();
+    MWFWrk::init_worker(&worker_id, &configuration).await.unwrap();
 
     MWFWrk::wait_worker_list_init(&vec![worker_id.clone()], Some(1000)).await.unwrap();
 
-    MWFWrk::close_worker(&worker_id, Bytes::new()).await.unwrap();
+    MWFWrk::close_worker(&worker_id, &()).await.unwrap();
 
     let result = MWFWrk::wait_worker_list_close(&vec![worker_id.clone()], Some(1000)).await;
 

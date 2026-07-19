@@ -277,11 +277,11 @@ async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: Wo
             //
             // WorkerTask is responsible for marking the worker
             // as Initialized only after on_init() completes.
-            WorkerCommand::Init { lifecycle_data } => {
+            WorkerCommand::Init { init_data } => {
                 let action_start_timer = Instant::now();
                 MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerInit, LogStatus::Start).expect(MWFPanic::LogBuffer_AddLogFailed.message());
 
-                let result_init = worker.on_init(worker_id.clone(), parent_id.clone(), lifecycle_data).await;
+                let result_init = worker.on_init(worker_id.clone(), parent_id.clone(), init_data).await;
 
                 // Publish successful initialization.
                 //
@@ -343,11 +343,11 @@ async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: Wo
             //
             // WorkerTask is responsible for removing the worker
             // from the Registry only after on_close() completes.
-            WorkerCommand::Close { lifecycle_data } => {
+            WorkerCommand::Close { close_data } => {
                 let action_start_timer = Instant::now();
                 MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerClose, LogStatus::Start).expect(MWFPanic::LogBuffer_AddLogFailed.message());
 
-                let result_close = worker.on_close(lifecycle_data).await;
+                let result_close = worker.on_close(close_data).await;
 
                 // Mark the worker as Closed.
                 //
