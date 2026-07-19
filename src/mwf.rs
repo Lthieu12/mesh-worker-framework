@@ -309,8 +309,11 @@ impl MWF {
         Ok(())
     }
 
-    /// Returns the current timestamp formatted as RFC3339.
-    pub(crate) fn get_timestamp_rfc3339() -> String {
+    /// Returns the current timestamp formatted according to RFC3339.
+    ///
+    /// The timestamp is generated using the current MWF timestamp
+    /// configuration (local time or UTC).
+    pub fn get_timestamp_rfc3339() -> String {
         match MWF_TIMESTAMP_FORMAT.load(Ordering::Relaxed) {
             x if x == TimestampFormat::LocalTime as u8 => Local::now().to_rfc3339_opts(SecondsFormat::Millis, false),
             x if x == TimestampFormat::UtcTime as u8 => Utc::now().to_rfc3339_opts(SecondsFormat::Millis, false),
