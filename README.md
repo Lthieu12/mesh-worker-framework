@@ -71,7 +71,7 @@ async fn main() -> Result<(), MWFError> {
     MWF::register_worker_type::<DemoWorker>()?;
 
     // Create the worker.
-    let demo_worker_id = MWFWrk::spawn_worker("DemoWorker", &main_entity)?;
+    let demo_worker_id = MWFWrk::spawn_worker(DemoWorker::worker_type_id(), &main_entity)?;
 
     // Initialize it.
     MWFWrk::init_worker(&demo_worker_id, &()).await?;
