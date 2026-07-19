@@ -206,7 +206,8 @@ impl MWF {
     /// All workers must be closed before calling this function.
     ///
     /// If one or more workers are still running,
-    /// FrameworkError::worker_StillRunning is returned.
+    /// MWFError::Framework_CannotClose_workersStillRunning
+    /// is returned.
     ///
     /// Use MWFWrk::close_worker() to terminate workers
     /// gracefully, or MWFWrk::abort_worker() as a last
