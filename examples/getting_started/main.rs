@@ -44,8 +44,8 @@ async fn main() -> Result<(), MWFError> {
     MWFWrk::wait_worker_init(&demo_worker_id, None).await?;
 
     // Send a few messages.
-    MWFWrk::send_message(&main_entity, &demo_worker_id, DemoMessages::QUICK_CALCULATION, Bytes::new()).await?;
-    MWFWrk::send_message(&main_entity, &demo_worker_id, DemoMessages::LONG_CALCULATION, Bytes::new()).await?;
+    MWFWrk::send_message(&main_entity, &demo_worker_id, &DemoMessages::QUICK_CALCULATION, &()).await?;
+    MWFWrk::send_message(&main_entity, &demo_worker_id, &DemoMessages::LONG_CALCULATION, &()).await?;
 
     // Close the worker.
     MWFWrk::close_worker(&demo_worker_id, Bytes::new()).await?;

@@ -74,7 +74,7 @@ async fn main() {
     let sender_id = EntityID::new_external("MAIN");
     let message_id = MessageID::new("PING");
 
-    let futures = worker_ids.iter().map(|worker_id| MWFWrk::send_message_and_wait(&sender_id, worker_id, &message_id, Bytes::new(), Some(TIMEOUT_MS)));
+    let futures = worker_ids.iter().map(|worker_id| MWFWrk::send_message_and_wait(&sender_id, worker_id, &message_id, &(), Some(TIMEOUT_MS)));
 
     let results = join_all(futures).await;
 

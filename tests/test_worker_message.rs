@@ -45,16 +45,16 @@ async fn test_message_priority_order() {
     MWFWrk::wait_worker_init(&worker_a_id, Some(1000)).await.unwrap();
 
     // First normal message starts processing.
-    MWFWrk::send_message(&EntityID::new_external("MAIN"), &worker_a_id, MESSAGE_NORMAL_1, Bytes::new()).await.unwrap();
+    MWFWrk::send_message(&EntityID::new_external("MAIN"), &worker_a_id, &MESSAGE_NORMAL_1, &()).await.unwrap();
 
     // Ensure the worker is busy before sending the remaining messages.
     tokio::time::sleep(Duration::from_millis(20)).await;
 
-    MWFWrk::send_message(&EntityID::new_external("MAIN"), &worker_a_id, MESSAGE_NORMAL_2, Bytes::new()).await.unwrap();
+    MWFWrk::send_message(&EntityID::new_external("MAIN"), &worker_a_id, &MESSAGE_NORMAL_2, &()).await.unwrap();
 
-    MWFWrk::send_priority_message(&EntityID::new_external("MAIN"), &worker_a_id, MESSAGE_PRIORITY_1, Bytes::new()).await.unwrap();
+    MWFWrk::send_priority_message(&EntityID::new_external("MAIN"), &worker_a_id, &MESSAGE_PRIORITY_1, &()).await.unwrap();
 
-    MWFWrk::send_priority_message(&EntityID::new_external("MAIN"), &worker_a_id, MESSAGE_PRIORITY_2, Bytes::new()).await.unwrap();
+    MWFWrk::send_priority_message(&EntityID::new_external("MAIN"), &worker_a_id, &MESSAGE_PRIORITY_2, &()).await.unwrap();
 
     // Wait until every message has been processed.
     tokio::time::sleep(Duration::from_millis(500)).await;
@@ -164,7 +164,7 @@ async fn test_send_message_and_wait() {
     //
     // Trigger the chain.
     //
-    MWFWrk::send_message(&EntityID::new_external("MAIN"), &worker_a_id, MESSAGE_CHAIN, Bytes::new()).await.unwrap();
+    MWFWrk::send_message(&EntityID::new_external("MAIN"), &worker_a_id, &MESSAGE_CHAIN, &()).await.unwrap();
 
     //
     // Wait until processing completes.
@@ -237,7 +237,7 @@ async fn test_send_unique_message() {
     MWFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
 
     // Send a blocking message to keep the worker busy.
-    MWFWrk::send_message(&EntityID::new_external("MAIN"), &worker_id, MESSAGE_CHAIN, Bytes::new()).await.unwrap();
+    MWFWrk::send_message(&EntityID::new_external("MAIN"), &worker_id, &MESSAGE_CHAIN, &()).await.unwrap();
 
     // Give the worker enough time to start processing
     // the blocking message.
@@ -245,7 +245,7 @@ async fn test_send_unique_message() {
 
     // Send several equivalent unique messages.
     for _ in 0..5 {
-        MWFWrk::send_unique_message(&EntityID::new_external("MAIN"), &worker_id, MESSAGE_CHAIN, Bytes::new()).await.unwrap();
+        MWFWrk::send_unique_message(&EntityID::new_external("MAIN"), &worker_id, &MESSAGE_CHAIN, &()).await.unwrap();
     }
 
     // Wait until all messages have been processed.

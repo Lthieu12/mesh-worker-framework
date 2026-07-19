@@ -135,7 +135,7 @@ impl Worker for SimulationWorker {
                     tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
                 }
                 let worker_id = self.worker_id.as_ref().expect("worker_id should be initialized");
-                MWFWrk::send_message_and_wait(&EntityID::new_worker(worker_id.clone()), target_worker_id, message_id, Bytes::new(), *timeout_ms).await.unwrap();
+                MWFWrk::send_message_and_wait(&EntityID::new_worker(worker_id.clone()), target_worker_id, message_id, &(), *timeout_ms).await.unwrap();
             }
 
             SimulationBehavior::Message_Wait { message_delay_ms } => {

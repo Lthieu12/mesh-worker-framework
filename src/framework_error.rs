@@ -79,6 +79,9 @@ pub enum MWFError {
     /// and can no longer generate unique identifiers.
     Message_InstanceIDExhausted,
 
+    /// The MessageData type mismatch.
+    Message_DataTypeMismatch { expected_type: &'static str, actual_type: &'static str },
+
     /// The ErrorInstanceID counter has reached its maximum value
     /// and can no longer generate unique identifiers.
     Error_InstanceIDExhausted,
@@ -169,6 +172,10 @@ impl fmt::Display for MWFError {
 
             MWFError::Message_InstanceIDExhausted => {
                 write!(f, "MessageInstanceID counter exhausted.")
+            }
+
+            MWFError::Message_DataTypeMismatch { expected_type, actual_type } => {
+                write!(f, "MessageData type mismatch (expected: '{expected_type}', actual: '{actual_type}').")
             }
 
             MWFError::Error_InstanceIDExhausted => {

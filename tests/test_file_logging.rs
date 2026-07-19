@@ -16,8 +16,7 @@ async fn test_file_logging() {
     use std::fs;
 
     // Configure MWF.
-    let mut configuration = MWFConfiguration::default();
-    configuration.log_file_max_size_bytes = 4096;
+    let configuration = MWFConfiguration { log_file_max_size_bytes: 4096, ..Default::default() };
 
     MWF::init_with_configuration(configuration).unwrap();
 
@@ -40,7 +39,7 @@ async fn test_file_logging() {
 
     // Generate enough log events to fill the log file.
     for index in 0..100 {
-        MWFWrk::send_message(&EntityID::new_external("Test"), &worker_id, format!("Message{index}"), Bytes::new()).await.unwrap();
+        MWFWrk::send_message(&EntityID::new_external("Test"), &worker_id, &format!("Message{index}"), &()).await.unwrap();
     }
 
     MWFWrk::close_worker(&worker_id, lifecycle_data).await.unwrap();

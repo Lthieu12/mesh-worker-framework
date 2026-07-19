@@ -571,16 +571,20 @@ impl MWFWrk {
     /// Send a message to a worker.
     ///
     /// `message_id` may be any type implementing `Into<MessageID>`.
-    pub async fn send_message<T>(sender_id: &EntityID, receiver_id: &WorkerID, message_id: T, message_data: Bytes) -> Result<(), MWFError>
+    pub async fn send_message<TMessageID, TMessageData>(sender_id: &EntityID, receiver_id: &WorkerID, message_id: &TMessageID, message_data: &TMessageData) -> Result<(), MWFError>
     where
-        T: Into<MessageID>,
+        TMessageID: Into<MessageID> + Clone,
+        TMessageData: Clone + Send + Sync + 'static,
     {
-        let message_id = message_id.into();
+        // Convert the message identifier.
+        let message_id = message_id.clone().into();
+
+        // Retrieve the normal sender channel.
         let normal_sender_channel = get_sender_channel(sender_id, receiver_id, WorkerChannel::Normal)?;
 
         // Generate the unique id and build the message
         let message_instance_id = MWFWrk::generate_message_instance_id()?;
-        let framework_message = WorkerMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
+        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data);
 
         // Send the message to the target worker.
         normal_sender_channel.send(WorkerCommand::Message { message: framework_message, priority: false, unique: false }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
@@ -597,16 +601,20 @@ impl MWFWrk {
     /// - Ok(()) if on_message() completed successfully.
     /// - workerError if on_message() returned an error.
     /// - Operation_Timeout if the timeout expires.
-    pub async fn send_message_and_wait<T>(sender_id: &EntityID, receiver_id: &WorkerID, message_id: T, message_data: Bytes, timeout_ms: Option<u64>) -> Result<(), MWFError>
+    pub async fn send_message_and_wait<TMessageID, TMessageData>(sender_id: &EntityID, receiver_id: &WorkerID, message_id: &TMessageID, message_data: &TMessageData, timeout_ms: Option<u64>) -> Result<(), MWFError>
     where
-        T: Into<MessageID>,
+        TMessageID: Into<MessageID> + Clone,
+        TMessageData: Clone + Send + Sync + 'static,
     {
-        let message_id = message_id.into();
+        // Convert the message identifier.
+        let message_id = message_id.clone().into();
+
+        // Retrieve the normal sender channel.
         let normal_sender_channel = get_sender_channel(sender_id, receiver_id, WorkerChannel::Normal)?;
 
         // Generate the unique id and build the message
         let message_instance_id = MWFWrk::generate_message_instance_id()?;
-        let framework_message = WorkerMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
+        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data);
 
         // Create a temporary reply channel used to signal
         // completion of on_message().
@@ -685,16 +693,20 @@ impl MWFWrk {
     /// normal messages.
     ///
     /// `message_id` may be any type implementing `Into<MessageID>`.
-    pub async fn send_priority_message<T>(sender_id: &EntityID, receiver_id: &WorkerID, message_id: T, message_data: Bytes) -> Result<(), MWFError>
+    pub async fn send_priority_message<TMessageID, TMessageData>(sender_id: &EntityID, receiver_id: &WorkerID, message_id: &TMessageID, message_data: &TMessageData) -> Result<(), MWFError>
     where
-        T: Into<MessageID>,
+        TMessageID: Into<MessageID> + Clone,
+        TMessageData: Clone + Send + Sync + 'static,
     {
-        let message_id = message_id.into();
+        // Convert the message identifier.
+        let message_id = message_id.clone().into();
+
+        // Retrieve the priority sender channel.
         let priority_sender_channel = get_sender_channel(sender_id, receiver_id, WorkerChannel::Priority)?;
 
         // Generate the unique id and build the message
         let message_instance_id = MWFWrk::generate_message_instance_id()?;
-        let framework_message = WorkerMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
+        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data);
 
         // Send the priority message to the target worker.
         priority_sender_channel.send(WorkerCommand::Message { message: framework_message, priority: true, unique: false }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
@@ -714,16 +726,20 @@ impl MWFWrk {
     /// - Ok(()) if on_message() completed successfully.
     /// - workerError if on_message() returned an error.
     /// - Operation_Timeout if the timeout expires.
-    pub async fn send_priority_message_and_wait<T>(sender_id: &EntityID, receiver_id: &WorkerID, message_id: T, message_data: Bytes, timeout_ms: Option<u64>) -> Result<(), MWFError>
+    pub async fn send_priority_message_and_wait<TMessageID, TMessageData>(sender_id: &EntityID, receiver_id: &WorkerID, message_id: &TMessageID, message_data: &TMessageData, timeout_ms: Option<u64>) -> Result<(), MWFError>
     where
-        T: Into<MessageID>,
+        TMessageID: Into<MessageID> + Clone,
+        TMessageData: Clone + Send + Sync + 'static,
     {
-        let message_id = message_id.into();
+        // Convert the message identifier.
+        let message_id = message_id.clone().into();
+
+        // Retrieve the priority sender channel.
         let priority_sender_channel = get_sender_channel(sender_id, receiver_id, WorkerChannel::Priority)?;
 
         // Generate the unique id and build the message
         let message_instance_id = MWFWrk::generate_message_instance_id()?;
-        let framework_message = WorkerMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
+        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data);
 
         // Create a temporary reply channel used to signal
         // completion of on_message().
@@ -805,16 +821,20 @@ impl MWFWrk {
     /// preserving its FIFO position.
     ///
     /// `message_id` may be any type implementing `Into<MessageID>`.
-    pub async fn send_unique_message<T>(sender_id: &EntityID, receiver_id: &WorkerID, message_id: T, message_data: Bytes) -> Result<(), MWFError>
+    pub async fn send_unique_message<TMessageID, TMessageData>(sender_id: &EntityID, receiver_id: &WorkerID, message_id: &TMessageID, message_data: &TMessageData) -> Result<(), MWFError>
     where
-        T: Into<MessageID>,
+        TMessageID: Into<MessageID> + Clone,
+        TMessageData: Clone + Send + Sync + 'static,
     {
-        let message_id = message_id.into();
+        // Convert the message identifier.
+        let message_id = message_id.clone().into();
+
+        // Retrieve the normal sender channel.
         let normal_sender_channel = get_sender_channel(sender_id, receiver_id, WorkerChannel::Normal)?;
 
         // Generate the unique id and build the message
         let message_instance_id = MWFWrk::generate_message_instance_id()?;
-        let framework_message = WorkerMessage::new(sender_id.clone(), receiver_id.clone(), message_id.clone(), message_instance_id, message_data);
+        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data);
 
         // Send the message to the target worker.
         normal_sender_channel.send(WorkerCommand::Message { message: framework_message, priority: false, unique: true }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;

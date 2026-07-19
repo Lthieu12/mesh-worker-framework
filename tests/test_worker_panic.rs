@@ -30,7 +30,7 @@ async fn test_worker_message_panic() {
     MWFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
 
     // Trigger the panic.
-    MWFWrk::send_message(&EntityID::new_external("MAIN"), &worker_id, "TEST", bytes::Bytes::new()).await.unwrap();
+    MWFWrk::send_message(&EntityID::new_external("MAIN"), &worker_id, &"TEST", &()).await.unwrap();
 
     // Wait until MWF has removed the worker.
     _ = MWFWrk::wait_worker_close(&worker_id, Some(1000)).await;

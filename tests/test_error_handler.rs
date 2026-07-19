@@ -47,7 +47,7 @@ async fn test_mwf_err_worker_failures() {
 
     // Generate multiple message failures.
     for _ in 0..3 {
-        MWFWrk::send_message(&EntityID::new_external("Test"), &worker_a_id, "TEST", Bytes::new()).await.unwrap();
+        MWFWrk::send_message(&EntityID::new_external("Test"), &worker_a_id, &"TEST", &()).await.unwrap();
     }
 
     // Simulation worker with error on init
@@ -128,10 +128,7 @@ async fn test_mwf_err_worker_failures() {
 #[tokio::test]
 #[serial]
 async fn test_mwf_err_buffer_overflow() {
-    let mut configuration = MWFConfiguration::default();
-
-    configuration.error_event_buffer_capacity = 10;
-    configuration.log_event_buffer_capacity = 10;
+    let configuration = MWFConfiguration { error_event_buffer_capacity: 10, log_event_buffer_capacity: 10, ..Default::default() };
 
     MWF::init_with_configuration(configuration).unwrap();
     MWF::register_worker_type::<SimulationWorker>().unwrap();
@@ -147,7 +144,7 @@ async fn test_mwf_err_buffer_overflow() {
 
     // Generate more errors than the buffer can hold.
     for _ in 0..15 {
-        let _ = MWFWrk::send_message_and_wait(&EntityID::new_external("Test"), &worker_id, "TEST", Bytes::new(), Some(1000)).await;
+        let _ = MWFWrk::send_message_and_wait(&EntityID::new_external("Test"), &worker_id, &"TEST", &(), Some(1000)).await;
     }
 
     let error_list = MWFErr::wait_error(Some(0)).await.unwrap();
