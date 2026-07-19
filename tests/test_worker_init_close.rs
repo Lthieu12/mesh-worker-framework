@@ -42,6 +42,38 @@ async fn test_worker_init_failed() {
 // Integration tests must run serially.
 #[tokio::test]
 #[serial]
+async fn test_worker_init_invalid_data_type() {
+    MWF::init().unwrap();
+
+    MWF::register_worker_type::<SimulationWorker>().unwrap();
+
+    let worker_id = MWFWrk::spawn_worker("SimulationWorker", &EntityID::new_external("MAIN")).unwrap();
+
+    // Intentionally send the wrong initialization data type.
+    MWFWrk::init_worker(&worker_id, &()).await.unwrap();
+
+    let result = MWFWrk::wait_worker_list_init(&vec![worker_id.clone()], Some(1000)).await;
+
+    assert!(matches!(result, Err(MWFError::Worker_InitializationFailed)));
+
+    // Verify the root cause reported by MWF.
+    let error_list = MWFErr::wait_error(None).await.unwrap();
+
+    let error_event = error_list.error_event_list.last().unwrap();
+    println!("error_event: {:?}", error_event);
+
+    assert!(error_event.error_description.contains("SimulationWorkerConfig"));
+    assert!(error_event.error_description.contains("()"));
+
+    MWFWrk::abort_children(&EntityID::new_external("MAIN")).unwrap();
+
+    MWF::close().unwrap();
+}
+
+// MWF uses a global runtime instance.
+// Integration tests must run serially.
+#[tokio::test]
+#[serial]
 async fn test_worker_close_failed() {
     MWF::init().unwrap();
 
