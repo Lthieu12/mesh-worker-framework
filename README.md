@@ -539,8 +539,8 @@ MWF currently uses a global runtime instance.
 
 Integration tests that call:
 
-- MWF::init()
-- MWF::close()
+* `MWF::init()`
+* `MWF::close()`
 
 must not execute concurrently.
 
