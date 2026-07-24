@@ -166,8 +166,10 @@ impl MWFWrk {
     }
 
     /// Execute blocking work without blocking the MWF runtime.
-    ///
+    /// 
     /// Typical uses include native DLL calls and CPU-intensive computations.
+    /// 
+    /// This is a thin wrapper around [`tokio::task::spawn_blocking`].
     ///
     /// The blocking work is executed on Tokio's blocking thread pool,
     /// allowing the Tokio runtime to continue executing other MWF workers.
@@ -181,6 +183,8 @@ impl MWFWrk {
 
     /// Suspend the current worker for the specified duration.
     ///
+    /// This is a thin wrapper around [`tokio::time::sleep`].
+    /// 
     /// While this worker is suspended, the Tokio runtime can continue
     /// executing other MWF workers.
     pub async fn sleep(duration: Duration) {
