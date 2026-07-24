@@ -279,6 +279,12 @@ impl MWF {
     {
         let mut mwf_data_guard = MWF_DATA.write().expect(MWFPanic::MWFData_WriteLockPoisoned.message());
         let mwf_data = mwf_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
+
+        let worker_type_id = T::worker_type_id();
+        if !worker_type_id.is_valid() {
+            return Err(MWFError::WorkerType_Invalid { worker_type_id });
+        }
+
         let rust_type_name = std::any::type_name::<T>();
 
         match mwf_data.worker_type_registry.get_worker_rust_type_name(&T::worker_type_id()) {

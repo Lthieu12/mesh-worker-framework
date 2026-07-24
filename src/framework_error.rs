@@ -5,6 +5,8 @@
 use std::error::Error;
 use std::fmt;
 
+use crate::{MessageID, WorkerTypeID};
+
 pub type WorkerError = anyhow::Error;
 
 /// Errors returned by MWF functions.
@@ -29,6 +31,9 @@ pub enum MWFError {
 
     /// The framework shutdown failed: one or more workers are still running.
     Framework_CannotClose_workersStillRunning,
+
+    /// The worker type identifier is invalid.
+    WorkerType_Invalid { worker_type_id: WorkerTypeID },
 
     /// The requested worker type was not found.
     /// Internal registry lookup error.
@@ -75,6 +80,9 @@ pub enum MWFError {
     /// The requested father worker was not found.
     ParentWorker_NotFound,
 
+    /// The message identifier is invalid.
+    Message_Invalid { message_id: MessageID },
+
     /// The MessageInstanceID counter has reached its maximum value
     /// and can no longer generate unique identifiers.
     Message_InstanceIDExhausted,
@@ -116,6 +124,10 @@ impl fmt::Display for MWFError {
 
             MWFError::Framework_CannotClose_workersStillRunning => {
                 write!(f, "The framework shutdown failed: one or more workers are still running.")
+            }
+
+            MWFError::WorkerType_Invalid { worker_type_id } => {
+                write!(f, "The worker type identifier is invalid (WorkerTypeID: '{worker_type_id}').")
             }
 
             MWFError::WorkerType_NotFound => {
@@ -168,6 +180,10 @@ impl fmt::Display for MWFError {
 
             MWFError::ParentWorker_NotFound => {
                 write!(f, "The requested father worker was not found.")
+            }
+
+            MWFError::Message_Invalid { message_id } => {
+                write!(f, "The message identifier is invalid (MessageID: '{message_id}').")
             }
 
             MWFError::Message_InstanceIDExhausted => {

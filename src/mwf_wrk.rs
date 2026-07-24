@@ -62,6 +62,9 @@ impl MWFWrk {
         TWorkerTypeID: Into<WorkerTypeID> + Clone,
     {
         let worker_type_id = worker_type_id.clone().into();
+        if !worker_type_id.is_valid() {
+            return Err(MWFError::WorkerType_Invalid { worker_type_id });
+        }
 
         // Ensure the framework has been initialized.
         let mwf_data_guard = MWF_DATA.read().expect(MWFPanic::MWFData_ReadLockPoisoned.message());
@@ -588,6 +591,9 @@ impl MWFWrk {
     {
         // Convert the message identifier.
         let message_id = message_id.clone().into();
+        if !message_id.is_valid() {
+            return Err(MWFError::Message_Invalid { message_id });
+        }
 
         // Retrieve the normal sender channel.
         let normal_sender_channel = get_sender_channel(sender_id, receiver_id, WorkerChannel::Normal)?;
@@ -618,6 +624,9 @@ impl MWFWrk {
     {
         // Convert the message identifier.
         let message_id = message_id.clone().into();
+        if !message_id.is_valid() {
+            return Err(MWFError::Message_Invalid { message_id });
+        }
 
         // Retrieve the normal sender channel.
         let normal_sender_channel = get_sender_channel(sender_id, receiver_id, WorkerChannel::Normal)?;
@@ -710,6 +719,9 @@ impl MWFWrk {
     {
         // Convert the message identifier.
         let message_id = message_id.clone().into();
+        if !message_id.is_valid() {
+            return Err(MWFError::Message_Invalid { message_id });
+        }
 
         // Retrieve the priority sender channel.
         let priority_sender_channel = get_sender_channel(sender_id, receiver_id, WorkerChannel::Priority)?;
@@ -743,6 +755,9 @@ impl MWFWrk {
     {
         // Convert the message identifier.
         let message_id = message_id.clone().into();
+        if !message_id.is_valid() {
+            return Err(MWFError::Message_Invalid { message_id });
+        }
 
         // Retrieve the priority sender channel.
         let priority_sender_channel = get_sender_channel(sender_id, receiver_id, WorkerChannel::Priority)?;
@@ -838,6 +853,9 @@ impl MWFWrk {
     {
         // Convert the message identifier.
         let message_id = message_id.clone().into();
+        if !message_id.is_valid() {
+            return Err(MWFError::Message_Invalid { message_id });
+        }
 
         // Retrieve the normal sender channel.
         let normal_sender_channel = get_sender_channel(sender_id, receiver_id, WorkerChannel::Normal)?;
