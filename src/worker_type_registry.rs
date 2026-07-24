@@ -34,12 +34,12 @@ impl WorkerTypeRegistry {
     }
 
     /// Register a worker type.
-    pub(crate) fn add_worker_type(&mut self, worker_type_id: WorkerTypeID, worker_rust_type_name: &'static str, worker_constructor: WorkerConstructor) {
-        self.worker_type_map.insert(worker_type_id, WorkerTypeEntry { worker_rust_type_name, worker_constructor });
+    pub(crate) fn add_worker_type(&mut self, worker_type_id: &WorkerTypeID, worker_rust_type_name: &'static str, worker_constructor: WorkerConstructor) {
+        self.worker_type_map.insert(worker_type_id.clone(), WorkerTypeEntry { worker_rust_type_name, worker_constructor });
     }
 
     /// Get the Rust type name associated with a WorkerTypeID.
-    pub(crate) fn get_worker_rust_type_name(&self, worker_type_id: WorkerTypeID) -> Result<&'static str, MWFError> {
+    pub(crate) fn get_worker_rust_type_name(&self, worker_type_id: &WorkerTypeID) -> Result<&'static str, MWFError> {
         let worker_type_entry = self.worker_type_map.get(worker_type_id).ok_or(MWFError::WorkerType_NotFound)?;
         Ok(worker_type_entry.worker_rust_type_name)
     }
@@ -48,13 +48,13 @@ impl WorkerTypeRegistry {
     ///
     /// The returned function creates a new instance of the
     /// corresponding worker type each time it is invoked.
-    pub(crate) fn get_worker_constructor(&self, worker_type_id: WorkerTypeID) -> Result<WorkerConstructor, MWFError> {
+    pub(crate) fn get_worker_constructor(&self, worker_type_id: &WorkerTypeID) -> Result<WorkerConstructor, MWFError> {
         let worker_type_entry = self.worker_type_map.get(worker_type_id).ok_or(MWFError::WorkerType_NotFound)?;
         Ok(worker_type_entry.worker_constructor)
     }
 
     /// Check whether a worker type has been registered.
-    pub(crate) fn contains_worker_type(&self, worker_type_id: WorkerTypeID) -> bool {
+    pub(crate) fn contains_worker_type(&self, worker_type_id: &WorkerTypeID) -> bool {
         self.worker_type_map.contains_key(worker_type_id)
     }
 }

@@ -33,7 +33,7 @@ pub struct DemoWorker {
 #[async_trait]
 impl Worker for DemoWorker {
     fn worker_type_id() -> WorkerTypeID {
-        "DemoWorker"
+        "DemoWorker".into()
     }
 
     fn new() -> Self {

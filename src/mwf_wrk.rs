@@ -57,18 +57,23 @@ impl MWFWrk {
     ///
     /// MWF retrieves the registered worker constructor,
     /// creates a new worker instance, then spawns it.
-    pub fn spawn_worker(worker_type_id: WorkerTypeID, parent_id: &EntityID) -> Result<WorkerID, MWFError> {
+    pub fn spawn_worker<TWorkerTypeID>(worker_type_id: &TWorkerTypeID, parent_id: &EntityID) -> Result<WorkerID, MWFError>
+    where
+        TWorkerTypeID: Into<WorkerTypeID> + Clone,
+    {
+        let worker_type_id = worker_type_id.clone().into();
+
         // Ensure the framework has been initialized.
         let mwf_data_guard = MWF_DATA.read().expect(MWFPanic::MWFData_ReadLockPoisoned.message());
         let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
 
         // Ensure the worker type has been registered.
-        if !mwf_data.worker_type_registry.contains_worker_type(worker_type_id) {
+        if !mwf_data.worker_type_registry.contains_worker_type(&worker_type_id) {
             return Err(MWFError::WorkerType_NotRegistered);
         }
 
         // Retrieve the constructor associated with the WorkerTypeID.
-        let worker_constructor = mwf_data.worker_type_registry.get_worker_constructor(worker_type_id)?;
+        let worker_constructor = mwf_data.worker_type_registry.get_worker_constructor(&worker_type_id)?;
 
         // Create a new worker instance.
         let worker = worker_constructor();
@@ -113,7 +118,7 @@ impl MWFWrk {
             EntityID::External(_) => {}
         }
 
-        let worker_id = mwf_data.worker_registry.generate_worker_id(worker_type_id);
+        let worker_id = mwf_data.worker_registry.generate_worker_id(&worker_type_id);
 
         let action_start_timer = Instant::now();
 
@@ -136,7 +141,7 @@ impl MWFWrk {
         // - worker state.
         // - Communication channels.
         // - JoinHandle associated with the Tokio task.
-        match mwf_data.worker_registry.add_worker(&worker_id, worker_type_id, parent_id, normal_sender_channel, priority_sender_channel, join_handle) {
+        match mwf_data.worker_registry.add_worker(&worker_id, &worker_type_id, parent_id, normal_sender_channel, priority_sender_channel, join_handle) {
             Ok(()) => {}
 
             Err((error, join_handle)) => {
@@ -235,7 +240,7 @@ impl MWFWrk {
         // Get the Rust type name associated with the WorkerTypeID.
         let mwf_data_guard = MWF_DATA.read().expect(MWFPanic::MWFData_ReadLockPoisoned.message());
         let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
-        let worker_rust_type_name = mwf_data.worker_type_registry.get_worker_rust_type_name(worker_type_id)?;
+        let worker_rust_type_name = mwf_data.worker_type_registry.get_worker_rust_type_name(&worker_type_id)?;
 
         Ok(worker_rust_type_name)
     }

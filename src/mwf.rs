@@ -281,7 +281,7 @@ impl MWF {
         let mwf_data = mwf_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
         let rust_type_name = std::any::type_name::<T>();
 
-        match mwf_data.worker_type_registry.get_worker_rust_type_name(T::worker_type_id()) {
+        match mwf_data.worker_type_registry.get_worker_rust_type_name(&T::worker_type_id()) {
             Ok(registered_rust_type_name) => {
                 if registered_rust_type_name == rust_type_name {
                     return Err(MWFError::WorkerType_AlreadyRegistered);
@@ -301,7 +301,7 @@ impl MWF {
                 // Instead, a function calling T::new() is created and
                 // stored for later use.
                 let worker_constructor: WorkerConstructor = || Box::new(T::new());
-                mwf_data.worker_type_registry.add_worker_type(T::worker_type_id(), rust_type_name, worker_constructor);
+                mwf_data.worker_type_registry.add_worker_type(&T::worker_type_id(), rust_type_name, worker_constructor);
             }
 
             Err(error) => return Err(error),

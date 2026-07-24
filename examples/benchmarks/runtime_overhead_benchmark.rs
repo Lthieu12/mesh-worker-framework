@@ -41,7 +41,7 @@ async fn main() {
     let mut worker_ids = Vec::with_capacity(worker_count);
 
     for _ in 0..worker_count {
-        let worker_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::External("MAIN".into())).unwrap();
+        let worker_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &EntityID::External("MAIN".into())).unwrap();
 
         worker_ids.push(worker_id);
     }

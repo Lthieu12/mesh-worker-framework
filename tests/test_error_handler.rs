@@ -36,7 +36,7 @@ async fn test_mwf_err_worker_failures() {
     MWFErr::add_error(&EntityID::new_external("Application"), &application_error).unwrap();
 
     // Simulation worker with error on message
-    let worker_a_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
+    let worker_a_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
 
@@ -49,7 +49,7 @@ async fn test_mwf_err_worker_failures() {
     }
 
     // Simulation worker with error on init
-    let worker_b_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
+    let worker_b_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Init_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
 
@@ -58,7 +58,7 @@ async fn test_mwf_err_worker_failures() {
     assert!(matches!(result, Err(MWFError::Worker_InitializationFailed)));
 
     // Simulation worker with error on close
-    let worker_c_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
+    let worker_c_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Close_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
 
@@ -129,7 +129,7 @@ async fn test_mwf_err_buffer_overflow() {
     MWF::init_with_configuration(configuration).unwrap();
     MWF::register_worker_type::<SimulationWorker>().unwrap();
 
-    let worker_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
+    let worker_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Fail, wait_children_close: false, wait_children_close_timeout_ms: None };
 

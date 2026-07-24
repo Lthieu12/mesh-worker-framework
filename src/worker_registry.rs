@@ -86,7 +86,7 @@ impl Registry {
 
     /// Get worker type id from WorkerID.
     pub(crate) fn get_worker_type_id(&self, worker_id: &WorkerID) -> Result<WorkerTypeID, MWFError> {
-        Ok(self.get_registry_entry(worker_id)?.worker_type_id)
+        Ok(self.get_registry_entry(worker_id)?.worker_type_id.clone())
     }
 
     /// Get worker channel from WorkerID.
@@ -105,8 +105,8 @@ impl Registry {
     }
 
     /// Generate a unique WorkerID for a worker type.
-    pub(crate) fn generate_worker_id(&mut self, worker_type_id: WorkerTypeID) -> WorkerID {
-        let counter = self.worker_counter_map.entry(worker_type_id).or_insert(0);
+    pub(crate) fn generate_worker_id(&mut self, worker_type_id: &WorkerTypeID) -> WorkerID {
+        let counter = self.worker_counter_map.entry(worker_type_id.clone()).or_insert(0);
         *counter += 1;
 
         WorkerID::new(format!("{}:{:05}", worker_type_id, *counter))
@@ -118,7 +118,7 @@ impl Registry {
     }
 
     /// Register a newly created worker.
-    pub(crate) fn add_worker(&mut self, worker_id: &WorkerID, worker_type_id: WorkerTypeID, parent_id: &EntityID, normal_sender_channel: WorkerNormalSenderChannel, priority_sender_channel: WorkerPrioritySenderChannel, join_handle: JoinHandle<()>) -> Result<(), (MWFError, JoinHandle<()>)> {
+    pub(crate) fn add_worker(&mut self, worker_id: &WorkerID, worker_type_id: &WorkerTypeID, parent_id: &EntityID, normal_sender_channel: WorkerNormalSenderChannel, priority_sender_channel: WorkerPrioritySenderChannel, join_handle: JoinHandle<()>) -> Result<(), (MWFError, JoinHandle<()>)> {
         // Prevent duplicate WorkerIDs.
         if self.worker_map.contains_key(worker_id) {
             return Err((MWFError::Worker_AlreadyExists, join_handle));
@@ -141,7 +141,7 @@ impl Registry {
         }
 
         // Create the Registry entry associated with the worker.
-        let registry_entry = RegistryEntry::new(worker_type_id, parent_id.clone(), normal_sender_channel, priority_sender_channel, join_handle);
+        let registry_entry = RegistryEntry::new(worker_type_id.clone(), parent_id.clone(), normal_sender_channel, priority_sender_channel, join_handle);
         // Register the worker.
         self.worker_map.insert(worker_id.to_owned(), registry_entry);
 

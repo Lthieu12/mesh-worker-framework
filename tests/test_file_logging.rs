@@ -28,7 +28,7 @@ async fn test_file_logging() {
 
     let simulation_configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
 
-    let worker_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
+    let worker_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &EntityID::new_external("Test")).unwrap();
 
     MWFWrk::init_worker(&worker_id, &simulation_configuration).await.unwrap();
 

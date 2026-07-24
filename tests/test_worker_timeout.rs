@@ -24,7 +24,7 @@ async fn test_worker_timeout_init() {
     MWF::init().unwrap();
     MWF::register_worker_type::<SimulationWorker>().unwrap();
 
-    let worker_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
+    let worker_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
 
     // Very long init
     let configuration = SimulationWorkerConfig { init_delay_ms: 5_000, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
@@ -45,7 +45,7 @@ async fn test_worker_timeout_close() {
     MWF::init().unwrap();
     MWF::register_worker_type::<SimulationWorker>().unwrap();
 
-    let worker_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
+    let worker_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
 
     // Very long close
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 5_000, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };

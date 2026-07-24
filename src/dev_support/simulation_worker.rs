@@ -90,7 +90,7 @@ pub struct SimulationWorker {
 #[async_trait]
 impl Worker for SimulationWorker {
     fn worker_type_id() -> WorkerTypeID {
-        "SimulationWorker"
+        "SimulationWorker".into()
     }
 
     fn new() -> Self {

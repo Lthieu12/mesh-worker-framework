@@ -26,7 +26,7 @@ async fn test_worker_hierarchy() {
     MWF::init().unwrap();
     MWF::register_worker_type::<SimulationWorker>().unwrap();
 
-    let worker_a_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
+    let worker_a_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 100, close_delay_ms: 100, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: true, wait_children_close_timeout_ms: Some(500) };
 
@@ -34,13 +34,13 @@ async fn test_worker_hierarchy() {
 
     MWFWrk::wait_worker_init(&worker_a_id, Some(500)).await.unwrap();
 
-    let worker_b_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::Worker(worker_a_id.clone())).unwrap();
+    let worker_b_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &EntityID::Worker(worker_a_id.clone())).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 200, close_delay_ms: 200, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
 
     MWFWrk::init_worker(&worker_b_id, &configuration).await.unwrap();
 
-    let worker_c_id = MWFWrk::spawn_worker(SimulationWorker::worker_type_id(), &EntityID::Worker(worker_a_id.clone())).unwrap();
+    let worker_c_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &EntityID::Worker(worker_a_id.clone())).unwrap();
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 300, close_delay_ms: 300, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
 
