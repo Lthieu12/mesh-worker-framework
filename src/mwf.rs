@@ -206,7 +206,7 @@ impl MWF {
     /// All workers must be closed before calling this function.
     ///
     /// If one or more workers are still running,
-    /// MWFError::Framework_CannotClose_workersStillRunning
+    /// MWFError::Framework_CannotClose_WorkersStillRunning
     /// is returned.
     ///
     /// Use MWFWrk::close_worker() to terminate workers
@@ -273,21 +273,21 @@ impl MWF {
     ///   already been registered.
     /// - Worker_DuplicateWorkerTypeID if the WorkerTypeID is
     ///   already associated with a different Rust worker type.
-    pub fn register_worker_type<T>() -> Result<(), MWFError>
+    pub fn register_worker_type<TWorker>() -> Result<(), MWFError>
     where
-        T: Worker + Send + 'static,
+        TWorker: Worker + Send + 'static,
     {
         let mut mwf_data_guard = MWF_DATA.write().expect(MWFPanic::MWFData_WriteLockPoisoned.message());
         let mwf_data = mwf_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
 
-        let worker_type_id = T::worker_type_id();
+        let worker_type_id = TWorker::worker_type_id();
         if !worker_type_id.is_valid() {
             return Err(MWFError::WorkerType_Invalid { worker_type_id });
         }
 
-        let rust_type_name = std::any::type_name::<T>();
+        let rust_type_name = std::any::type_name::<TWorker>();
 
-        match mwf_data.worker_type_registry.get_worker_rust_type_name(&T::worker_type_id()) {
+        match mwf_data.worker_type_registry.get_worker_rust_type_name(&TWorker::worker_type_id()) {
             Ok(registered_rust_type_name) => {
                 if registered_rust_type_name == rust_type_name {
                     return Err(MWFError::WorkerType_AlreadyRegistered);
@@ -306,8 +306,8 @@ impl MWF {
                 // Note that T::new() is not executed here.
                 // Instead, a function calling T::new() is created and
                 // stored for later use.
-                let worker_constructor: WorkerConstructor = || Box::new(T::new());
-                mwf_data.worker_type_registry.add_worker_type(&T::worker_type_id(), rust_type_name, worker_constructor);
+                let worker_constructor: WorkerConstructor = || Box::new(TWorker::new());
+                mwf_data.worker_type_registry.add_worker_type(&TWorker::worker_type_id(), rust_type_name, worker_constructor);
             }
 
             Err(error) => return Err(error),
