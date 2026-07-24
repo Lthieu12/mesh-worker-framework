@@ -30,7 +30,7 @@ pub enum MWFError {
     Framework_AlreadyInitialized,
 
     /// The framework shutdown failed: one or more workers are still running.
-    Framework_CannotClose_workersStillRunning,
+    Framework_CannotClose_WorkersStillRunning,
 
     /// The worker type identifier is invalid.
     WorkerType_Invalid { worker_type_id: WorkerTypeID },
@@ -122,7 +122,7 @@ impl fmt::Display for MWFError {
                 write!(f, "The framework is already initialized.")
             }
 
-            MWFError::Framework_CannotClose_workersStillRunning => {
+            MWFError::Framework_CannotClose_WorkersStillRunning => {
                 write!(f, "The framework shutdown failed: one or more workers are still running.")
             }
 

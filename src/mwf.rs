@@ -225,7 +225,7 @@ impl MWF {
             let mwf_wrk_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
             let mwf_wrk_data = mwf_wrk_data_guard.as_ref().expect(MWFPanic::MWFWrkData_Missing.message());
             if !mwf_wrk_data.worker_registry.is_empty() {
-                return Err(MWFError::Framework_CannotClose_workersStillRunning);
+                return Err(MWFError::Framework_CannotClose_WorkersStillRunning);
             }
         }
 
