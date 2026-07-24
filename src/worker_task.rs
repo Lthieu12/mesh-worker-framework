@@ -155,10 +155,10 @@ pub(crate) fn spawn_worker_task(worker: Box<dyn Worker + Send>, normal_receiver_
                 let mwf_data = mwf_data_guard.as_mut().expect(MWFPanic::MWFWrkData_Missing.message());
 
                 // Update the worker state.
-                mwf_data.worker_registry.set_worker_state(&task_worker_id, WorkerState::Panicked).expect(MWFPanic::Registry_workerMissing.message());
+                mwf_data.worker_registry.set_worker_state(&task_worker_id, WorkerState::Panicked).expect(MWFPanic::Registry_WorkerMissing.message());
 
                 // Remove the worker from the Registry.
-                mwf_data.worker_registry.remove_worker(&task_worker_id).expect(MWFPanic::Registry_workerMissing.message());
+                mwf_data.worker_registry.remove_worker(&task_worker_id).expect(MWFPanic::Registry_WorkerMissing.message());
 
                 drop(mwf_data_guard);
 
@@ -291,12 +291,12 @@ async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: Wo
                 let mwf_data = mwf_data_guard.as_mut().expect(MWFPanic::MWFWrkData_Missing.message());
                 match &result_init {
                     Ok(()) => {
-                        mwf_data.worker_registry.set_worker_state(&worker_id, WorkerState::Initialized).expect(MWFPanic::Registry_workerMissing.message());
+                        mwf_data.worker_registry.set_worker_state(&worker_id, WorkerState::Initialized).expect(MWFPanic::Registry_WorkerMissing.message());
                         MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerInit, LogStatus::Ok).expect(MWFPanic::LogBuffer_AddLogFailed.message());
                     }
                     Err(error) => {
                         MWFErr::add_error_internal(&EntityID::new_worker(worker_id.clone()), Some("on_init".into()), error).expect(MWFPanic::ErrorBuffer_AddErrorFailed.message());
-                        mwf_data.worker_registry.set_worker_state(&worker_id, WorkerState::InitFailed).expect(MWFPanic::Registry_workerMissing.message());
+                        mwf_data.worker_registry.set_worker_state(&worker_id, WorkerState::InitFailed).expect(MWFPanic::Registry_WorkerMissing.message());
                         MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerInit, LogStatus::Error).expect(MWFPanic::LogBuffer_AddLogFailed.message());
                     }
                 }
@@ -357,18 +357,18 @@ async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: Wo
                 let mwf_data = mwf_data_guard.as_mut().expect(MWFPanic::MWFWrkData_Missing.message());
                 match &result_close {
                     Ok(()) => {
-                        mwf_data.worker_registry.set_worker_state(&worker_id, WorkerState::Closed).expect(MWFPanic::Registry_workerMissing.message());
+                        mwf_data.worker_registry.set_worker_state(&worker_id, WorkerState::Closed).expect(MWFPanic::Registry_WorkerMissing.message());
                         MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerClose, LogStatus::Ok).expect(MWFPanic::LogBuffer_AddLogFailed.message());
                         // Remove the worker from the Registry.
                         //
                         // Once removed, the worker is no longer visible
                         // to MWF and cannot receive new commands.
-                        mwf_data.worker_registry.remove_worker(&worker_id).expect(MWFPanic::Registry_workerMissing.message());
+                        mwf_data.worker_registry.remove_worker(&worker_id).expect(MWFPanic::Registry_WorkerMissing.message());
                         let _ = MWFLog::remove_logged_worker(&worker_id);
                     }
                     Err(error) => {
                         MWFErr::add_error_internal(&EntityID::new_worker(worker_id.clone()), Some("on_close".into()), error).expect(MWFPanic::ErrorBuffer_AddErrorFailed.message());
-                        mwf_data.worker_registry.set_worker_state(&worker_id, WorkerState::CloseFailed).expect(MWFPanic::Registry_workerMissing.message());
+                        mwf_data.worker_registry.set_worker_state(&worker_id, WorkerState::CloseFailed).expect(MWFPanic::Registry_WorkerMissing.message());
                         MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerClose, LogStatus::Error).expect(MWFPanic::LogBuffer_AddLogFailed.message());
                     }
                 }

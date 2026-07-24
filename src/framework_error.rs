@@ -235,7 +235,7 @@ pub(crate) enum MWFPanic {
     MWFWrkData_WriteLockPoisoned,
     MWFWrkData_Missing,
 
-    Registry_workerMissing,
+    Registry_WorkerMissing,
 
     worker_JoinHandleMissing,
 
@@ -271,7 +271,7 @@ impl MWFPanic {
 
             MWFPanic::MWFWrkData_Missing => "Internal MWF error: MWFWrk_DATA is unexpectedly missing",
 
-            MWFPanic::Registry_workerMissing => "Internal MWF error: worker unexpectedly missing in registry.",
+            MWFPanic::Registry_WorkerMissing => "Internal MWF error: worker unexpectedly missing in registry.",
 
             MWFPanic::worker_JoinHandleMissing => "Internal MWF error: JoinHandle unexpectedly missing.",
 
