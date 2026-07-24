@@ -71,7 +71,7 @@ async fn main() -> Result<(), MWFError> {
     MWF::register_worker_type::<DemoWorker>()?;
 
     // Create the worker.
-    let demo_worker_id = MWFWrk::spawn_worker(DemoWorker::worker_type_id(), &main_entity)?;
+    let demo_worker_id = MWFWrk::spawn_worker(&DemoWorker::worker_type_id(), &main_entity)?;
 
     // Initialize it.
     MWFWrk::init_worker(&demo_worker_id, &()).await?;
@@ -118,7 +118,7 @@ pub struct DemoWorker {
 #[async_trait]
 impl Worker for DemoWorker {
     fn worker_type_id() -> WorkerTypeID {
-        "DemoWorker"
+        "DemoWorker".into()
     }
 
     fn new() -> Self {
@@ -343,9 +343,9 @@ through MWFErr::add_error().
 
 Supported callback sources include:
 
-* on_init()
-* on_message()
-* on_close()
+* `on_init()`
+* `on_message()`
+* `on_close()`
 
 Error events are stored in a circular buffer and can be
 retrieved asynchronously by monitoring tools, loggers or
@@ -598,18 +598,18 @@ Example output:
 
 ```text
 =====================================================
-            MWF runtime overhead benchmark  
-=====================================================    
-                                              
-Workers : 1000                                             
-                                                
-Spawn                   :  3.775ms (3.77 µs/worker)
-Init                    : 662.700µs (0.66 µs/worker)
-SendAndWait (parallel)  :  1.307ms (1.31 µs/message)
-Close                   :  3.248ms (3.25 µs/worker)
+            MWF runtime overhead benchmark
+=====================================================
+Workers : 1000
 
-Total                   :  8.992ms
-Throughput              : 765345 msg/s
+Spawn                   :  4.784ms (4.78 µs/worker)
+Init                    : 974.200µs (0.97 µs/worker)
+SendAndWait (parallel)  :  1.406ms (1.41 µs/message)
+Close                   :  3.979ms (3.98 µs/worker)
+
+Total                   : 11.143ms
+Throughput              : 711389 msg/s
+=====================================================
 ```
 
 These measurements represent the runtime overhead of MWF using
