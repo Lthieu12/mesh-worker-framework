@@ -38,9 +38,9 @@ MWF intentionally remains application-agnostic. Business concepts such as workfl
  +----------------+   +----------------+   +----------------+
  |     MWFWrk     |   |     MWFLog     |   |     MWFErr     |
  +----------------+   +----------------+   +----------------+
- | Messaging      |   | Log events     |   | Error events   |
+ | Workers        |   | Log events     |   | Error events   |
  | Lifecycle      |   | Monitoring     |   | Monitoring     |
- | Registry       |   | Export         |   | Export         |
+ | Messaging      |   | Export         |   | Export         |
  +----------------+   +----------------+   +----------------+
 ```
 
