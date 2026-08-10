@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use std::sync::{LazyLock, RwLock};
 use tokio::sync::Notify;
 
+use crate::MWFLog;
 use crate::framework_error::{MWFError, MWFPanic};
 use crate::log_file;
 use crate::mwf::TimestampFormat::LocalTime;
@@ -163,6 +164,12 @@ impl MWF {
 
     /// Initialize the MWF framework with custom configuration.
     pub fn init_with_configuration(mut mwf_configuration: MWFConfiguration) -> Result<(), MWFError> {
+        // Verify that MWF is running on a multi-threaded Tokio runtime.
+        let runtime_handle = tokio::runtime::Handle::current();
+        if runtime_handle.runtime_flavor() != tokio::runtime::RuntimeFlavor::MultiThread {
+            return Err(MWFError::Framework_InvalidTokioRuntime);
+        }
+
         let mut mwf_data_guard = MWF_DATA.write().expect(MWFPanic::MWFData_WriteLockPoisoned.message());
         if mwf_data_guard.is_some() {
             return Err(MWFError::Framework_AlreadyInitialized);
@@ -195,6 +202,9 @@ impl MWF {
             log_file: Some(log_file),
             log_file_max_size_bytes: mwf_configuration.log_file_max_size_bytes,
             log_file_current_size_bytes: 0,
+            log_terminal_enabled: false,
+            log_terminal_shutdown_sender: None,
+            log_terminal_task_handle: None,
         });
         drop(mwf_log_data_guard);
 
@@ -228,6 +238,9 @@ impl MWF {
                 return Err(MWFError::Framework_CannotClose_WorkersStillRunning);
             }
         }
+
+        // Disable terminal logging and wait for the terminal logging task to terminate.
+        tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(async { MWFLog::set_log_terminal_enabled(false).await }))?;
 
         // Destroy MWF data.
         let mut mwf_data_guard = MWF_DATA.write().expect(MWFPanic::MWFData_WriteLockPoisoned.message());

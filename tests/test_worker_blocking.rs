@@ -4,7 +4,7 @@ use serial_test::serial;
 
 use mesh_worker_framework::*;
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[serial]
 async fn test_spawn_blocking_ok() {
     MWF::init().unwrap();
@@ -16,7 +16,7 @@ async fn test_spawn_blocking_ok() {
     MWF::close().unwrap();
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[serial]
 async fn test_spawn_blocking_panic() {
     MWF::init().unwrap();

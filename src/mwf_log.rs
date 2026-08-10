@@ -8,6 +8,8 @@ use std::fs::File;
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::time::Instant;
+use tokio::sync::oneshot;
+use tokio::task::JoinHandle;
 
 use crate::MWF;
 use crate::framework_error::{MWFError, MWFPanic};
@@ -66,20 +68,29 @@ pub(crate) struct LoggingData {
     /// Circular buffer of log events.
     pub(crate) log_event_list: VecDeque<LogEvent>,
 
-    /// mwf.log file activation
+    /// mwf.log file activation.
     pub(crate) log_file_enabled: bool,
 
-    /// mwf.log file path
+    /// mwf.log file path.
     pub(crate) log_file_path: PathBuf,
 
-    /// mwf.log file reference
+    /// mwf.log file reference.
     pub(crate) log_file: Option<File>,
 
-    /// mwf.log file max size (bytes)
+    /// mwf.log file max size (bytes).
     pub(crate) log_file_max_size_bytes: u64,
 
-    /// mwf.log file current size (bytes)
+    /// mwf.log file current size (bytes).
     pub(crate) log_file_current_size_bytes: u64,
+
+    /// terminal log task activation.
+    pub(crate) log_terminal_enabled: bool,
+
+    /// Terminal logging task shutdown sender.
+    pub(crate) log_terminal_shutdown_sender: Option<oneshot::Sender<()>>,
+
+    /// terminal log task handle.
+    pub(crate) log_terminal_task_handle: Option<JoinHandle<()>>,
 }
 
 /// Terminal log column widths.
@@ -559,5 +570,132 @@ impl MWFLog {
         let logging_data = mwf_log_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
 
         Ok(logging_data.log_file_path.clone())
+    }
+
+    /// Enables or disables MWF terminal logging.
+    ///
+    /// When enabled, MWF starts a background task that waits for new log events
+    /// and prints them to the process terminal.
+    ///
+    /// When disabled, the terminal logging task is requested to stop, prints any
+    /// remaining log events, and is awaited until it has fully terminated.
+    pub async fn set_log_terminal_enabled(enabled: bool) -> Result<(), MWFError> {
+        if enabled {
+            // Create a one-shot channel used to delay log consumption until the
+            // terminal logging task has been fully registered.
+            let (start_sender, start_receiver) = oneshot::channel();
+
+            // Create a one-shot channel used to request a graceful task shutdown.
+            let (shutdown_sender, mut shutdown_receiver) = oneshot::channel();
+
+            // Start the terminal logging task before acquiring the MWF_LOG_DATA lock.
+            let task_handle = tokio::spawn(async move {
+                // Wait until the terminal logging task has been fully registered.
+                if start_receiver.await.is_err() {
+                    return;
+                }
+
+                // Print the terminal log column header once when the logger starts.
+                println!("{}", LogList::get_header(LogOutputFormat::Terminal));
+
+                // Keep the last consumed log instance ID local to the logging task.
+                let mut last_log_instance_id = None;
+
+                loop {
+                    tokio::select! {
+                        log_result = MWFLog::wait_log(last_log_instance_id) => {
+                            match log_result {
+                                Ok(log_list) => {
+                                    // Print all newly received log events.
+                                    for log_event in &log_list.log_event_list {
+                                        println!("{}", log_event.to_terminal_string());
+                                    }
+
+                                    // Continue waiting from the last consumed log event.
+                                    last_log_instance_id = log_list.last_log_instance_id;
+                                }
+
+                                Err(_) => {
+                                    // Stop the terminal logging task if MWF is no longer
+                                    // available.
+                                    return;
+                                }
+                            }
+                        }
+
+                        _ = &mut shutdown_receiver => {
+                            // Print all log events that remain in the MWF log buffer.
+                            if let Ok(log_list) = MWFLog::get_log_list(last_log_instance_id) {
+                                for log_event in &log_list.log_event_list {
+                                    println!("{}", log_event.to_terminal_string());
+                                }
+                            }
+
+                            return;
+                        }
+                    }
+                }
+            });
+
+            // Register the terminal logging task before allowing it to consume logs.
+            let mut mwf_log_data_guard = MWF_LOG_DATA.write().expect(MWFPanic::MWFLogData_WriteLockPoisoned.message());
+
+            let logging_data = match mwf_log_data_guard.as_mut() {
+                Some(logging_data) => logging_data,
+                None => {
+                    // The task is still waiting for its start signal, so it can be
+                    // safely aborted because it has not started consuming logs.
+                    task_handle.abort();
+
+                    return Err(MWFError::Framework_NotInitialized);
+                }
+            };
+
+            // Ignore redundant enable requests.
+            if logging_data.log_terminal_enabled {
+                // Another terminal logging task is already active.
+                task_handle.abort();
+
+                return Ok(());
+            }
+
+            logging_data.log_terminal_enabled = true;
+            logging_data.log_terminal_task_handle = Some(task_handle);
+            logging_data.log_terminal_shutdown_sender = Some(shutdown_sender);
+
+            // The terminal logging task is now fully registered and can start
+            // consuming log events.
+            let _ = start_sender.send(());
+        } else {
+            // Retrieve the terminal logging task controls while updating its state.
+            let (shutdown_sender, task_handle) = {
+                let mut mwf_log_data_guard = MWF_LOG_DATA.write().expect(MWFPanic::MWFLogData_WriteLockPoisoned.message());
+
+                let logging_data = mwf_log_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
+
+                // Ignore redundant disable requests.
+                if !logging_data.log_terminal_enabled {
+                    return Ok(());
+                }
+
+                logging_data.log_terminal_enabled = false;
+
+                (logging_data.log_terminal_shutdown_sender.take(), logging_data.log_terminal_task_handle.take())
+            };
+
+            // Request the terminal logging task to print its remaining log events
+            // before terminating.
+            if let Some(shutdown_sender) = shutdown_sender {
+                let _ = shutdown_sender.send(());
+            }
+
+            // Wait until the terminal logging task has printed all remaining logs
+            // and terminated.
+            if let Some(task_handle) = task_handle {
+                let _ = task_handle.await;
+            }
+        }
+
+        Ok(())
     }
 }

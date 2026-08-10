@@ -23,6 +23,9 @@ pub enum MWFError {
     /// The operation timed out.
     Operation_Timeout,
 
+    /// The framework requires a multi-threaded Tokio runtime.
+    Framework_InvalidTokioRuntime,
+
     /// The framework has not been initialized.
     Framework_NotInitialized,
 
@@ -113,6 +116,10 @@ impl fmt::Display for MWFError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             MWFError::Operation_Timeout => write!(f, "The operation timed out."),
+
+            MWFError::Framework_InvalidTokioRuntime => {
+                write!(f, "The framework requires a multi-threaded Tokio runtime. Try #[tokio::main] or configure your Tokio runtime with the \"multi_thread\" flavor.")
+            }
 
             MWFError::Framework_NotInitialized => {
                 write!(f, "The framework has not been initialized.")

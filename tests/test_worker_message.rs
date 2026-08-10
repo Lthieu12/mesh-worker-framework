@@ -25,7 +25,7 @@ const MESSAGE_CHAIN: &str = "CHAIN";
 
 // MWF uses a global runtime instance.
 // Integration tests must run serially.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[serial]
 async fn test_message_priority_order() {
     MWF::init().unwrap();
@@ -118,7 +118,7 @@ async fn test_message_priority_order() {
 
 // MWF uses a global runtime instance.
 // Integration tests must run serially.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[serial]
 async fn test_send_message_and_wait() {
     MWF::init().unwrap();
@@ -210,7 +210,7 @@ async fn test_send_message_and_wait() {
 
 // MWF uses a global runtime instance.
 // Integration tests must run serially.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[serial]
 async fn test_send_unique_message() {
     // Initialize MWF.

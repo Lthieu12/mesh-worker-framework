@@ -20,7 +20,7 @@ use mesh_worker_framework::*;
 
 // MWF uses a global runtime instance.
 // Integration tests must run serially.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[serial]
 async fn test_worker_hierarchy() {
     MWF::init().unwrap();

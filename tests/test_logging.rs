@@ -37,7 +37,7 @@ use mesh_worker_framework::*;
 
 // MWF uses a global runtime instance.
 // Integration tests must run serially.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[serial]
 async fn test_mwf_log_worker_lifecycle() {
     MWF::init().unwrap();
@@ -84,7 +84,7 @@ async fn test_mwf_log_worker_lifecycle() {
 
 // MWF uses a global runtime instance.
 // Integration tests must run serially.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[serial]
 async fn test_mwf_log_messages() {
     MWF::init().unwrap();
@@ -154,7 +154,7 @@ async fn test_mwf_log_messages() {
 
 // MWF uses a global runtime instance.
 // Integration tests must run serially.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[serial]
 async fn test_mwf_log_buffer_overflow() {
     let config = MWFConfiguration { log_event_buffer_capacity: 10, ..Default::default() };

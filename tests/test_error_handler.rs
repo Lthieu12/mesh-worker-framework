@@ -24,7 +24,7 @@ fn generate_application_error() -> Result<()> {
 
 // MWF uses a global runtime instance.
 // Integration tests must run serially.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[serial]
 async fn test_mwf_err_worker_failures() {
     MWF::init().unwrap();
@@ -121,7 +121,7 @@ async fn test_mwf_err_worker_failures() {
 
 // MWF uses a global runtime instance.
 // Integration tests must run serially.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[serial]
 async fn test_mwf_err_buffer_overflow() {
     let configuration = MWFConfiguration { error_event_buffer_capacity: 10, log_event_buffer_capacity: 10, ..Default::default() };
