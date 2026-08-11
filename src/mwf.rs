@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use std::sync::{LazyLock, RwLock};
 use tokio::sync::Notify;
 
+use crate::MWFErr;
 use crate::MWFLog;
 use crate::framework_error::{MWFError, MWFPanic};
 use crate::log_file;
@@ -190,7 +191,7 @@ impl MWF {
         drop(mwf_wrk_data_guard);
 
         let mut mwf_err_data_guard = MWF_ERR_DATA.write().expect(MWFPanic::MWFErrData_WriteLockPoisoned.message());
-        *mwf_err_data_guard = Some(ErrorData { error_event_buffer_capacity: mwf_configuration.error_event_buffer_capacity, error_event_list: VecDeque::new() });
+        *mwf_err_data_guard = Some(ErrorData { error_event_buffer_capacity: mwf_configuration.error_event_buffer_capacity, error_event_list: VecDeque::new(), error_terminal_enabled: false, error_terminal_shutdown_sender: None, error_terminal_task_handle: None });
         drop(mwf_err_data_guard);
 
         // Initialize the MWF log file.
@@ -244,6 +245,8 @@ impl MWF {
 
         // Disable terminal logging and wait for the terminal logging task to terminate.
         tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(async { MWFLog::set_log_terminal_enabled(false).await }))?;
+        // Disable terminal error logging and wait for the terminal error task to terminate.
+        tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(async { MWFErr::set_error_terminal_enabled(false).await }))?;
 
         // Destroy MWF data.
         let mut mwf_data_guard = MWF_DATA.write().expect(MWFPanic::MWFData_WriteLockPoisoned.message());
