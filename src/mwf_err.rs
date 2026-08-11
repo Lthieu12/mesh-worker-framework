@@ -190,7 +190,6 @@ impl MWFErr {
     /// Error events are stored in a circular buffer and
     /// notify all MWFErr waiters.
     pub(crate) fn add_error_internal(entity_id: &EntityID, callback_name: Option<String>, error: &anyhow::Error) -> Result<(), MWFError> {
-        let error_instance_id = MWFErr::generate_error_instance_id()?;
         let error_message = error.to_string();
 
         let mut error_context_list = Vec::new();
@@ -206,10 +205,6 @@ impl MWFErr {
             context = error_context.source();
         }
 
-        let timestamp_rfc3339 = MWF::get_timestamp_rfc3339();
-
-        let error_event = ErrorEvent { error_instance_id, timestamp_rfc3339, entity_id: entity_id.clone(), error_description: error_message, error_context_list };
-
         // Maintain the error circular buffer.
         //
         // When the configured capacity is reached,
@@ -217,6 +212,11 @@ impl MWFErr {
         // room for newer ones.
         let mut mwf_err_data_guard = MWF_ERR_DATA.write().expect(MWFPanic::MWFErrData_WriteLockPoisoned.message());
         let mwf_err_data = mwf_err_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
+
+        let error_instance_id = MWFErr::generate_error_instance_id()?;
+        let timestamp_rfc3339 = MWF::get_timestamp_rfc3339();
+        let error_event = ErrorEvent { error_instance_id, timestamp_rfc3339, entity_id: entity_id.clone(), error_description: error_message, error_context_list };
+
         let error_event_buffer_capacity = mwf_err_data.error_event_buffer_capacity;
 
         while mwf_err_data.error_event_list.len() >= error_event_buffer_capacity {

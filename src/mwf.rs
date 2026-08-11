@@ -165,7 +165,10 @@ impl MWF {
     /// Initialize the MWF framework with custom configuration.
     pub fn init_with_configuration(mut mwf_configuration: MWFConfiguration) -> Result<(), MWFError> {
         // Verify that MWF is running on a multi-threaded Tokio runtime.
-        let runtime_handle = tokio::runtime::Handle::current();
+        let runtime_handle = match tokio::runtime::Handle::try_current() {
+            Ok(runtime_handle) => runtime_handle,
+            Err(_) => return Err(MWFError::Framework_InvalidTokioRuntime),
+        };
         if runtime_handle.runtime_flavor() != tokio::runtime::RuntimeFlavor::MultiThread {
             return Err(MWFError::Framework_InvalidTokioRuntime);
         }

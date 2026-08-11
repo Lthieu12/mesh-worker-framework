@@ -415,18 +415,18 @@ impl MWFLog {
             return Ok(());
         }
 
-        let log_instance_id = MWFLog::generate_log_instance_id()?;
-        let timestamp_rfc3339 = MWF::get_timestamp_rfc3339();
         let duration_ms: Option<u128> = match log_status {
             LogStatus::Start => None,
 
             LogStatus::Ok | LogStatus::Error => Some(action_start_timer.elapsed().as_millis()),
         };
 
-        let log_event = LogEvent { log_instance_id, timestamp_rfc3339, worker_id: worker_id.to_owned(), log_action, log_status, duration_ms };
-
         let mut mwf_log_data_guard = MWF_LOG_DATA.write().expect(MWFPanic::MWFLogData_WriteLockPoisoned.message());
         let logging_data = mwf_log_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
+
+        let log_instance_id = MWFLog::generate_log_instance_id()?;
+        let timestamp_rfc3339 = MWF::get_timestamp_rfc3339();
+        let log_event = LogEvent { log_instance_id, timestamp_rfc3339, worker_id: worker_id.to_owned(), log_action, log_status, duration_ms };
 
         // Write the log event to the log file if enabled.
         write_log_event(logging_data, &log_event)?;

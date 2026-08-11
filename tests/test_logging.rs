@@ -179,7 +179,7 @@ async fn test_mwf_log_buffer_overflow() {
 
     // Generate more logs than the buffer can hold.
     for index in 0..15 {
-        MWFWrk::send_message(&EntityID::new_external("Test"), &worker_id, &format!("MSG_{index}"), &()).await.unwrap();
+        MWFWrk::send_message_and_wait(&EntityID::new_external("Test"), &worker_id, &format!("MSG_{index}"), &(), Some(1000)).await.unwrap();
     }
 
     let log_list = MWFLog::wait_log(last_log_instance_id).await.unwrap();
