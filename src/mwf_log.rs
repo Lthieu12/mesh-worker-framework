@@ -575,7 +575,7 @@ impl MWFLog {
     /// Enables or disables MWF terminal logging.
     ///
     /// When enabled, MWF starts a background task that waits for new log events
-    /// and prints them to the process terminal.
+    /// and prints them to the terminal.
     ///
     /// When disabled, the terminal logging task is requested to stop, prints any
     /// remaining log events, and is awaited until it has fully terminated.

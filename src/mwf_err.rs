@@ -361,6 +361,13 @@ impl MWFErr {
         Ok(ErrorList { first_error_instance_id: Some(first_buffer_error_instance_id), last_error_instance_id: Some(last_buffer_error_instance_id), missing_error_count, error_event_list })
     }
 
+    /// Enables or disables MWF terminal error logging.
+    ///
+    /// When enabled, MWF starts a background task that waits for new error events
+    /// and prints them to the terminal.
+    ///
+    /// When disabled, the terminal error logging task is requested to stop, prints any
+    /// remaining error events, and is awaited until it has fully terminated.
     pub async fn set_error_terminal_enabled(enabled: bool) -> Result<(), MWFError> {
         if enabled {
             // Create a one-shot channel used to delay error consumption until the
