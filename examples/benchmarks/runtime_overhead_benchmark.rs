@@ -19,14 +19,14 @@ const DEFAULT_WORKER_COUNT: usize = 1000;
 const TIMEOUT_MS: u64 = 5000;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), MWFError> {
     let worker_count = std::env::args().nth(1).and_then(|arg| arg.parse::<usize>().ok()).unwrap_or(DEFAULT_WORKER_COUNT);
 
-    MWF::init().unwrap();
+    MWF::init()?;
 
-    MWF::register_worker_type::<SimulationWorker>().unwrap();
+    MWF::register_worker_type::<SimulationWorker>()?;
 
-    MWFLog::set_log_mode(LogMode::NoLog, None).unwrap();
+    MWFLog::set_log_mode(LogMode::NoLog, None)?;
 
     let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
 
@@ -41,7 +41,7 @@ async fn main() {
     let mut worker_ids = Vec::with_capacity(worker_count);
 
     for _ in 0..worker_count {
-        let worker_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &EntityID::External("MAIN".into())).unwrap();
+        let worker_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &EntityID::External("MAIN".into()))?;
 
         worker_ids.push(worker_id);
     }
@@ -55,10 +55,10 @@ async fn main() {
     let timer = Instant::now();
 
     for worker_id in &worker_ids {
-        MWFWrk::init_worker(worker_id, &configuration).await.unwrap();
+        MWFWrk::init_worker(worker_id, &configuration).await?;
     }
 
-    MWFWrk::wait_worker_list_init(&worker_ids, Some(TIMEOUT_MS)).await.unwrap();
+    MWFWrk::wait_worker_list_init(&worker_ids, Some(TIMEOUT_MS)).await?;
 
     let init_time = timer.elapsed();
 
@@ -88,10 +88,10 @@ async fn main() {
     let timer = Instant::now();
 
     for worker_id in &worker_ids {
-        MWFWrk::close_worker(worker_id, &()).await.unwrap();
+        MWFWrk::close_worker(worker_id, &()).await?;
     }
 
-    MWFWrk::wait_children_close(&EntityID::new_external("MAIN"), Some(TIMEOUT_MS)).await.unwrap();
+    MWFWrk::wait_children_close(&EntityID::new_external("MAIN"), Some(TIMEOUT_MS)).await?;
 
     let close_time = timer.elapsed();
 
@@ -125,5 +125,7 @@ async fn main() {
     println!("=====================================================");
     println!();
 
-    MWF::close().unwrap();
+    MWF::close()?;
+
+    Ok(())
 }

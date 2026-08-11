@@ -64,6 +64,10 @@ try {
     InvokeVerificationStep "Windows" "cargo test" "cargo test --workspace --all-targets --all-features"
     InvokeVerificationStep "Windows" "cargo test --doc" "cargo test --workspace --doc"
     InvokeVerificationStep "Windows" "cargo build --examples" "cargo build --workspace --examples --all-features"
+    InvokeVerificationStep "Windows" "getting_started example" "cargo run --release --example getting_started"
+    InvokeVerificationStep "Windows" "getting_started_with_logging example" "cargo run --release --example getting_started_with_logging"
+    InvokeVerificationStep "Windows" "getting_started_with_error_handling example" "cargo run --release --example getting_started_with_error_handling"
+    InvokeVerificationStep "Windows" "runtime_overhead_benchmark example" "cargo run --release --example runtime_overhead_benchmark"
     InvokeVerificationStep "Windows" "cargo doc" "cargo doc --workspace --no-deps"
 
     # ========================================================================
@@ -78,6 +82,10 @@ try {
     InvokeVerificationStep "Linux" "cargo test" "cargo test --workspace --all-targets --all-features"
     InvokeVerificationStep "Linux" "cargo test --doc" "cargo test --workspace --doc"
     InvokeVerificationStep "Linux" "cargo build --examples" "cargo build --workspace --examples --all-features"
+    InvokeVerificationStep "Linux" "getting_started example" "cargo run --release --example getting_started"
+    InvokeVerificationStep "Linux" "getting_started_with_logging example" "cargo run --release --example getting_started_with_logging"
+    InvokeVerificationStep "Linux" "getting_started_with_error_handling example" "cargo run --release --example getting_started_with_error_handling"
+    InvokeVerificationStep "Linux" "runtime_overhead_benchmark example" "cargo run --release --example runtime_overhead_benchmark"
     InvokeVerificationStep "Linux" "cargo doc" "cargo doc --workspace --no-deps"
 
     Write-Host ""
