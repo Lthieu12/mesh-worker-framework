@@ -26,6 +26,9 @@ pub enum MWFError {
     /// The framework requires a multi-threaded Tokio runtime.
     Framework_InvalidTokioRuntime,
 
+    /// The provided framework configuration is invalid.
+    Framework_InvalidConfiguration,
+
     /// The framework has not been initialized.
     Framework_NotInitialized,
 
@@ -104,6 +107,9 @@ pub enum MWFError {
     /// Invalid log file path.
     Logging_LogFileInvalidPath,
 
+    /// Log file path is not configured.
+    Logging_LogFileNotConfigured,
+
     /// Failed to access to log file.
     Logging_LogFileAccessFailed(anyhow::Error),
 
@@ -119,6 +125,10 @@ impl fmt::Display for MWFError {
 
             MWFError::Framework_InvalidTokioRuntime => {
                 write!(f, "The framework requires a multi-threaded Tokio runtime. Try #[tokio::main] or configure your Tokio runtime with the \"multi_thread\" flavor.")
+            }
+
+            MWFError::Framework_InvalidConfiguration => {
+                write!(f, "The provided framework configuration is invalid.")
             }
 
             MWFError::Framework_NotInitialized => {
@@ -210,6 +220,10 @@ impl fmt::Display for MWFError {
             }
 
             MWFError::Logging_LogFileInvalidPath => {
+                write!(f, "Log file path is not configured.")
+            }
+
+            MWFError::Logging_LogFileNotConfigured => {
                 write!(f, "Invalid log file path.")
             }
 

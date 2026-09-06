@@ -5,7 +5,7 @@
 use serial_test::serial;
 
 use dev_support::simulation_worker::{SimulationBehavior, SimulationWorker, SimulationWorkerConfig};
-use mesh_worker_framework::*;
+use mwf::*;
 
 // MWF uses a global runtime instance.
 // Integration tests must run serially.
@@ -19,7 +19,7 @@ async fn test_file_logging() {
 
     MWF::init_with_configuration(configuration).unwrap();
 
-    let log_file_path = MWFLog::get_log_file_path().unwrap();
+    let log_file_path = MWFLog::get_log_file_path().unwrap().unwrap();
 
     MWF::register_worker_type::<SimulationWorker>().unwrap();
 

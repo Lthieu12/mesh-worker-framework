@@ -1,8 +1,5 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
-#![allow(clippy::expect_fun_call)] // `expect()` keeps MWFPanic messages concise and readable.
-#![allow(clippy::single_match)] // Keep match statements ready for future behavior extensions.
-#![allow(clippy::collapsible_if)] // Preserve explicit multi-step control flow for readability.
 mod channel;
 mod framework_error;
 mod log_file;
@@ -13,10 +10,10 @@ mod worker_registry;
 mod worker_task;
 mod worker_type_registry;
 
-pub mod mwf;
-pub mod mwf_err;
-pub mod mwf_log;
-pub mod mwf_wrk;
+mod mwf;
+mod mwf_err;
+mod mwf_log;
+mod mwf_wrk;
 
 // only used for tests, examples and debug.
 //

@@ -19,7 +19,7 @@
 //!
 //! cargo run --release --example getting_started_with_logging
 
-use mesh_worker_framework::{LogMode::LogAll, *};
+use mwf::{LogMode::LogAll, *};
 
 // DemoWorker and DemoMessages are defined in
 // examples/getting_started/workers/demo_worker.rs.

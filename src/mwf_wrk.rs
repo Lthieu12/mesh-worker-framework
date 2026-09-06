@@ -843,8 +843,8 @@ impl MWFWrk {
 
     /// Send a unique message to a worker.
     ///
-    /// At most one pending unique message with the same MessageID
-    /// can exist in the receiver queue.
+    /// At most one unique message with the same MessageID
+    /// is retained in the worker's pending command queue.
     ///
     /// Sending a new unique message replaces the pending one while
     /// preserving its FIFO position.

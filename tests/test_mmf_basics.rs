@@ -9,7 +9,7 @@ use serial_test::serial;
 #[serial]
 mod tests {
 
-    use mesh_worker_framework::*;
+    use mwf::*;
 
     /// Verify that MWF rejects initialization without a Tokio runtime.
     #[test]

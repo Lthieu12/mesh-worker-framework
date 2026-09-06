@@ -195,7 +195,7 @@ impl MWFErr {
     ///
     /// This internal function is used by MWF to enrich error
     /// events with framework-specific context, such as the
-    /// worker callback where the error occurred.
+    /// framework-specific context associated with the error.
     ///
     /// Application code should use `add_error()` instead.
     ///

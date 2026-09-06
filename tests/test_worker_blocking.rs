@@ -2,7 +2,7 @@
 
 use serial_test::serial;
 
-use mesh_worker_framework::*;
+use mwf::*;
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]

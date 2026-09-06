@@ -52,7 +52,7 @@ The complete, compiled version of this example is available in `examples/getting
 It demonstrates the recommended way to initialize MWF, register a worker type, spawn a worker, exchange messages and gracefully shut down the framework.
 
 ```rust,ignore
-use mesh_worker_framework::*;
+use mwf::*;
 
 // DemoWorker and DemoMessages are defined in
 // examples/getting_started/workers/demo_worker.rs.
@@ -96,7 +96,7 @@ The following DemoWorker implementation, available in `examples/getting_started/
 
 ```rust,ignore
 use async_trait::async_trait;
-use mesh_worker_framework::*;
+use mwf::*;
 use std::time::Duration;
 
 /// Message identifiers handled by DemoWorker.
@@ -294,13 +294,13 @@ When a worker queue reaches its configured capacity, message senders are suspend
 This prevents message loss while allowing the Tokio runtime to continue executing other workers.
 Backpressure is transparent to the application and never blocks a Tokio worker thread.
 
-### Send
+### `send_message()`
 
 Fire-and-forget message.
 
 ---
 
-### SendPriority
+### `send_priority_message()`
 
 Fire-and-forget message processed before normal messages.
 
@@ -309,7 +309,7 @@ Priority messages are handled using a Last-In, First-Out
 
 ---
 
-### SendAndWait
+### `send_message_and_wait()`
 
 The current processing flow is suspended until the target
 worker finishes processing the message or a timeout occurs.
@@ -323,8 +323,8 @@ The caller receives the processing result.
 MWF also provides additional messaging patterns for more
 specialized use cases:
 
-* SendPriorityAndWait
-* SendUnique
+* `send_priority_message_and_wait()`
+* `send_unique_message()`
 
 See the `MWFWrk` API documentation for the complete semantics
 and usage of these messaging functions.
@@ -355,7 +355,7 @@ Each error event contains:
 
 * ErrorInstanceID
 * Timestamp
-* SenderID
+* ErrorSource/EntityID
 * Error message
 * Error source chain
 
@@ -365,7 +365,7 @@ Each error event contains:
 
 MWF provides a centralized logging and observability system.
 
-Framework lifecycle events and message processing are automatically recorded by MWFLog.
+When logging is enabled, framework lifecycle events and message processing are recorded by MWFLog.
 
 Supported framework events include:
 
@@ -451,9 +451,9 @@ Each log event contains:
             ──────────── Runtime ────────────
                              │
                              ▼
-                CameraWorker::spawn_worker(...)
-                FFTWorker::spawn_worker(...)
-                DisplayWorker::spawn_worker(...)
+                MWF::spawn_worker(CameraWorker...)
+                MWF::spawn_worker(FFTWorker...)
+                MWF::spawn_worker(DisplayWorker...)
                              │
                              ▼
                     ┌──────────────────┐
@@ -529,7 +529,7 @@ The long-term objective is to validate:
 The core runtime is implemented and continuously evolving.
 
 Current work focuses on additional runtime features,
-workflow support and production hardening.
+workflow support and production hardening. 
 
 ---
 
@@ -612,9 +612,12 @@ Throughput              : 711389 msg/s
 =====================================================
 ```
 
+Example benchmark output from one test environment.
+Actual performance depends on hardware, Tokio configuration,
+worker behavior and workload.
+
 These measurements represent the runtime overhead of MWF using
 `SimulationWorker` with `SimulationBehavior::DoNothing`.
-Actual application performance depends on the work performed by each worker.
 
 ---
 

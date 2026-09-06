@@ -72,7 +72,7 @@ pub(crate) struct LoggingData {
     pub(crate) log_file_enabled: bool,
 
     /// mwf.log file path.
-    pub(crate) log_file_path: PathBuf,
+    pub(crate) log_file_path: Option<PathBuf>,
 
     /// mwf.log file reference.
     pub(crate) log_file: Option<File>,
@@ -558,13 +558,17 @@ impl MWFLog {
 
         let logging_data = mwf_log_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
 
+        if enabled && logging_data.log_file_path.is_none() {
+            return Err(MWFError::Logging_LogFileNotConfigured);
+        }
+
         logging_data.log_file_enabled = enabled;
 
         Ok(())
     }
 
     /// Returns the current MWF log file path.
-    pub fn get_log_file_path() -> Result<PathBuf, MWFError> {
+    pub fn get_log_file_path() -> Result<Option<PathBuf>, MWFError> {
         let mwf_log_data_guard = MWF_LOG_DATA.read().expect(MWFPanic::MWFLogData_ReadLockPoisoned.message());
 
         let logging_data = mwf_log_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;

@@ -13,10 +13,9 @@
 use anyhow::{Context, Result};
 use serial_test::serial;
 
-use crate::mwf::MWFConfiguration;
 use dev_support::dev_helper::*;
 use dev_support::simulation_worker::{SimulationBehavior, SimulationWorker, SimulationWorkerConfig};
-use mesh_worker_framework::*;
+use mwf::*;
 
 fn generate_application_error() -> Result<()> {
     Err(anyhow::anyhow!("config.toml not found")).context("Failed to load configuration")

@@ -147,7 +147,7 @@ pub(crate) fn spawn_worker_task(worker: Box<dyn Worker + Send>, normal_receiver_
                 };
 
                 // Store the panic in MWFErr.
-                MWFErr::add_error_internal(&EntityID::Worker(task_worker_id.clone()), Some("on_init".into()), &panic_error).expect(MWFPanic::ErrorBuffer_AddErrorFailed.message());
+                MWFErr::add_error_internal(&EntityID::Worker(task_worker_id.clone()), Some("worker_task".into()), &panic_error).expect(MWFPanic::ErrorBuffer_AddErrorFailed.message());
                 // Log the panic in MWFLog
                 MWFLog::add_log(Instant::now(), &task_worker_id, LogAction::WorkerPanic, LogStatus::Error).expect(MWFPanic::LogBuffer_AddLogFailed.message());
 

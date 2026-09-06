@@ -16,7 +16,7 @@
 //!
 //! cargo run --release --example getting_started
 
-use mesh_worker_framework::*;
+use mwf::*;
 
 // DemoWorker and DemoMessages are defined in
 // examples/getting_started/workers/demo_worker.rs.

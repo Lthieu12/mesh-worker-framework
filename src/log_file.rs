@@ -28,17 +28,22 @@ const LOG_FILE_FULL_MESSAGE: &str = "Maximum log file size reached.\n\
 /// Existing MWF log files are truncated.
 /// Existing non-MWF files are never modified.
 pub(crate) fn init_log_file(configuration: &mut MWFConfiguration) -> Result<File, MWFError> {
+    let log_file_path = configuration.log_file_path.as_ref().ok_or(MWFError::Logging_LogFileInvalidPath)?;
+
     // Find a reusable MWF log file.
-    configuration.log_file_path = find_log_file_path(&configuration.log_file_path)?;
+    let log_file_path = find_log_file_path(log_file_path)?;
 
     // Open and initialize the log file.
-    let mut log_file = OpenOptions::new().create(true).write(true).truncate(true).open(&configuration.log_file_path).map_err(|error| log_file_access_failed(error, &configuration.log_file_path))?;
+    let mut log_file = OpenOptions::new().create(true).write(true).truncate(true).open(&log_file_path).map_err(|error| log_file_access_failed(error, &log_file_path))?;
 
     let log_file_header = format!("{}\n{}\n", LOG_FILE_HEADER_V1, LogList::get_header(LogOutputFormat::CSV),);
 
-    log_file.write_all(log_file_header.as_bytes()).map_err(|error| log_file_access_failed(error, &configuration.log_file_path))?;
+    log_file.write_all(log_file_header.as_bytes()).map_err(|error| log_file_access_failed(error, &log_file_path))?;
 
-    log_file.flush().map_err(|error| log_file_access_failed(error, &configuration.log_file_path))?;
+    log_file.flush().map_err(|error| log_file_access_failed(error, &log_file_path))?;
+
+    // Store the actual path selected for the log file.
+    configuration.log_file_path = Some(log_file_path);
 
     Ok(log_file)
 }
@@ -119,14 +124,16 @@ pub(crate) fn write_log_event(logging_data: &mut LoggingData, log_event: &LogEve
         None => return Ok(()),
     };
 
+    let log_file_path = logging_data.log_file_path.as_ref().ok_or(MWFError::Logging_LogFileInvalidPath)?;
+
     // Convert the log event to a CSV line.
     let log_line = format!("{}\n", log_event.to_csv_string());
 
     // Write the log event.
-    log_file.write_all(log_line.as_bytes()).map_err(|error| log_file_access_failed(error, &logging_data.log_file_path))?;
+    log_file.write_all(log_line.as_bytes()).map_err(|error| log_file_access_failed(error, log_file_path))?;
 
     // Flush the log file.
-    log_file.flush().map_err(|error| log_file_access_failed(error, &logging_data.log_file_path))?;
+    log_file.flush().map_err(|error| log_file_access_failed(error, log_file_path))?;
 
     // Update the current log file size.
     logging_data.log_file_current_size_bytes += log_line.len() as u64;
@@ -134,9 +141,9 @@ pub(crate) fn write_log_event(logging_data: &mut LoggingData, log_event: &LogEve
     // Disable file logging if the maximum
     // log file size has been reached.
     if logging_data.log_file_current_size_bytes >= logging_data.log_file_max_size_bytes {
-        log_file.write_all(LOG_FILE_FULL_MESSAGE.as_bytes()).map_err(|error| log_file_access_failed(error, &logging_data.log_file_path))?;
+        log_file.write_all(LOG_FILE_FULL_MESSAGE.as_bytes()).map_err(|error| log_file_access_failed(error, log_file_path))?;
 
-        log_file.flush().map_err(|error| log_file_access_failed(error, &logging_data.log_file_path))?;
+        log_file.flush().map_err(|error| log_file_access_failed(error, log_file_path))?;
 
         // Close the log file.
         logging_data.log_file = None;

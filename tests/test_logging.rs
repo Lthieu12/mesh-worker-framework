@@ -33,7 +33,7 @@ use serial_test::serial;
 
 use dev_support::dev_helper::*;
 use dev_support::simulation_worker::{SimulationBehavior, SimulationWorker, SimulationWorkerConfig};
-use mesh_worker_framework::*;
+use mwf::*;
 
 // MWF uses a global runtime instance.
 // Integration tests must run serially.

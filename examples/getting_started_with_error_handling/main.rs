@@ -17,7 +17,7 @@
 //! cargo run --release --example getting_started_with_error_handling
 
 use anyhow::{Context, Result};
-use mesh_worker_framework::*;
+use mwf::*;
 
 /// Generate an application error for the given attempt.
 fn generate_error(attempt_index: u32) -> Result<()> {

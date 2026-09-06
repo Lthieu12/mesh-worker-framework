@@ -116,25 +116,28 @@ impl MWFData {
 /// MWF startup configuration.
 #[derive(Debug, Clone)]
 pub struct MWFConfiguration {
-    /// Capacity of normal worker event queues.
+    /// Capacity of normal worker event queues (must be >= 1).
     pub worker_normal_channel_capacity: usize,
 
-    /// Capacity of priority worker event queues.
+    /// Capacity of priority worker event queues (must be >= 1).
     pub worker_priority_channel_capacity: usize,
 
     /// Timestamp format used by MWF.
     pub timestamp_format: TimestampFormat,
 
-    /// Capacity of the MWFErr circular buffer.
+    /// Capacity of the MWFErr circular buffer (must be >= 1).
     pub error_event_buffer_capacity: usize,
 
-    /// Capacity of the MWFLog circular buffer.
+    /// Capacity of the MWFLog circular buffer (must be >= 1).
     pub log_event_buffer_capacity: usize,
 
-    /// Log file path.
-    pub log_file_path: PathBuf,
+    /// Path to the MWF log file.
+    ///
+    /// By default, MWF creates a log file next to the executable.
+    /// Set to `None` to disable file logging and prevent the log file from being created.
+    pub log_file_path: Option<PathBuf>,
 
-    /// Maximum log file size in bytes.
+    /// Maximum log file size in bytes before file logging is disabled (must be >= 1024).
     pub log_file_max_size_bytes: u64,
 }
 
@@ -145,7 +148,7 @@ impl Default for MWFConfiguration {
 
         let log_file_max_size_bytes = 10 * 1024 * 1024;
 
-        Self { worker_normal_channel_capacity: 50, worker_priority_channel_capacity: 10, timestamp_format: LocalTime, error_event_buffer_capacity: 100, log_event_buffer_capacity: 100, log_file_path, log_file_max_size_bytes }
+        Self { worker_normal_channel_capacity: 50, worker_priority_channel_capacity: 10, timestamp_format: LocalTime, error_event_buffer_capacity: 100, log_event_buffer_capacity: 100, log_file_path: Some(log_file_path), log_file_max_size_bytes }
     }
 }
 
@@ -174,10 +177,17 @@ impl MWF {
             return Err(MWFError::Framework_InvalidTokioRuntime);
         }
 
+        // Verify that MWF is not already initialized.
         let mut mwf_data_guard = MWF_DATA.write().expect(MWFPanic::MWFData_WriteLockPoisoned.message());
         if mwf_data_guard.is_some() {
             return Err(MWFError::Framework_AlreadyInitialized);
         }
+        // Verify that supplied configuration is valid.
+        if mwf_configuration.worker_normal_channel_capacity == 0 || mwf_configuration.worker_priority_channel_capacity == 0 || mwf_configuration.error_event_buffer_capacity == 0 || mwf_configuration.log_event_buffer_capacity == 0 || mwf_configuration.log_file_max_size_bytes < 1024 {
+            return Err(MWFError::Framework_InvalidConfiguration);
+        }
+        // Initialize the MWF log file if file logging is enabled.
+        let log_file = if mwf_configuration.log_file_path.is_some() { Some(log_file::init_log_file(&mut mwf_configuration)?) } else { None };
         *mwf_data_guard = Some(MWFData::new());
         drop(mwf_data_guard);
 
@@ -185,6 +195,7 @@ impl MWF {
         MWF_ERR_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
         MWF_LOG_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
         MWF_TIMESTAMP_FORMAT.store(mwf_configuration.timestamp_format as u8, Ordering::Relaxed);
+        MWF_LOG_MODE.store(LogMode::NoLog as u8, Ordering::Relaxed);
 
         let mut mwf_wrk_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
         *mwf_wrk_data_guard = Some(WorkerData::new(&mwf_configuration));
@@ -195,7 +206,6 @@ impl MWF {
         drop(mwf_err_data_guard);
 
         // Initialize the MWF log file.
-        let log_file = log_file::init_log_file(&mut mwf_configuration)?;
         let mut mwf_log_data_guard = MWF_LOG_DATA.write().expect(MWFPanic::MWFLogData_WriteLockPoisoned.message());
         *mwf_log_data_guard = Some(LoggingData {
             log_event_buffer_capacity: mwf_configuration.log_event_buffer_capacity,
@@ -203,7 +213,7 @@ impl MWF {
             log_event_list: VecDeque::new(),
             log_file_enabled: false,
             log_file_path: mwf_configuration.log_file_path,
-            log_file: Some(log_file),
+            log_file,
             log_file_max_size_bytes: mwf_configuration.log_file_max_size_bytes,
             log_file_current_size_bytes: 0,
             log_terminal_enabled: false,

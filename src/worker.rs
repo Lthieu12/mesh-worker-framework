@@ -310,12 +310,15 @@ impl WorkerState {
 /// Current status of a worker within the framework.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WorkerStatus {
+    /// Current lifecycle state of the worker.
     pub worker_state: WorkerState,
-
+    /// Number of normal messages currently waiting in the worker queue.
     pub normal_channel_size: usize,
+    /// Maximum number of normal messages that can be queued by the worker.
     pub normal_channel_capacity: usize,
-
+    /// Number of priority messages currently waiting in the worker queue.
     pub priority_channel_size: usize,
+    /// Maximum number of priority messages that can be queued by the worker.
     pub priority_channel_capacity: usize,
 }
 
@@ -331,8 +334,11 @@ pub struct WorkerStatus {
 /// - Logging configuration tools.
 #[derive(Debug, Clone)]
 pub struct WorkerInfo {
+    /// Unique identifier of the worker.
     pub worker_id: WorkerID,
+    /// Identifier of the worker's parent entity.
     pub parent_id: EntityID,
+    /// Current lifecycle state of the worker.
     pub worker_state: WorkerState,
 }
 
@@ -359,7 +365,9 @@ impl WorkerInfo {
 /// Output format used to represent worker information.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum WorkerOutputFormat {
+    /// Human-readable terminal output.
     Terminal,
+    /// Comma-separated values output.
     CSV,
 }
 
@@ -374,6 +382,7 @@ mod terminal_worker_column {
 /// List of worker information returned by MWFWrk.
 #[derive(Debug, Clone)]
 pub struct WorkerList {
+    /// Worker information entries contained in the list.
     pub worker_info_list: Vec<WorkerInfo>,
 }
 
@@ -423,11 +432,11 @@ impl WorkerList {
 /// MWF creates worker instances dynamically by calling
 /// `worker::new()` on the registered worker type.
 ///
-/// MWF stores worker instances behind `Box<dyn worker>`.
+/// MWF stores worker instances behind `Box<dyn Worker>`.
 ///
 /// The `Self: Sized` bounds on `worker_type_id()` and `new()` are
 /// required to keep this trait object-safe. Without these bounds,
-/// `worker` could no longer be used as `dyn worker`.
+/// `worker` could no longer be used as `dyn Worker`.
 ///
 #[async_trait]
 pub trait Worker {
@@ -437,8 +446,8 @@ pub trait Worker {
     ///
     /// This associated function is only available on concrete worker
     /// types (`Self: Sized`). It is intentionally excluded from trait
-    /// objects (`dyn worker`) so that MWF can store workers behind
-    /// `Box<dyn worker>`.
+    /// objects (`dyn Worker`) so that MWF can store workers behind
+    /// `Box<dyn Worker>`.
     fn worker_type_id() -> WorkerTypeID
     where
         Self: Sized;

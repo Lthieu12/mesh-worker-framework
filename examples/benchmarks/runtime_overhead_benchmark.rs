@@ -12,8 +12,8 @@ use std::time::Instant;
 
 use futures::future::join_all;
 
-use mesh_worker_framework::dev_support::simulation_worker::{SimulationBehavior, SimulationWorker, SimulationWorkerConfig};
-use mesh_worker_framework::*;
+use mwf::dev_support::simulation_worker::{SimulationBehavior, SimulationWorker, SimulationWorkerConfig};
+use mwf::*;
 
 const DEFAULT_WORKER_COUNT: usize = 1000;
 const TIMEOUT_MS: u64 = 5000;

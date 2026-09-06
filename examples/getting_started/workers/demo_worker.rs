@@ -11,7 +11,7 @@
 //! - graceful shutdown through `on_close()`.
 
 use async_trait::async_trait;
-use mesh_worker_framework::*;
+use mwf::*;
 use std::time::Duration;
 
 /// Message identifiers handled by DemoWorker.

@@ -11,7 +11,7 @@
 use serial_test::serial;
 use std::time::Duration;
 
-use mesh_worker_framework::*;
+use mwf::*;
 
 use dev_support::dev_helper::*;
 use dev_support::simulation_worker::{SimulationBehavior, SimulationWorker, SimulationWorkerConfig};
