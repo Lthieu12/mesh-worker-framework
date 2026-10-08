@@ -463,6 +463,11 @@ impl MWFLog {
     /// has not been initialized through MWF::init().
     pub async fn wait_log(last_log_instance_id: Option<LogInstanceID>) -> Result<LogList, MWFError> {
         loop {
+            // Register interest in the next log event before checking the
+            // current log list to avoid missing a notification between the
+            // state check and the await.
+            let log_notify = MWF_LOG_NOTIFY.notified();
+
             let log_list = MWFLog::get_log_list(last_log_instance_id)?;
 
             // New log events are already available.
@@ -477,7 +482,7 @@ impl MWFLog {
             //
             // Wait until MWFLog is notified that a new
             // log event has been added.
-            MWF_LOG_NOTIFY.notified().await;
+            log_notify.await;
         }
     }
 

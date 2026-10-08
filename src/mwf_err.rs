@@ -277,6 +277,11 @@ impl MWFErr {
     /// has not been initialized through MWF::init().
     pub async fn wait_error(last_error_instance_id: Option<ErrorInstanceID>) -> Result<ErrorList, MWFError> {
         loop {
+            // Register interest in the next error event before checking the
+            // current error list to avoid missing a notification between the
+            // state check and the await.
+            let error_notify = MWF_ERR_NOTIFY.notified();
+
             let error_list = MWFErr::get_error_list(last_error_instance_id)?;
 
             // New error events are already available.
@@ -291,7 +296,7 @@ impl MWFErr {
             //
             // Wait until MWFErr is notified that a new
             // error event has been added.
-            MWF_ERR_NOTIFY.notified().await;
+            error_notify.await;
         }
     }
 

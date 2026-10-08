@@ -1,10 +1,11 @@
 [package]
 name = "mwf"
-version = "0.9.0"
+version = "0.9.1"
 edition = "2024"
 description = "Mesh Worker Framework (MWF) is a Rust Tokio/Futures-based runtime for building applications composed of long-running software workers that communicate through asynchronous messages."
 license = "MIT"
 readme = "README.md"
+keywords = ["async", "tokio", "workers", "messaging", "observability"]
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
