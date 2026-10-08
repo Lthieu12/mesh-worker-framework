@@ -627,3 +627,9 @@ Additional design information is available in:
 
 - Architecture.md
 
+---
+
+## 15. License
+
+This project is licensed under the MIT License.
+
