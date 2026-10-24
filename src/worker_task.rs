@@ -42,6 +42,8 @@ use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerState};
 tokio::task_local! {
     /// Inheritance context of the message currently being processed.
     static CURRENT_MESSAGE_INHERITANCE_CONTEXT: MessageInheritanceContext;
+    /// Worker currently executing a message callback.
+    static CURRENT_WORKER_ID: WorkerID;
 }
 
 /// Return the inheritance context of the currently processed message.
@@ -56,11 +58,6 @@ pub(crate) fn current_message_inheritance_context() -> MessageInheritanceContext
         Ok(context) => context,
         Err(_) => MessageInheritanceContext::default(),
     }
-}
-
-tokio::task_local! {
-    /// Worker currently executing a message callback.
-    static CURRENT_WORKER_ID: WorkerID;
 }
 
 /// Return the ID of the worker currently executing a message callback.
