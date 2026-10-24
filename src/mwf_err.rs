@@ -183,12 +183,7 @@ pub struct MWFErr;
 impl MWFErr {
     /// Generate a unique ErrorInstanceID.
     fn generate_error_instance_id() -> Result<u64, MWFError> {
-        let current_id = MWF_ERR_INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed);
-        if current_id == u64::MAX {
-            return Err(MWFError::Error_InstanceIDExhausted);
-        }
-
-        Ok(current_id)
+        MWF_ERR_INSTANCE_COUNTER.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current_id| current_id.checked_add(1)).map_err(|_| MWFError::Error_InstanceIDExhausted)
     }
 
     /// Record a new error event.

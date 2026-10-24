@@ -4,6 +4,7 @@ mod channel;
 mod framework_error;
 mod log_file;
 mod message;
+mod message_wait;
 mod string_helper;
 mod worker;
 mod worker_registry;

@@ -5,7 +5,8 @@
 use std::error::Error;
 use std::fmt;
 
-use crate::{MessageID, WorkerTypeID};
+use crate::message::{MessageID, MessageInstanceID, MessageWaitMode};
+use crate::worker::{WorkerID, WorkerTypeID};
 
 pub type WorkerError = anyhow::Error;
 
@@ -83,6 +84,15 @@ pub enum MWFError {
     /// a message sent through send_message_and_wait_reply().
     Worker_MessageError(anyhow::Error),
 
+    /// A worker cannot wait for a message sent to itself.
+    Worker_CannotWaitForSelf,
+
+    /// The worker already has an active message wait.
+    Worker_AlreadyWaiting { sender_id: WorkerID, receiver_id: WorkerID, waiting_worker_id: WorkerID, waiting_receiver_id: WorkerID, waiting_message_id: MessageID, waiting_message_instance_id: MessageInstanceID, waiting_mode: MessageWaitMode },
+
+    /// The requested wait would create a deadlock cycle.
+    Worker_WaitWouldDeadlock { sender_id: WorkerID, receiver_id: WorkerID, waiting_worker_id: WorkerID, waiting_receiver_id: WorkerID, waiting_message_id: MessageID, waiting_message_instance_id: MessageInstanceID, waiting_mode: MessageWaitMode, wait_chain: Vec<WorkerID> },
+
     /// The requested father worker was not found.
     ParentWorker_NotFound,
 
@@ -93,8 +103,15 @@ pub enum MWFError {
     /// and can no longer generate unique identifiers.
     Message_InstanceIDExhausted,
 
+    /// The MessageFlowID counter has reached its maximum value
+    /// and can no longer generate unique identifiers.
+    Message_FlowIDExhausted,
+
     /// The MessageData type mismatch.
     Message_DataTypeMismatch { expected_type: &'static str, actual_type: &'static str },
+
+    /// The message wait registry contains an inconsistent state.
+    MessageWait_RegistryInconsistent,
 
     /// The ErrorInstanceID counter has reached its maximum value
     /// and can no longer generate unique identifiers.
@@ -195,6 +212,33 @@ impl fmt::Display for MWFError {
                 write!(f, "Worker message processing failed: {}", error)
             }
 
+            MWFError::Worker_CannotWaitForSelf => {
+                write!(f, "A worker cannot wait for a message sent to itself.")
+            }
+
+            MWFError::Worker_AlreadyWaiting { sender_id, receiver_id, waiting_worker_id, waiting_receiver_id, waiting_message_id, waiting_message_instance_id, waiting_mode } => {
+                write!(
+                    f,
+                    "Cannot start send-and-wait from worker '{sender_id}' to worker '{receiver_id}': \
+                    worker '{waiting_worker_id}' is already waiting for worker '{waiting_receiver_id}' \
+                    to complete message '{waiting_message_id}' \
+                    (MessageInstanceID: {waiting_message_instance_id}, wait mode: {waiting_mode:?})."
+                )
+            }
+
+            MWFError::Worker_WaitWouldDeadlock { sender_id, receiver_id, waiting_worker_id, waiting_receiver_id, waiting_message_id, waiting_message_instance_id, waiting_mode, wait_chain } => {
+                let wait_chain = wait_chain.iter().map(ToString::to_string).collect::<Vec<_>>().join(" -> ");
+
+                write!(
+                    f,
+                    "Cannot start send-and-wait from worker '{sender_id}' to worker '{receiver_id}': \
+                    worker '{waiting_worker_id}' is already waiting for worker '{waiting_receiver_id}' \
+                    to complete message '{waiting_message_id}' \
+                    (MessageInstanceID: {waiting_message_instance_id}, wait mode: {waiting_mode:?}). \
+                    This would create a circular wait: {wait_chain}."
+                )
+            }
+
             MWFError::ParentWorker_NotFound => {
                 write!(f, "The requested father worker was not found.")
             }
@@ -205,6 +249,14 @@ impl fmt::Display for MWFError {
 
             MWFError::Message_InstanceIDExhausted => {
                 write!(f, "MessageInstanceID counter exhausted.")
+            }
+
+            MWFError::Message_FlowIDExhausted => {
+                write!(f, "MessageFlowID counter exhausted.")
+            }
+
+            MWFError::MessageWait_RegistryInconsistent => {
+                write!(f, "Internal MWF error: a wait cycle was detected, but a worker wait was missing from the registry.")
             }
 
             MWFError::Message_DataTypeMismatch { expected_type, actual_type } => {
@@ -271,6 +323,9 @@ pub(crate) enum MWFPanic {
 
     LogBuffer_Inconsistency,
     LogBuffer_AddLogFailed,
+
+    MWFMessageWaitData_ReadLockPoisoned,
+    MWFMessageWaitData_WriteLockPoisoned,
 }
 
 impl MWFPanic {
@@ -311,6 +366,10 @@ impl MWFPanic {
             MWFPanic::LogBuffer_Inconsistency => "Internal MWF error: logging buffer is inconsistent.",
 
             MWFPanic::LogBuffer_AddLogFailed => "Internal MWF error: add log to buffer unexpectedly failed.",
+
+            MWFPanic::MWFMessageWaitData_ReadLockPoisoned => "Internal MWF error: MWFMessageWait_DATA read lock poisoned.",
+
+            MWFPanic::MWFMessageWaitData_WriteLockPoisoned => "Internal MWF error: MWFMessageWait_DATA write lock poisoned.",
         }
     }
 }

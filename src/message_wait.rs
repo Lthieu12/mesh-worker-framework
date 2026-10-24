@@ -1,0 +1,257 @@
+//! Internal message wait and flow management.
+
+use std::collections::{HashMap, HashSet};
+use std::time::Instant;
+use tokio::sync::oneshot;
+
+use crate::framework_error::{MWFError, MWFPanic};
+use crate::message::{MessageFlowID, MessageID, MessageInstanceID, MessageWaitMode};
+use crate::mwf::MWF_MESSAGE_WAIT_DATA;
+use crate::worker::WorkerID;
+
+/// Runtime state associated with an active message flow.
+#[derive(Debug)]
+pub(crate) struct MessageFlowState {
+    /// Channel used to return the flow result to its waiter.
+    pub(crate) reply_sender: oneshot::Sender<Result<(), MWFError>>,
+}
+
+/// Information about a worker currently waiting for message completion.
+#[derive(Debug)]
+pub(crate) struct WorkerWaitState {
+    /// Worker receiving the awaited message.
+    pub(crate) receiver_id: WorkerID,
+
+    /// Functional identifier of the awaited message.
+    pub(crate) message_id: MessageID,
+
+    /// Unique identifier of the awaited message instance.
+    pub(crate) message_instance_id: MessageInstanceID,
+
+    /// Type of completion being awaited.
+    pub(crate) wait_mode: MessageWaitMode,
+
+    /// Time when the wait started.
+    pub(crate) started_at: Instant,
+}
+
+/// Internal data used to manage message waits and flows.
+#[derive(Debug)]
+pub(crate) struct MessageWaitData {
+    /// Active message flows and their reply channels.
+    pub(crate) message_flow_registry: HashMap<MessageFlowID, MessageFlowState>,
+
+    /// Workers currently waiting for message completion.
+    pub(crate) waiting_worker_registry: HashMap<WorkerID, WorkerWaitState>,
+}
+
+impl MessageWaitData {
+    /// Create an empty message wait registry.
+    pub(crate) fn new() -> Self {
+        Self { message_flow_registry: HashMap::new(), waiting_worker_registry: HashMap::new() }
+    }
+}
+
+/// Register a worker wait after checking that it cannot create a deadlock cycle.
+///
+/// The cycle check and registration are performed under the same write lock
+/// so concurrent wait requests cannot create a cycle between workers.
+pub(crate) fn register_worker_wait(sender_id: &WorkerID, wait_state: WorkerWaitState) -> Result<WorkerWaitGuard, MWFError> {
+    // A worker cannot wait for a message sent to itself.
+    if sender_id == &wait_state.receiver_id {
+        return Err(MWFError::Worker_CannotWaitForSelf);
+    }
+
+    let message_instance_id = wait_state.message_instance_id;
+
+    // Lock the registry to check and register the wait atomically.
+    let mut message_wait_data_guard = MWF_MESSAGE_WAIT_DATA.write().expect(MWFPanic::MWFMessageWaitData_WriteLockPoisoned.message());
+
+    let message_wait_data = message_wait_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
+
+    // Reject the request if the sender already has an active wait.
+    if let Some(active_wait) = message_wait_data.waiting_worker_registry.get(sender_id) {
+        return Err(MWFError::Worker_AlreadyWaiting {
+            sender_id: sender_id.clone(),
+            receiver_id: wait_state.receiver_id.clone(),
+            waiting_worker_id: sender_id.clone(),
+            waiting_receiver_id: active_wait.receiver_id.clone(),
+            waiting_message_id: active_wait.message_id.clone(),
+            waiting_message_instance_id: active_wait.message_instance_id,
+            waiting_mode: active_wait.wait_mode,
+        });
+    }
+
+    // Reject the request if the receiver's existing wait chain leads back to the sender.
+    if let Some(wait_chain) = find_wait_cycle(sender_id, &wait_state.receiver_id, &message_wait_data.waiting_worker_registry) {
+        // The receiver already has an active wait that would form a cycle.
+        let waiting_worker_id = wait_state.receiver_id.clone();
+
+        let active_wait = match message_wait_data.waiting_worker_registry.get(&waiting_worker_id) {
+            Some(active_wait) => active_wait,
+            None => {
+                return Err(MWFError::MessageWait_RegistryInconsistent);
+            }
+        };
+
+        return Err(MWFError::Worker_WaitWouldDeadlock {
+            sender_id: sender_id.clone(),
+            receiver_id: wait_state.receiver_id.clone(),
+            waiting_worker_id,
+            waiting_receiver_id: active_wait.receiver_id.clone(),
+            waiting_message_id: active_wait.message_id.clone(),
+            waiting_message_instance_id: active_wait.message_instance_id,
+            waiting_mode: active_wait.wait_mode,
+            wait_chain,
+        });
+    }
+
+    // Register the wait only after all checks have succeeded.
+    message_wait_data.waiting_worker_registry.insert(sender_id.clone(), wait_state);
+
+    // Release the lock before the caller performs any asynchronous operation.
+    drop(message_wait_data_guard);
+
+    Ok(WorkerWaitGuard { worker_id: sender_id.clone(), message_instance_id })
+}
+
+/// Find a cycle that would be created by adding `sender_id -> receiver_id`.
+///
+/// Each registered worker has at most one outgoing wait, so the search follows
+/// a single chain instead of traversing a general dependency graph.
+fn find_wait_cycle(sender_id: &WorkerID, receiver_id: &WorkerID, waiting_worker_registry: &HashMap<WorkerID, WorkerWaitState>) -> Option<Vec<WorkerID>> {
+    let mut wait_chain = vec![sender_id.clone()];
+    let mut visited_worker_ids = HashSet::new();
+    let mut current_worker_id = receiver_id.clone();
+
+    loop {
+        // The chain returns to the sender: adding the wait would create a cycle.
+        if &current_worker_id == sender_id {
+            wait_chain.push(current_worker_id);
+            return Some(wait_chain);
+        }
+
+        // Stop safely if an existing inconsistent cycle is encountered.
+        if !visited_worker_ids.insert(current_worker_id.clone()) {
+            wait_chain.push(current_worker_id);
+            return Some(wait_chain);
+        }
+
+        wait_chain.push(current_worker_id.clone());
+
+        // Follow the current worker's existing wait, if any.
+        match waiting_worker_registry.get(&current_worker_id) {
+            Some(wait_state) => {
+                current_worker_id = wait_state.receiver_id.clone();
+            }
+            None => return None,
+        }
+    }
+}
+
+/// Automatically removes a registered wait when the guard is dropped.
+#[derive(Debug)]
+pub(crate) struct WorkerWaitGuard {
+    /// Worker whose wait is registered.
+    worker_id: WorkerID,
+
+    /// Message instance associated with this specific wait.
+    message_instance_id: MessageInstanceID,
+}
+
+impl Drop for WorkerWaitGuard {
+    fn drop(&mut self) {
+        // Do not panic during cleanup if the registry lock is poisoned.
+        let Ok(mut message_wait_data_guard) = MWF_MESSAGE_WAIT_DATA.write() else {
+            return;
+        };
+
+        let Some(message_wait_data) = message_wait_data_guard.as_mut() else {
+            return;
+        };
+
+        // Remove only the wait associated with this guard.
+        // This prevents an old guard from removing a newer wait.
+        let should_remove = message_wait_data.waiting_worker_registry.get(&self.worker_id).is_some_and(|wait_state| wait_state.message_instance_id == self.message_instance_id);
+
+        if should_remove {
+            message_wait_data.waiting_worker_registry.remove(&self.worker_id);
+        }
+    }
+}
+
+/// Unit tests for message wait-chain validation.
+///
+/// These tests exercise `find_wait_cycle()` independently from the global MWF runtime.
+/// They verify that:
+/// - A wait is allowed when the receiver has no active wait.
+/// - A chain of waits is allowed when it ends without a cycle.
+/// - A direct or indirect cycle is detected before a new wait is registered.
+/// - The detected cycle identifies the sequence of workers involved.
+///
+/// These tests focus on cycle detection. Registration, cleanup and concurrent access
+/// to the global wait registry are tested separately.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Instant;
+
+    /// Create a worker identifier for testing.
+    fn test_worker_id(worker_id: &str) -> WorkerID {
+        WorkerID::new(worker_id)
+    }
+
+    /// Create a registered wait targeting the specified worker.
+    fn test_wait_state(receiver_id: &str) -> WorkerWaitState {
+        WorkerWaitState { receiver_id: test_worker_id(receiver_id), message_id: MessageID::new("TestMessage"), message_instance_id: 1, wait_mode: MessageWaitMode::WaitThisMessage, started_at: Instant::now() }
+    }
+
+    #[test]
+    fn no_cycle_when_receiver_is_not_waiting() {
+        let waiting_worker_registry = HashMap::new();
+
+        let cycle = find_wait_cycle(&test_worker_id("A"), &test_worker_id("B"), &waiting_worker_registry);
+
+        assert_eq!(cycle, None);
+    }
+
+    #[test]
+    fn no_cycle_when_wait_chain_ends() {
+        let mut waiting_worker_registry = HashMap::new();
+
+        // Existing wait: B -> C.
+        waiting_worker_registry.insert(test_worker_id("B"), test_wait_state("C"));
+
+        // Proposed wait: A -> B. The chain ends at C.
+        let cycle = find_wait_cycle(&test_worker_id("A"), &test_worker_id("B"), &waiting_worker_registry);
+
+        assert_eq!(cycle, None);
+    }
+
+    #[test]
+    fn detects_two_worker_cycle() {
+        let mut waiting_worker_registry = HashMap::new();
+
+        // Existing wait: A -> B.
+        waiting_worker_registry.insert(test_worker_id("A"), test_wait_state("B"));
+
+        // Proposed wait: B -> A.
+        let cycle = find_wait_cycle(&test_worker_id("B"), &test_worker_id("A"), &waiting_worker_registry);
+
+        assert_eq!(cycle, Some(vec![test_worker_id("B"), test_worker_id("A"), test_worker_id("B"),]));
+    }
+
+    #[test]
+    fn detects_multi_worker_cycle() {
+        let mut waiting_worker_registry = HashMap::new();
+
+        // Existing waits: A -> B -> C.
+        waiting_worker_registry.insert(test_worker_id("A"), test_wait_state("B"));
+        waiting_worker_registry.insert(test_worker_id("B"), test_wait_state("C"));
+
+        // Proposed wait: C -> A.
+        let cycle = find_wait_cycle(&test_worker_id("C"), &test_worker_id("A"), &waiting_worker_registry);
+
+        assert_eq!(cycle, Some(vec![test_worker_id("C"), test_worker_id("A"), test_worker_id("B"), test_worker_id("C"),]));
+    }
+}

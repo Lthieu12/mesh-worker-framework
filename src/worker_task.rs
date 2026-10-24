@@ -34,10 +34,44 @@ use crate::MWFErr;
 use crate::MWFLog;
 use crate::channel::{WorkerCommand, WorkerNormalReceiverChannel, WorkerPriorityReceiverChannel};
 use crate::framework_error::MWFPanic;
-use crate::message::WorkerMessage;
+use crate::message::{MessageInheritanceContext, WorkerMessage};
 use crate::mwf::{MWF_WRK_CLOSE_NOTIFY, MWF_WRK_DATA, MWF_WRK_INIT_NOTIFY};
 use crate::mwf_log::{LogAction, LogStatus};
 use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerState};
+
+tokio::task_local! {
+    /// Inheritance context of the message currently being processed.
+    static CURRENT_MESSAGE_INHERITANCE_CONTEXT: MessageInheritanceContext;
+}
+
+/// Return the inheritance context of the currently processed message.
+///
+/// The context is available only while a message callback is executed inside
+/// `CURRENT_MESSAGE_INHERITANCE_CONTEXT.scope()`. If no context is installed,
+/// return the default context, which has no associated message flow.
+pub(crate) fn current_message_inheritance_context() -> MessageInheritanceContext {
+    // `try_with()` provides a reference to the stored context.
+    // Dereferencing it copies the value because MessageInheritanceContext implements Copy.
+    match CURRENT_MESSAGE_INHERITANCE_CONTEXT.try_with(|context| *context) {
+        Ok(context) => context,
+        Err(_) => MessageInheritanceContext::default(),
+    }
+}
+
+tokio::task_local! {
+    /// Worker currently executing a message callback.
+    static CURRENT_WORKER_ID: WorkerID;
+}
+
+/// Return the ID of the worker currently executing a message callback.
+///
+/// Returns `None` when called outside a worker message callback.
+pub(crate) fn current_worker_id() -> Option<WorkerID> {
+    match CURRENT_WORKER_ID.try_with(|worker_id| worker_id.clone()) {
+        Ok(worker_id) => Some(worker_id),
+        Err(_) => None,
+    }
+}
 
 /// Internal command queue owned by WorkerTask.
 ///
@@ -123,50 +157,58 @@ impl PendingCommands {
 /// and shutdown.
 pub(crate) fn spawn_worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: WorkerNormalReceiverChannel, priority_receiver_channel: WorkerPriorityReceiverChannel, worker_id: WorkerID, parent_id: EntityID) -> JoinHandle<()> {
     tokio::spawn(async move {
+        // Keep the worker ID available throughout the complete task lifecycle.
+        let context_worker_id = worker_id.clone();
+        // Keep a separate copy for panic reporting and registry cleanup.       
         let task_worker_id = worker_id.clone();
-        // Execute the worker task while catching Rust panics.
-        //
-        // Ok(())           => normal termination.
-        // Err(payload)     => worker panicked.
-        //
-        // Native crashes (unsafe/DLL) are not recoverable.
-        let result = AssertUnwindSafe(worker_task(worker, normal_receiver_channel, priority_receiver_channel, worker_id, parent_id)).catch_unwind().await;
+        
+        // Execute the worker lifecycle with its ID available through the task-local context.
+        CURRENT_WORKER_ID.scope(context_worker_id, async move {
 
-        match result {
-            Ok(()) => {
-                // Nothing to do.
+            // Execute the worker task while catching Rust panics.
+            //
+            // Ok(())           => normal termination.
+            // Err(payload)     => worker panicked.
+            //
+            // Native crashes (unsafe/DLL) are not recoverable.
+            let result = AssertUnwindSafe(worker_task(worker, normal_receiver_channel, priority_receiver_channel, worker_id, parent_id)).catch_unwind().await;
+
+            match result {
+                Ok(()) => {
+                    // Nothing to do.
+                }
+
+                Err(payload) => {
+                    let panic_error = if let Some(message) = payload.downcast_ref::<&str>() {
+                        anyhow::anyhow!("{}", message)
+                    } else if let Some(message) = payload.downcast_ref::<String>() {
+                        anyhow::anyhow!("{}", message)
+                    } else {
+                        anyhow::anyhow!("Unknown panic")
+                    };
+
+                    // Store the panic in MWFErr.
+                    MWFErr::add_error_internal(&EntityID::Worker(task_worker_id.clone()), Some("worker_task".into()), &panic_error).expect(MWFPanic::ErrorBuffer_AddErrorFailed.message());
+                    // Log the panic in MWFLog
+                    MWFLog::add_log(Instant::now(), &task_worker_id, LogAction::WorkerPanic, LogStatus::Error).expect(MWFPanic::LogBuffer_AddLogFailed.message());
+
+                    let mut mwf_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
+                    let mwf_data = mwf_data_guard.as_mut().expect(MWFPanic::MWFWrkData_Missing.message());
+
+                    // Update the worker state.
+                    mwf_data.worker_registry.set_worker_state(&task_worker_id, WorkerState::Panicked).expect(MWFPanic::Registry_WorkerMissing.message());
+
+                    // Remove the worker from the Registry.
+                    mwf_data.worker_registry.remove_worker(&task_worker_id).expect(MWFPanic::Registry_WorkerMissing.message());
+
+                    drop(mwf_data_guard);
+
+                    // Wake up all waiters interested in worker
+                    // shutdown events.
+                    MWF_WRK_CLOSE_NOTIFY.notify_waiters();
+                }
             }
-
-            Err(payload) => {
-                let panic_error = if let Some(message) = payload.downcast_ref::<&str>() {
-                    anyhow::anyhow!("{}", message)
-                } else if let Some(message) = payload.downcast_ref::<String>() {
-                    anyhow::anyhow!("{}", message)
-                } else {
-                    anyhow::anyhow!("Unknown panic")
-                };
-
-                // Store the panic in MWFErr.
-                MWFErr::add_error_internal(&EntityID::Worker(task_worker_id.clone()), Some("worker_task".into()), &panic_error).expect(MWFPanic::ErrorBuffer_AddErrorFailed.message());
-                // Log the panic in MWFLog
-                MWFLog::add_log(Instant::now(), &task_worker_id, LogAction::WorkerPanic, LogStatus::Error).expect(MWFPanic::LogBuffer_AddLogFailed.message());
-
-                let mut mwf_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
-                let mwf_data = mwf_data_guard.as_mut().expect(MWFPanic::MWFWrkData_Missing.message());
-
-                // Update the worker state.
-                mwf_data.worker_registry.set_worker_state(&task_worker_id, WorkerState::Panicked).expect(MWFPanic::Registry_WorkerMissing.message());
-
-                // Remove the worker from the Registry.
-                mwf_data.worker_registry.remove_worker(&task_worker_id).expect(MWFPanic::Registry_WorkerMissing.message());
-
-                drop(mwf_data_guard);
-
-                // Wake up all waiters interested in worker
-                // shutdown events.
-                MWF_WRK_CLOSE_NOTIFY.notify_waiters();
-            }
-        }
+        }).await;
     })
 }
 
@@ -182,7 +224,21 @@ async fn execute_message(worker: &mut Box<dyn Worker + Send>, worker_id: &Worker
 
     MWFLog::add_log(action_start_timer, worker_id, log_action.clone(), LogStatus::Start).expect(MWFPanic::LogBuffer_AddLogFailed.message());
 
-    let result = worker.on_message(message).await;
+    // Copy the inheritance context from the message before passing ownership
+    // of the message to `on_message`.
+    // MessageInheritanceContext implements Copy, so the original message remains usable.
+    let context_to_install = message.inheritance_context;
+
+    // Make this context available while the worker processes the message.
+    //
+    // `worker.on_message(message)` creates a Future representing the asynchronous callback.
+    // `scope()` makes `context_to_install` available through
+    // CURRENT_MESSAGE_INHERITANCE_CONTEXT while Tokio executes that Future.
+    // This allows the callback and the functions it calls to retrieve the current context
+    // without having to receive it as an explicit function parameter.
+    // The context remains available across `.await` points during the callback.
+    // The final `.await` waits for the scoped callback to finish and returns its result.
+    let result = CURRENT_MESSAGE_INHERITANCE_CONTEXT.scope(context_to_install, worker.on_message(message)).await;
 
     match &result {
         Ok(()) => {

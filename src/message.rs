@@ -75,6 +75,27 @@ impl From<&MessageID> for MessageID {
 /// tracing and request/reply correlation.
 pub type MessageInstanceID = u64;
 
+/// Identifies a message flow that can span multiple
+/// message instances.
+pub(crate) type MessageFlowID = u64;
+
+/// Context inherited by messages sent during message processing.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct MessageInheritanceContext {
+    /// Flow associated with the current message, if any.
+    pub(crate) message_flow_id: Option<MessageFlowID>,
+}
+
+/// Type of message completion being awaited.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MessageWaitMode {
+    /// Wait until the receiver finishes processing this message.
+    WaitThisMessage,
+
+    /// Wait until the receiver completes the entire message flow.
+    WaitMessageFlow,
+}
+
 /// Opaque container transporting application-defined data.
 ///
 /// `MessageData` can store any Rust type implementing
@@ -150,14 +171,17 @@ pub struct WorkerMessage {
 
     /// Data associated with the message.
     pub message_data: MessageData,
+
+    /// Context inherited from the message that initiated this message.
+    pub(crate) inheritance_context: MessageInheritanceContext,
 }
 
 impl WorkerMessage {
     /// Create a new worker message.
-    pub(crate) fn new<TMessageData>(sender_id: &EntityID, receiver_id: &WorkerID, message_id: &MessageID, message_instance_id: MessageInstanceID, message_data: &TMessageData) -> Self
+    pub(crate) fn new<TMessageData>(sender_id: &EntityID, receiver_id: &WorkerID, message_id: &MessageID, message_instance_id: MessageInstanceID, message_data: &TMessageData, inheritance_context: MessageInheritanceContext) -> Self
     where
         TMessageData: Clone + Send + Sync + 'static,
     {
-        Self { sender_id: sender_id.clone(), receiver_id: receiver_id.clone(), message_id: message_id.clone(), message_instance_id, message_data: MessageData::new(message_data) }
+        Self { sender_id: sender_id.clone(), receiver_id: receiver_id.clone(), message_id: message_id.clone(), message_instance_id, message_data: MessageData::new(message_data), inheritance_context: MessageInheritanceContext::default() }
     }
 }

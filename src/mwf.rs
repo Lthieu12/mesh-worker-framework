@@ -14,6 +14,7 @@ use crate::MWFErr;
 use crate::MWFLog;
 use crate::framework_error::{MWFError, MWFPanic};
 use crate::log_file;
+use crate::message_wait::MessageWaitData;
 use crate::mwf::TimestampFormat::LocalTime;
 use crate::mwf_err::ErrorData;
 use crate::mwf_log::{LogMode, LoggingData};
@@ -36,6 +37,9 @@ pub(crate) static MWF_WRK_CLOSE_NOTIFY: LazyLock<Notify> = LazyLock::new(Notify:
 
 /// Global MWF message instance counter used to identify messages sent to workers.
 pub(crate) static MWF_WRK_MESSAGE_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
+
+/// Global MWF message flow counter used to identify message flows.
+pub(crate) static MWF_WRK_MESSAGE_FLOW_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 /// Global MWF error event storage.
 pub(crate) static MWF_ERR_DATA: LazyLock<RwLock<Option<ErrorData>>> = LazyLock::new(|| RwLock::new(None));
@@ -62,6 +66,9 @@ pub(crate) static MWF_LOG_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 /// Current timestamp format used by the framework.
 pub(crate) static MWF_TIMESTAMP_FORMAT: AtomicU8 = AtomicU8::new(TimestampFormat::LocalTime as u8);
+
+/// Global MWF message wait and flow storage.
+pub(crate) static MWF_MESSAGE_WAIT_DATA: LazyLock<RwLock<Option<MessageWaitData>>> = LazyLock::new(|| RwLock::new(None));
 
 /// Timestamp format used by MWF.
 #[repr(u8)]
@@ -192,6 +199,7 @@ impl MWF {
         drop(mwf_data_guard);
 
         MWF_WRK_MESSAGE_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
+        MWF_WRK_MESSAGE_FLOW_COUNTER.store(1, Ordering::Relaxed);
         MWF_ERR_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
         MWF_LOG_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
         MWF_TIMESTAMP_FORMAT.store(mwf_configuration.timestamp_format as u8, Ordering::Relaxed);
@@ -221,6 +229,11 @@ impl MWF {
             log_terminal_task_handle: None,
         });
         drop(mwf_log_data_guard);
+
+        // Initialize message wait and flow data.
+        let mut message_wait_data_guard = MWF_MESSAGE_WAIT_DATA.write().expect(MWFPanic::MWFMessageWaitData_WriteLockPoisoned.message());
+        *message_wait_data_guard = Some(MessageWaitData::new());
+        drop(message_wait_data_guard);
 
         Ok(())
     }
@@ -273,6 +286,10 @@ impl MWF {
         // Dropping LoggingData also closes the MWF log file.
         let mut mwf_log_data_guard = MWF_LOG_DATA.write().expect(MWFPanic::MWFLogData_WriteLockPoisoned.message());
         *mwf_log_data_guard = None;
+
+        // Destroy message wait and flow data.
+        let mut message_wait_data_guard = MWF_MESSAGE_WAIT_DATA.write().expect(MWFPanic::MWFMessageWaitData_WriteLockPoisoned.message());
+        *message_wait_data_guard = None;
 
         Ok(())
     }

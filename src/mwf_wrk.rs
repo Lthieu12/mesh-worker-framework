@@ -9,12 +9,12 @@ use std::time::{Duration, Instant};
 use crate::MWFLog;
 use crate::channel::{WorkerChannel, WorkerCommand, get_sender_channel};
 use crate::framework_error::{MWFError, MWFPanic};
-use crate::message::{MessageData, MessageID, MessageInstanceID, WorkerMessage};
-use crate::mwf::{MWF_DATA, MWF_WRK_CLOSE_NOTIFY, MWF_WRK_DATA, MWF_WRK_INIT_NOTIFY, MWF_WRK_MESSAGE_INSTANCE_COUNTER, MWFConfiguration};
+use crate::message::{MessageData, MessageFlowID, MessageID, MessageInstanceID, WorkerMessage};
+use crate::mwf::{MWF_DATA, MWF_WRK_CLOSE_NOTIFY, MWF_WRK_DATA, MWF_WRK_INIT_NOTIFY, MWF_WRK_MESSAGE_FLOW_COUNTER, MWF_WRK_MESSAGE_INSTANCE_COUNTER, MWFConfiguration};
 use crate::mwf_log::{LogAction, LogStatus};
 use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerList, WorkerState, WorkerStatus, WorkerTypeID};
 use crate::worker_registry::Registry;
-use crate::worker_task::spawn_worker_task;
+use crate::worker_task::{current_message_inheritance_context, spawn_worker_task};
 
 /// Internal MWFWrk runtime data.
 #[derive(Debug)]
@@ -42,12 +42,12 @@ pub struct MWFWrk;
 impl MWFWrk {
     /// Generate a unique MessageInstanceID.
     fn generate_message_instance_id() -> Result<MessageInstanceID, MWFError> {
-        let current_id = MWF_WRK_MESSAGE_INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed);
-        if current_id == u64::MAX {
-            return Err(MWFError::Message_InstanceIDExhausted);
-        }
+        MWF_WRK_MESSAGE_INSTANCE_COUNTER.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current_id| current_id.checked_add(1)).map_err(|_| MWFError::Message_InstanceIDExhausted)
+    }
 
-        Ok(current_id)
+    /// Generate a unique MessageFlowID.
+    fn generate_message_flow_id() -> Result<MessageFlowID, MWFError> {
+        MWF_WRK_MESSAGE_FLOW_COUNTER.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current_id| current_id.checked_add(1)).map_err(|_| MWFError::Message_FlowIDExhausted)
     }
 
     /// Create and register a new worker instance from its WorkerTypeID.
@@ -604,7 +604,11 @@ impl MWFWrk {
 
         // Generate the unique id and build the message
         let message_instance_id = MWFWrk::generate_message_instance_id()?;
-        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data);
+
+        // Retrieve the inheritance context of the currently processed message.
+        let inheritance_context = current_message_inheritance_context();
+
+        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, inheritance_context);
 
         // Send the message to the target worker.
         normal_sender_channel.send(WorkerCommand::Message { message: framework_message, priority: false, unique: false }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
@@ -637,7 +641,11 @@ impl MWFWrk {
 
         // Generate the unique id and build the message
         let message_instance_id = MWFWrk::generate_message_instance_id()?;
-        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data);
+
+        // Retrieve the inheritance context of the currently processed message.
+        let inheritance_context = current_message_inheritance_context();
+
+        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, inheritance_context);
 
         // Create a temporary reply channel used to signal
         // completion of on_message().
@@ -732,7 +740,11 @@ impl MWFWrk {
 
         // Generate the unique id and build the message
         let message_instance_id = MWFWrk::generate_message_instance_id()?;
-        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data);
+
+        // Retrieve the inheritance context of the currently processed message.
+        let inheritance_context = current_message_inheritance_context();
+
+        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, inheritance_context);
 
         // Send the priority message to the target worker.
         priority_sender_channel.send(WorkerCommand::Message { message: framework_message, priority: true, unique: false }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
@@ -768,7 +780,11 @@ impl MWFWrk {
 
         // Generate the unique id and build the message
         let message_instance_id = MWFWrk::generate_message_instance_id()?;
-        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data);
+
+        // Retrieve the inheritance context of the currently processed message.
+        let inheritance_context = current_message_inheritance_context();
+
+        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, inheritance_context);
 
         // Create a temporary reply channel used to signal
         // completion of on_message().
@@ -866,7 +882,11 @@ impl MWFWrk {
 
         // Generate the unique id and build the message
         let message_instance_id = MWFWrk::generate_message_instance_id()?;
-        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data);
+
+        // Retrieve the inheritance context of the currently processed message.
+        let inheritance_context = current_message_inheritance_context();
+
+        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, inheritance_context);
 
         // Send the message to the target worker.
         normal_sender_channel.send(WorkerCommand::Message { message: framework_message, priority: false, unique: true }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;

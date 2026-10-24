@@ -371,12 +371,7 @@ impl MWFLog {
 
     /// Generate a unique LogInstanceID.
     fn generate_log_instance_id() -> Result<u64, MWFError> {
-        let current_id = MWF_LOG_INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed);
-        if current_id == u64::MAX {
-            return Err(MWFError::Logging_InstanceIDExhausted);
-        }
-
-        Ok(current_id)
+        MWF_LOG_INSTANCE_COUNTER.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current_id| current_id.checked_add(1)).map_err(|_| MWFError::Logging_InstanceIDExhausted)
     }
 
     /// Check whether logging is enabled for a worker.
