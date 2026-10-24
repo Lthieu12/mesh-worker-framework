@@ -40,10 +40,20 @@ use crate::mwf_log::{LogAction, LogStatus};
 use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerState};
 
 tokio::task_local! {
-    /// Inheritance context of the message currently being processed.
-    static CURRENT_MESSAGE_INHERITANCE_CONTEXT: MessageInheritanceContext;
     /// Worker currently executing a message callback.
     static CURRENT_WORKER_ID: WorkerID;
+    /// Inheritance context of the message currently being processed.
+    static CURRENT_MESSAGE_INHERITANCE_CONTEXT: MessageInheritanceContext;
+}
+
+/// Return the ID of the worker currently executing a message callback.
+///
+/// Returns `None` when called outside a worker message callback.
+pub(crate) fn current_worker_id() -> Option<WorkerID> {
+    match CURRENT_WORKER_ID.try_with(|worker_id| worker_id.clone()) {
+        Ok(worker_id) => Some(worker_id),
+        Err(_) => None,
+    }
 }
 
 /// Return the inheritance context of the currently processed message.
@@ -57,16 +67,6 @@ pub(crate) fn current_message_inheritance_context() -> MessageInheritanceContext
     match CURRENT_MESSAGE_INHERITANCE_CONTEXT.try_with(|context| *context) {
         Ok(context) => context,
         Err(_) => MessageInheritanceContext::default(),
-    }
-}
-
-/// Return the ID of the worker currently executing a message callback.
-///
-/// Returns `None` when called outside a worker message callback.
-pub(crate) fn current_worker_id() -> Option<WorkerID> {
-    match CURRENT_WORKER_ID.try_with(|worker_id| worker_id.clone()) {
-        Ok(worker_id) => Some(worker_id),
-        Err(_) => None,
     }
 }
 
