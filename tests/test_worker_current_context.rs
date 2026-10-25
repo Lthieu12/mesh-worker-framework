@@ -21,14 +21,8 @@ async fn test_worker_current_context() {
     MWF::register_worker_type::<SimulationWorker>().unwrap();
 
     // Context getters must fail outside an MWF worker task.
-    assert!(matches!(
-        MWFWrk::get_current_worker_id(),
-        Err(MWFError::Worker_CurrentContextUnavailable)
-    ));
-    assert!(matches!(
-        MWFWrk::get_current_parent_id(),
-        Err(MWFError::Worker_CurrentContextUnavailable)
-    ));
+    assert!(matches!(MWFWrk::get_current_worker_id(), Err(MWFError::Worker_CurrentContextUnavailable)));
+    assert!(matches!(MWFWrk::get_current_parent_id(), Err(MWFError::Worker_CurrentContextUnavailable)));
 
     // Create two distinct external parent entities.
     let parent_a_id = EntityID::new_external("PARENT_A");
@@ -39,27 +33,11 @@ async fn test_worker_current_context() {
     let worker_b_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &parent_b_id).unwrap();
 
     // Configure each worker to validate its context when processing a message.
-    let configuration_a = SimulationWorkerConfig {
-        init_delay_ms: 0,
-        close_delay_ms: 0,
-        simulation_behavior: SimulationBehavior::Message_CheckMyContext {
-            expected_worker_id: worker_a_id.clone(),
-            expected_parent_id: parent_a_id.clone(),
-        },
-        wait_children_close: false,
-        wait_children_close_timeout_ms: None,
-    };
+    let configuration_a =
+        SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_CheckMyContext { expected_worker_id: worker_a_id.clone(), expected_parent_id: parent_a_id.clone() }, wait_children_close: false, wait_children_close_timeout_ms: None };
 
-    let configuration_b = SimulationWorkerConfig {
-        init_delay_ms: 0,
-        close_delay_ms: 0,
-        simulation_behavior: SimulationBehavior::Message_CheckMyContext {
-            expected_worker_id: worker_b_id.clone(),
-            expected_parent_id: parent_b_id.clone(),
-        },
-        wait_children_close: false,
-        wait_children_close_timeout_ms: None,
-    };
+    let configuration_b =
+        SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_CheckMyContext { expected_worker_id: worker_b_id.clone(), expected_parent_id: parent_b_id.clone() }, wait_children_close: false, wait_children_close_timeout_ms: None };
 
     // Initialize both workers.
     MWFWrk::init_worker(&worker_a_id, &configuration_a).await.unwrap();
@@ -71,11 +49,9 @@ async fn test_worker_current_context() {
     // Send a message to each worker and wait for its context validation.
     let message_id = MessageID::new("CHECK_CONTEXT");
 
-    let worker_a_result =
-        MWFWrk::send_message_and_wait(&parent_a_id, &worker_a_id, &message_id, &(), Some(1000)).await;
+    let worker_a_result = MWFWrk::send_message_and_wait(&parent_a_id, &worker_a_id, &message_id, &(), Some(1000)).await;
 
-    let worker_b_result =
-        MWFWrk::send_message_and_wait(&parent_b_id, &worker_b_id, &message_id, &(), Some(1000)).await;
+    let worker_b_result = MWFWrk::send_message_and_wait(&parent_b_id, &worker_b_id, &message_id, &(), Some(1000)).await;
 
     // Shutdown both workers before asserting message results,
     // so the framework can still be closed if a context check fails.

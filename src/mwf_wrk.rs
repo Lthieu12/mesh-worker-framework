@@ -9,7 +9,8 @@ use std::time::{Duration, Instant};
 use crate::MWFLog;
 use crate::channel::{WorkerChannel, WorkerCommand, get_sender_channel};
 use crate::framework_error::{MWFError, MWFPanic};
-use crate::message::{MessageData, MessageFlowID, MessageID, MessageInstanceID, WorkerMessage};
+use crate::message::{MessageData, MessageFlowID, MessageID, MessageInstanceID, MessageWaitMode, WorkerMessage};
+use crate::message_wait::{WorkerWaitGuard, WorkerWaitState, register_worker_wait};
 use crate::mwf::{MWF_DATA, MWF_WRK_CLOSE_NOTIFY, MWF_WRK_DATA, MWF_WRK_INIT_NOTIFY, MWF_WRK_MESSAGE_FLOW_COUNTER, MWF_WRK_MESSAGE_INSTANCE_COUNTER, MWFConfiguration};
 use crate::mwf_log::{LogAction, LogStatus};
 use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerList, WorkerState, WorkerStatus, WorkerTypeID};
@@ -48,6 +49,22 @@ impl MWFWrk {
     /// Generate a unique MessageFlowID.
     fn generate_message_flow_id() -> Result<MessageFlowID, MWFError> {
         MWF_WRK_MESSAGE_FLOW_COUNTER.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current_id| current_id.checked_add(1)).map_err(|_| MWFError::Message_FlowIDExhausted)
+    }
+
+    /// Register the current worker's active message wait, when applicable.
+    ///
+    /// External application tasks have no MWF worker execution context,
+    /// so their waits are not added to the worker wait registry.
+    fn register_current_worker_wait(receiver_id: &WorkerID, message_id: &MessageID, message_instance_id: MessageInstanceID, wait_mode: MessageWaitMode) -> Result<Option<WorkerWaitGuard>, MWFError> {
+        // Identify the worker from the actual execution context.
+        let Some(waiting_worker_id) = current_worker_id() else {
+            return Ok(None);
+        };
+
+        // Register the wait and reject any operation that would create a deadlock.
+        let worker_wait_guard = register_worker_wait(&waiting_worker_id, WorkerWaitState { receiver_id: receiver_id.clone(), message_id: message_id.clone(), message_instance_id, wait_mode, started_at: Instant::now() })?;
+
+        Ok(Some(worker_wait_guard))
     }
 
     /// Return the ID of the worker executing the current MWF task.
@@ -662,6 +679,10 @@ impl MWFWrk {
         // Generate the unique id and build the message
         let message_instance_id = MWFWrk::generate_message_instance_id()?;
 
+        // Register the current worker's wait before sending the message.
+        // The guard removes the registration when this function returns or is cancelled.
+        let _worker_wait_guard = MWFWrk::register_current_worker_wait(receiver_id, &message_id, message_instance_id, MessageWaitMode::WaitThisMessage)?;
+
         // Retrieve the inheritance context of the currently processed message.
         let inheritance_context = current_message_inheritance_context();
 
@@ -800,6 +821,10 @@ impl MWFWrk {
 
         // Generate the unique id and build the message
         let message_instance_id = MWFWrk::generate_message_instance_id()?;
+
+        // Register the current worker's wait before sending the message.
+        // The guard removes the registration when this function returns or is cancelled.
+        let _worker_wait_guard = MWFWrk::register_current_worker_wait(receiver_id, &message_id, message_instance_id, MessageWaitMode::WaitThisMessage)?;
 
         // Retrieve the inheritance context of the currently processed message.
         let inheritance_context = current_message_inheritance_context();

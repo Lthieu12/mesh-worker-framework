@@ -136,7 +136,7 @@ impl Worker for SimulationWorker {
                     tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
                 }
                 let worker_id = self.worker_id.as_ref().expect("worker_id should be initialized");
-                MWFWrk::send_message_and_wait(&EntityID::new_worker(worker_id.clone()), target_worker_id, message_id, &(), *timeout_ms).await.unwrap();
+                MWFWrk::send_message_and_wait(&EntityID::new_worker(worker_id.clone()), target_worker_id, message_id, &(), *timeout_ms).await?;
             }
 
             SimulationBehavior::Message_Wait { message_delay_ms } => {
@@ -161,16 +161,12 @@ impl Worker for SimulationWorker {
 
                 // Validate the current worker ID.
                 if &current_worker_id != expected_worker_id {
-                    return Err(anyhow::anyhow!(
-                        "Unexpected current WorkerID: expected '{expected_worker_id}', got '{current_worker_id}'"
-                    ));
+                    return Err(anyhow::anyhow!("Unexpected current WorkerID: expected '{expected_worker_id}', got '{current_worker_id}'"));
                 }
 
                 // Validate the current parent ID.
                 if &current_parent_id != expected_parent_id {
-                    return Err(anyhow::anyhow!(
-                        "Unexpected current parent ID: expected '{expected_parent_id}', got '{current_parent_id}'"
-                    ));
+                    return Err(anyhow::anyhow!("Unexpected current parent ID: expected '{expected_parent_id}', got '{current_parent_id}'"));
                 }
             }
 
