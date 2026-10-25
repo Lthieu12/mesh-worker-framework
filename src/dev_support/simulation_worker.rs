@@ -35,6 +35,8 @@ pub enum SimulationBehavior {
 
     Message_SendAndWait { target_worker_id: WorkerID, message_id: MessageID, timeout_ms: Option<u64>, message_delay_ms: u64 },
 
+    Message_SendPriorityAndWait { target_worker_id: WorkerID, message_id: MessageID, timeout_ms: Option<u64>, message_delay_ms: u64 },
+
     Init_Fail,
 
     Close_Fail,
@@ -137,6 +139,18 @@ impl Worker for SimulationWorker {
                 }
                 let worker_id = self.worker_id.as_ref().expect("worker_id should be initialized");
                 MWFWrk::send_message_and_wait(&EntityID::new_worker(worker_id.clone()), target_worker_id, message_id, &(), *timeout_ms).await?;
+            }
+
+            SimulationBehavior::Message_SendPriorityAndWait { target_worker_id, message_id, timeout_ms, message_delay_ms } => {
+                // Simulate message processing work before sending.
+                if *message_delay_ms > 0 {
+                    tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
+                }
+
+                let worker_id = self.worker_id.as_ref().expect("worker_id should be initialized");
+
+                // Send a priority message and wait for its completion.
+                MWFWrk::send_priority_message_and_wait(&EntityID::new_worker(worker_id.clone()), target_worker_id, message_id, &(), *timeout_ms).await?;
             }
 
             SimulationBehavior::Message_Wait { message_delay_ms } => {

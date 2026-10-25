@@ -16,9 +16,7 @@ fn is_wait_would_deadlock(error: &MWFError) -> bool {
     match error {
         MWFError::Worker_WaitWouldDeadlock { .. } => true,
 
-        MWFError::Worker_MessageError(worker_error) => worker_error
-            .downcast_ref::<MWFError>()
-            .is_some_and(is_wait_would_deadlock),
+        MWFError::Worker_MessageError(worker_error) => worker_error.downcast_ref::<MWFError>().is_some_and(is_wait_would_deadlock),
 
         _ => false,
     }
@@ -42,26 +40,17 @@ async fn test_worker_wait_cycle() {
     let configuration_a = SimulationWorkerConfig {
         init_delay_ms: 0,
         close_delay_ms: 0,
-        simulation_behavior: SimulationBehavior::Message_SendAndWait {
-            target_worker_id: worker_b_id.clone(),
-            message_id: MessageID::new("CYCLE"),
-            timeout_ms: Some(1000),
-            message_delay_ms: 0,
-        },
+        simulation_behavior: SimulationBehavior::Message_SendAndWait { target_worker_id: worker_b_id.clone(), message_id: MessageID::new("CYCLE"), timeout_ms: Some(1000), message_delay_ms: 0 },
         wait_children_close: false,
         wait_children_close_timeout_ms: None,
     };
 
-    // Worker B waits for A, completing the potential cycle.
+    // Worker B uses the priority send-and-wait path to attempt
+    // the reverse wait, which would create the cycle A -> B -> A.
     let configuration_b = SimulationWorkerConfig {
         init_delay_ms: 0,
         close_delay_ms: 0,
-        simulation_behavior: SimulationBehavior::Message_SendAndWait {
-            target_worker_id: worker_a_id.clone(),
-            message_id: MessageID::new("CYCLE"),
-            timeout_ms: Some(1000),
-            message_delay_ms: 0,
-        },
+        simulation_behavior: SimulationBehavior::Message_SendPriorityAndWait { target_worker_id: worker_a_id.clone(), message_id: MessageID::new("CYCLE"), timeout_ms: Some(1000), message_delay_ms: 0 },
         wait_children_close: false,
         wait_children_close_timeout_ms: None,
     };
@@ -77,25 +66,11 @@ async fn test_worker_wait_cycle() {
     let test_sender_id = EntityID::new_external("TEST");
     let trigger_message_id = MessageID::new("TRIGGER");
 
-    let first_result = MWFWrk::send_message_and_wait(
-        &test_sender_id,
-        &worker_a_id,
-        &trigger_message_id,
-        &(),
-        Some(3000),
-    )
-    .await;
+    let first_result = MWFWrk::send_message_and_wait(&test_sender_id, &worker_a_id, &trigger_message_id, &(), Some(3000)).await;
 
     // Repeat the cycle. A stale registration would reject A's new wait
     // with Worker_AlreadyWaiting instead of detecting the circular wait.
-    let second_result = MWFWrk::send_message_and_wait(
-        &test_sender_id,
-        &worker_a_id,
-        &trigger_message_id,
-        &(),
-        Some(3000),
-    )
-    .await;
+    let second_result = MWFWrk::send_message_and_wait(&test_sender_id, &worker_a_id, &trigger_message_id, &(), Some(3000)).await;
 
     // Close both workers before asserting, so framework cleanup still runs
     // if an assertion below fails.
@@ -107,14 +82,8 @@ async fn test_worker_wait_cycle() {
 
     // Both attempts must fail because of the circular wait, not a stale wait entry.
     let first_error = first_result.unwrap_err();
-    assert!(
-        is_wait_would_deadlock(&first_error),
-        "Expected Worker_WaitWouldDeadlock on the first attempt, got: {first_error:?}"
-    );
+    assert!(is_wait_would_deadlock(&first_error), "Expected Worker_WaitWouldDeadlock on the first attempt, got: {first_error:?}");
 
     let second_error = second_result.unwrap_err();
-    assert!(
-        is_wait_would_deadlock(&second_error),
-        "Expected Worker_WaitWouldDeadlock on the second attempt, got: {second_error:?}"
-    );
+    assert!(is_wait_would_deadlock(&second_error), "Expected Worker_WaitWouldDeadlock on the second attempt, got: {second_error:?}");
 }
