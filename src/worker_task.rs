@@ -35,6 +35,7 @@ use crate::MWFLog;
 use crate::channel::{WorkerCommand, WorkerNormalReceiverChannel, WorkerPriorityReceiverChannel};
 use crate::framework_error::MWFPanic;
 use crate::message::{MessageInheritanceContext, WorkerMessage};
+use crate::message_wait::is_message_flow_active_for_worker;
 use crate::mwf::{MWF_WRK_CLOSE_NOTIFY, MWF_WRK_DATA, MWF_WRK_INIT_NOTIFY};
 use crate::mwf_log::{LogAction, LogStatus};
 use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerState};
@@ -238,10 +239,11 @@ async fn execute_message(worker: &mut Box<dyn Worker + Send>, worker_id: &Worker
 
     MWFLog::add_log(action_start_timer, worker_id, log_action.clone(), LogStatus::Start).expect(MWFPanic::LogBuffer_AddLogFailed.message());
 
-    // Copy the inheritance context from the message before passing ownership
-    // of the message to `on_message`.
-    // MessageInheritanceContext implements Copy, so the original message remains usable.
-    let context_to_install = message.inheritance_context;
+    // Ignore the workflow context if its workflow has already been closed.
+    let context_to_install = match message.inheritance_context.message_flow_id {
+        Some(message_flow_id) if is_message_flow_active_for_worker(message_flow_id, worker_id) => message.inheritance_context,
+        _ => MessageInheritanceContext::default(),
+    };
 
     // Make this context available while the worker processes the message.
     //
