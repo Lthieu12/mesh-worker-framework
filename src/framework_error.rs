@@ -106,15 +106,21 @@ pub enum MWFError {
     /// and can no longer generate unique identifiers.
     Message_InstanceIDExhausted,
 
-    /// The MessageFlowID counter has reached its maximum value
-    /// and can no longer generate unique identifiers.
-    Message_FlowIDExhausted,
-
     /// The MessageData type mismatch.
     Message_DataTypeMismatch { expected_type: &'static str, actual_type: &'static str },
 
     /// The message wait registry contains an inconsistent state.
     MessageWait_RegistryInconsistent,
+
+    /// The MessageFlowID counter has reached its maximum value
+    /// and can no longer generate unique identifiers.
+    MessageFlow_InstanceIDExhausted,
+
+    /// The message flow registry contains an inconsistent state.
+    MessageFlow_RegistryInconsistent,
+
+    /// The current worker has no active message flow to complete.
+    MessageFlow_NotActive,
 
     /// The ErrorInstanceID counter has reached its maximum value
     /// and can no longer generate unique identifiers.
@@ -258,16 +264,24 @@ impl fmt::Display for MWFError {
                 write!(f, "MessageInstanceID counter exhausted.")
             }
 
-            MWFError::Message_FlowIDExhausted => {
-                write!(f, "MessageFlowID counter exhausted.")
+            MWFError::Message_DataTypeMismatch { expected_type, actual_type } => {
+                write!(f, "MessageData type mismatch (expected: '{expected_type}', actual: '{actual_type}').")
             }
 
             MWFError::MessageWait_RegistryInconsistent => {
                 write!(f, "Internal MWF error: a wait cycle was detected, but a worker wait was missing from the registry.")
             }
 
-            MWFError::Message_DataTypeMismatch { expected_type, actual_type } => {
-                write!(f, "MessageData type mismatch (expected: '{expected_type}', actual: '{actual_type}').")
+            MWFError::MessageFlow_InstanceIDExhausted => {
+                write!(f, "MessageFlowID counter exhausted.")
+            }
+
+            MWFError::MessageFlow_RegistryInconsistent => {
+                write!(f, "Internal MWF error: the message flow registry is inconsistent.")
+            }
+
+            MWFError::MessageFlow_NotActive => {
+                write!(f, "No active message flow is associated with the current worker context.")
             }
 
             MWFError::Error_InstanceIDExhausted => {

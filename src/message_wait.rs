@@ -162,6 +162,61 @@ fn find_wait_cycle(sender_id: &WorkerID, receiver_id: &WorkerID, waiting_worker_
     }
 }
 
+/// Register a new message flow before submitting its initial message.
+pub(crate) fn register_message_flow(message_flow_id: MessageFlowID, worker_id: WorkerID, reply_sender: oneshot::Sender<Result<(), MWFError>>) -> Result<MessageFlowRegistrationGuard, MWFError> {
+    let mut message_wait_data_guard = MWF_MESSAGE_WAIT_DATA.write().expect(MWFPanic::MWFMessageWaitData_WriteLockPoisoned.message());
+
+    let message_wait_data = message_wait_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
+
+    // A generated flow ID must never replace an existing flow.
+    if message_wait_data.message_flow_registry.contains_key(&message_flow_id) {
+        return Err(MWFError::MessageFlow_RegistryInconsistent);
+    }
+
+    message_wait_data.message_flow_registry.insert(message_flow_id, MessageFlowState { worker_id: worker_id.clone(), reply_sender });
+
+    drop(message_wait_data_guard);
+
+    Ok(MessageFlowRegistrationGuard { message_flow_id, worker_id, armed: true })
+}
+
+/// Complete a message flow and notify its caller.
+pub(crate) fn complete_message_flow(message_flow_id: MessageFlowID, worker_id: &WorkerID, result: Result<(), MWFError>) -> Result<(), MWFError> {
+    let flow_state = take_message_flow(message_flow_id, worker_id)?;
+
+    // The caller may already have stopped waiting, for example because of a timeout.
+    let _ = flow_state.reply_sender.send(result);
+
+    Ok(())
+}
+
+/// Remove a message flow without sending a completion result.
+///
+/// Used when the initial message cannot be processed successfully.
+pub(crate) fn remove_message_flow(message_flow_id: MessageFlowID, worker_id: &WorkerID) -> Result<(), MWFError> {
+    drop(take_message_flow(message_flow_id, worker_id)?);
+    Ok(())
+}
+
+/// Remove a message flow and return its state.
+///
+/// Only the worker that owns the flow may remove it.
+fn take_message_flow(message_flow_id: MessageFlowID, worker_id: &WorkerID) -> Result<MessageFlowState, MWFError> {
+    let mut message_wait_data_guard = MWF_MESSAGE_WAIT_DATA.write().expect(MWFPanic::MWFMessageWaitData_WriteLockPoisoned.message());
+
+    let message_wait_data = message_wait_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
+
+    // Validate that the flow exists and belongs to the current worker.
+    let flow_state = message_wait_data.message_flow_registry.get(&message_flow_id).ok_or(MWFError::MessageFlow_NotActive)?;
+
+    if &flow_state.worker_id != worker_id {
+        return Err(MWFError::MessageFlow_NotActive);
+    }
+
+    // Remove the entry while still holding the write lock.
+    message_wait_data.message_flow_registry.remove(&message_flow_id).ok_or(MWFError::MessageFlow_NotActive)
+}
+
 /// Automatically removes a registered wait when the guard is dropped.
 #[derive(Debug)]
 pub(crate) struct WorkerWaitGuard {
@@ -189,6 +244,51 @@ impl Drop for WorkerWaitGuard {
 
         if should_remove {
             message_wait_data.waiting_worker_registry.remove(&self.worker_id);
+        }
+    }
+}
+
+/// Automatically removes a newly registered flow if message submission fails.
+#[derive(Debug)]
+pub(crate) struct MessageFlowRegistrationGuard {
+    /// Identifier of the registered message flow.
+    message_flow_id: MessageFlowID,
+
+    /// Worker that owns this message flow.
+    worker_id: WorkerID,
+
+    /// Indicates whether the registration still needs cleanup.
+    armed: bool,
+}
+
+impl MessageFlowRegistrationGuard {
+    /// Preserve the registration after the initial message has been submitted.
+    pub(crate) fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for MessageFlowRegistrationGuard {
+    fn drop(&mut self) {
+        // Cleanup is needed only while submission has not been confirmed.
+        if !self.armed {
+            return;
+        }
+
+        // Do not panic during cleanup if the registry lock is poisoned.
+        let Ok(mut message_wait_data_guard) = MWF_MESSAGE_WAIT_DATA.write() else {
+            return;
+        };
+
+        let Some(message_wait_data) = message_wait_data_guard.as_mut() else {
+            return;
+        };
+
+        // Remove only the flow registered by this guard and owned by this worker.
+        let should_remove = message_wait_data.message_flow_registry.get(&self.message_flow_id).is_some_and(|flow_state| flow_state.worker_id == self.worker_id);
+
+        if should_remove {
+            message_wait_data.message_flow_registry.remove(&self.message_flow_id);
         }
     }
 }

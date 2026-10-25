@@ -10,7 +10,7 @@ use crate::MWFLog;
 use crate::channel::{WorkerChannel, WorkerCommand, get_sender_channel};
 use crate::framework_error::{MWFError, MWFPanic};
 use crate::message::{MessageData, MessageFlowID, MessageID, MessageInheritanceContext, MessageInstanceID, MessageWaitMode, WorkerMessage};
-use crate::message_wait::{WorkerWaitGuard, WorkerWaitState, is_message_flow_active_for_worker, register_worker_wait};
+use crate::message_wait::{WorkerWaitGuard, WorkerWaitState, complete_message_flow, is_message_flow_active_for_worker, register_message_flow, register_worker_wait, remove_message_flow};
 use crate::mwf::{MWF_DATA, MWF_WRK_CLOSE_NOTIFY, MWF_WRK_DATA, MWF_WRK_INIT_NOTIFY, MWF_WRK_MESSAGE_FLOW_COUNTER, MWF_WRK_MESSAGE_INSTANCE_COUNTER, MWFConfiguration};
 use crate::mwf_log::{LogAction, LogStatus};
 use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerList, WorkerState, WorkerStatus, WorkerTypeID};
@@ -48,7 +48,7 @@ impl MWFWrk {
 
     /// Generate a unique MessageFlowID.
     fn generate_message_flow_id() -> Result<MessageFlowID, MWFError> {
-        MWF_WRK_MESSAGE_FLOW_COUNTER.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current_id| current_id.checked_add(1)).map_err(|_| MWFError::Message_FlowIDExhausted)
+        MWF_WRK_MESSAGE_FLOW_COUNTER.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current_id| current_id.checked_add(1)).map_err(|_| MWFError::MessageFlow_InstanceIDExhausted)
     }
 
     /// Returns the current message flow context only for messages sent to the current worker.
@@ -963,5 +963,25 @@ impl MWFWrk {
         normal_sender_channel.send(WorkerCommand::Message { message: framework_message, priority: false, unique: true }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
 
         Ok(())
+    }
+
+    /// Complete the message flow associated with the current message and forward its result.
+    ///
+    /// `workflow_result` is returned by the caller waiting for the message flow.
+    ///
+    /// The returned result indicates whether MWF successfully completed the active flow.
+    ///
+    /// Returns:
+    /// - Worker_CurrentContextUnavailable if called outside an MWF worker task.
+    /// - MessageFlow_NotActive if the current message has no active flow.
+    pub fn workflow_end(workflow_result: Result<(), MWFError>) -> Result<(), MWFError> {
+        // Identify the worker executing the current callback.
+        let worker_id = current_worker_id().ok_or(MWFError::Worker_CurrentContextUnavailable)?;
+
+        // Retrieve the workflow associated with the currently processed message.
+        let message_flow_id = current_message_inheritance_context().message_flow_id.ok_or(MWFError::MessageFlow_NotActive)?;
+
+        // Remove the flow and forward its result to the waiting caller.
+        complete_message_flow(message_flow_id, &worker_id, workflow_result)
     }
 }
