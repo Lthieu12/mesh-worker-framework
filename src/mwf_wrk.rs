@@ -642,6 +642,90 @@ impl MWFWrk {
         MWFWrk::abort_worker_list(&MWFWrk::get_children_ids(entity_id)?)
     }
 
+    /// Send a message through the specified worker channel.
+    async fn send_message_internal<TMessageID, TMessageData>(sender_id: &EntityID, receiver_id: &WorkerID, message_id: &TMessageID, message_data: &TMessageData, channel: WorkerChannel) -> Result<(), MWFError>
+    where
+        TMessageID: Into<MessageID> + Clone,
+        TMessageData: Clone + Send + Sync + 'static,
+    {
+        // Validate the message identifier.
+        let message_id = message_id.clone().into();
+        if !message_id.is_valid() {
+            return Err(MWFError::Message_Invalid { message_id });
+        }
+
+        // Determine the message priority and retrieve its sender channel.
+        let priority = match &channel {
+            WorkerChannel::Normal => false,
+            WorkerChannel::Priority => true,
+        };
+        let sender_channel = get_sender_channel(sender_id, receiver_id, channel)?;
+
+        // Generate a unique identifier for this message instance.
+        let message_instance_id = Self::generate_message_instance_id()?;
+
+        // Inherit the current workflow only when sending to the same worker.
+        let inheritance_context = Self::get_message_inheritance_context_for_receiver(receiver_id);
+
+        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, inheritance_context);
+
+        // Send the message to the target worker.
+        sender_channel.send(WorkerCommand::Message { message: framework_message, priority, unique: false }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
+
+        Ok(())
+    }
+
+    /// Send a message and wait for the requested completion mode.
+    async fn send_message_and_wait_internal<TMessageID, TMessageData>(sender_id: &EntityID, receiver_id: &WorkerID, message_id: &TMessageID, wait_mode: MessageWaitMode, message_data: &TMessageData, timeout_ms: Option<u64>, channel: WorkerChannel) -> Result<(), MWFError>
+    where
+        TMessageID: Into<MessageID> + Clone,
+        TMessageData: Clone + Send + Sync + 'static,
+    {
+        // Validate the message identifier.
+        let message_id = message_id.clone().into();
+        if !message_id.is_valid() {
+            return Err(MWFError::Message_Invalid { message_id });
+        }
+
+        // Resolve the channel and whether the message is a priority message.
+        let priority = match &channel {
+            WorkerChannel::Normal => false,
+            WorkerChannel::Priority => true,
+        };
+        let sender_channel = get_sender_channel(sender_id, receiver_id, channel)?;
+
+        // Generate an identifier for this message instance.
+        let message_instance_id = Self::generate_message_instance_id()?;
+
+        // Register the current worker's wait to detect deadlocks.
+        let _worker_wait_guard = Self::register_current_worker_wait(receiver_id, &message_id, message_instance_id, wait_mode)?;
+
+        // Workflow propagation will be implemented in the dedicated wait handlers.
+        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, MessageInheritanceContext::default());
+
+        // Create a reply channel for the message callback result.
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<Result<(), WorkerError>>();
+
+        // Submit the message to the selected channel.
+        sender_channel.send(WorkerCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
+
+        // Wait for callback completion or timeout.
+        let worker_result = match timeout_ms {
+            Some(timeout_ms) => match tokio::time::timeout(Duration::from_millis(timeout_ms), reply_receiver).await {
+                Ok(Ok(worker_result)) => worker_result,
+                Ok(Err(_)) => return Err(MWFError::Worker_ChannelClosed),
+                Err(_) => return Err(MWFError::Operation_Timeout),
+            },
+            None => match reply_receiver.await {
+                Ok(worker_result) => worker_result,
+                Err(_) => return Err(MWFError::Worker_ChannelClosed),
+            },
+        };
+
+        // Forward any error returned by the worker callback.
+        worker_result.map_err(MWFError::Worker_MessageError)
+    }
+
     /// Send a message to a worker.
     ///
     /// `message_id` may be any type implementing `Into<MessageID>`.
@@ -650,27 +734,7 @@ impl MWFWrk {
         TMessageID: Into<MessageID> + Clone,
         TMessageData: Clone + Send + Sync + 'static,
     {
-        // Convert the message identifier.
-        let message_id = message_id.clone().into();
-        if !message_id.is_valid() {
-            return Err(MWFError::Message_Invalid { message_id });
-        }
-
-        // Retrieve the normal sender channel.
-        let normal_sender_channel = get_sender_channel(sender_id, receiver_id, WorkerChannel::Normal)?;
-
-        // Generate the unique id and build the message
-        let message_instance_id = MWFWrk::generate_message_instance_id()?;
-
-        // Inherit the current workflow only when sending a message to this same worker.
-        let inheritance_context = MWFWrk::get_message_inheritance_context_for_receiver(receiver_id);
-
-        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, inheritance_context);
-
-        // Send the message to the target worker.
-        normal_sender_channel.send(WorkerCommand::Message { message: framework_message, priority: false, unique: false }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
-
-        Ok(())
+        Self::send_message_internal(sender_id, receiver_id, message_id, message_data, WorkerChannel::Normal).await
     }
 
     /// Send a message and wait until the receiver has finished
@@ -687,99 +751,7 @@ impl MWFWrk {
         TMessageID: Into<MessageID> + Clone,
         TMessageData: Clone + Send + Sync + 'static,
     {
-        // Convert the message identifier.
-        let message_id = message_id.clone().into();
-        if !message_id.is_valid() {
-            return Err(MWFError::Message_Invalid { message_id });
-        }
-
-        // Retrieve the normal sender channel.
-        let normal_sender_channel = get_sender_channel(sender_id, receiver_id, WorkerChannel::Normal)?;
-
-        // Generate the unique id and build the message
-        let message_instance_id = MWFWrk::generate_message_instance_id()?;
-
-        // Register the current worker's wait before sending the message.
-        // The guard removes the registration when this function returns or is cancelled.
-        let _worker_wait_guard = MWFWrk::register_current_worker_wait(receiver_id, &message_id, message_instance_id, wait_mode)?;
-
-        // Select the message flow context according to the requested wait mode.
-        let inheritance_context = match wait_mode {
-            MessageWaitMode::WaitThisMessage => MessageInheritanceContext::default(),
-            MessageWaitMode::WaitMessageFlow => MessageInheritanceContext::default(),
-        };
-
-        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, inheritance_context);
-
-        // Create a temporary reply channel used to signal
-        // completion of on_message().
-        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<Result<(), WorkerError>>();
-
-        // Send the message to the receiver worker.
-        normal_sender_channel.send(WorkerCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority: false }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
-
-        // Wait for completion or timeout.
-        //
-        // The reply channel transports the Result returned
-        // by the receiver on_message() callback.
-        let worker_result: Result<(), WorkerError> = match timeout_ms {
-            Some(timeout_ms) => {
-                // Wait until the receiver worker finishes
-                // processing the message.
-                //
-                // timeout() returns:
-                // - Ok(channel_result) if the receiver replied.
-                // - Err(Elapsed) if the timeout expires.
-                let timeout_result = tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), reply_receiver).await;
-
-                // Convert timeout errors into MWF errors.
-                let channel_result = match timeout_result {
-                    Ok(channel_result) => channel_result,
-                    Err(_) => {
-                        return Err(MWFError::Operation_Timeout);
-                    }
-                };
-
-                // The receiver worker task has disappeared
-                // before sending its completion status.
-                //
-                // channel_result contains:
-                // - Ok(worker_result)
-                // - Err(RecvError)
-                match channel_result {
-                    Ok(worker_result) => worker_result,
-                    Err(_) => {
-                        return Err(MWFError::Worker_ChannelClosed);
-                    }
-                }
-            }
-
-            None => {
-                // Wait indefinitely until the receiver worker
-                // finishes processing the message.
-                let channel_result = reply_receiver.await;
-
-                // The receiver worker task has disappeared
-                // before sending its completion status.
-                match channel_result {
-                    Ok(worker_result) => worker_result,
-                    Err(_) => {
-                        return Err(MWFError::Worker_ChannelClosed);
-                    }
-                }
-            }
-        };
-
-        // The receiver worker returned an error while
-        // processing the message.
-        match worker_result {
-            Ok(()) => {}
-            Err(worker_error) => {
-                return Err(MWFError::Worker_MessageError(worker_error));
-            }
-        }
-
-        Ok(())
+        Self::send_message_and_wait_internal(sender_id, receiver_id, message_id, wait_mode, message_data, timeout_ms, WorkerChannel::Normal).await
     }
 
     /// Send a priority message to a worker.
@@ -793,27 +765,7 @@ impl MWFWrk {
         TMessageID: Into<MessageID> + Clone,
         TMessageData: Clone + Send + Sync + 'static,
     {
-        // Convert the message identifier.
-        let message_id = message_id.clone().into();
-        if !message_id.is_valid() {
-            return Err(MWFError::Message_Invalid { message_id });
-        }
-
-        // Retrieve the priority sender channel.
-        let priority_sender_channel = get_sender_channel(sender_id, receiver_id, WorkerChannel::Priority)?;
-
-        // Generate the unique id and build the message
-        let message_instance_id = MWFWrk::generate_message_instance_id()?;
-
-        // Inherit the current workflow only when sending a message to this same worker.
-        let inheritance_context = MWFWrk::get_message_inheritance_context_for_receiver(receiver_id);
-
-        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, inheritance_context);
-
-        // Send the priority message to the target worker.
-        priority_sender_channel.send(WorkerCommand::Message { message: framework_message, priority: true, unique: false }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
-
-        Ok(())
+        Self::send_message_internal(sender_id, receiver_id, message_id, message_data, WorkerChannel::Priority).await
     }
 
     /// Send a priority message and wait until the receiver has finished
@@ -833,99 +785,7 @@ impl MWFWrk {
         TMessageID: Into<MessageID> + Clone,
         TMessageData: Clone + Send + Sync + 'static,
     {
-        // Convert the message identifier.
-        let message_id = message_id.clone().into();
-        if !message_id.is_valid() {
-            return Err(MWFError::Message_Invalid { message_id });
-        }
-
-        // Retrieve the priority sender channel.
-        let priority_sender_channel = get_sender_channel(sender_id, receiver_id, WorkerChannel::Priority)?;
-
-        // Generate the unique id and build the message
-        let message_instance_id = MWFWrk::generate_message_instance_id()?;
-
-        // Register the current worker's wait before sending the message.
-        // The guard removes the registration when this function returns or is cancelled.
-        let _worker_wait_guard = MWFWrk::register_current_worker_wait(receiver_id, &message_id, message_instance_id, wait_mode)?;
-
-        // Select the message flow context according to the requested wait mode.
-        let inheritance_context = match wait_mode {
-            MessageWaitMode::WaitThisMessage => MessageInheritanceContext::default(),
-            MessageWaitMode::WaitMessageFlow => MessageInheritanceContext::default(),
-        };
-
-        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, inheritance_context);
-
-        // Create a temporary reply channel used to signal
-        // completion of on_message().
-        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel();
-
-        // Send the message to the receiver worker.
-        priority_sender_channel.send(WorkerCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority: true }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
-
-        // Wait for completion or timeout.
-        //
-        // The reply channel transports the Result returned
-        // by the receiver on_message() callback.
-        let worker_result: Result<(), WorkerError> = match timeout_ms {
-            Some(timeout_ms) => {
-                // Wait until the receiver worker finishes
-                // processing the message.
-                //
-                // timeout() returns:
-                // - Ok(channel_result) if the receiver replied.
-                // - Err(Elapsed) if the timeout expires.
-                let timeout_result = tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), reply_receiver).await;
-
-                // Convert timeout errors into MWF errors.
-                let channel_result = match timeout_result {
-                    Ok(channel_result) => channel_result,
-                    Err(_) => {
-                        return Err(MWFError::Operation_Timeout);
-                    }
-                };
-
-                // The receiver worker task has disappeared
-                // before sending its completion status.
-                //
-                // channel_result contains:
-                // - Ok(worker_result)
-                // - Err(RecvError)
-                match channel_result {
-                    Ok(worker_result) => worker_result,
-                    Err(_) => {
-                        return Err(MWFError::Worker_ChannelClosed);
-                    }
-                }
-            }
-
-            None => {
-                // Wait indefinitely until the receiver worker
-                // finishes processing the message.
-                let channel_result = reply_receiver.await;
-
-                // The receiver worker task has disappeared
-                // before sending its completion status.
-                match channel_result {
-                    Ok(worker_result) => worker_result,
-                    Err(_) => {
-                        return Err(MWFError::Worker_ChannelClosed);
-                    }
-                }
-            }
-        };
-
-        // The receiver worker returned an error while
-        // processing the message.
-        match worker_result {
-            Ok(()) => {}
-            Err(worker_error) => {
-                return Err(MWFError::Worker_MessageError(worker_error));
-            }
-        }
-
-        Ok(())
+        Self::send_message_and_wait_internal(sender_id, receiver_id, message_id, wait_mode, message_data, timeout_ms, WorkerChannel::Priority).await
     }
 
     /// Send a unique message to a worker.
