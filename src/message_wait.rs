@@ -210,6 +210,29 @@ fn take_message_flow(message_flow_id: MessageFlowID, worker_id: &WorkerID) -> Re
     message_wait_data.message_flow_registry.remove(&message_flow_id).ok_or(MWFError::MessageFlow_NotActive)
 }
 
+/// Removes all active message flows owned by a worker task and notifies their waiters.
+///
+/// The registry lock is released before notifying waiters.
+pub(crate) fn cleanup_worker_task_message_flows(worker_id: &WorkerID) -> Result<(), MWFError> {
+    // Remove all flows owned by this worker while holding the registry lock.
+    let flow_states = {
+        let mut message_wait_data_guard = MWF_MESSAGE_WAIT_DATA.write().map_err(|_| MWFError::MessageWait_RegistryInconsistent)?;
+
+        let message_wait_data = message_wait_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
+
+        let message_flow_ids = message_wait_data.message_flow_registry.iter().filter_map(|(message_flow_id, flow_state)| (&flow_state.worker_id == worker_id).then_some(*message_flow_id)).collect::<Vec<_>>();
+
+        message_flow_ids.into_iter().filter_map(|message_flow_id| message_wait_data.message_flow_registry.remove(&message_flow_id)).collect::<Vec<_>>()
+    };
+
+    // Notify waiters only after releasing the registry lock.
+    for flow_state in flow_states {
+        let _ = flow_state.reply_sender.send(Err(MWFError::MessageFlow_WorkerTaskTerminated { worker_id: worker_id.clone() }));
+    }
+
+    Ok(())
+}
+
 /// Send a message and wait until its callback has completed.
 pub(crate) async fn wait_this_message<TMessageData>(sender_channel: WorkerSenderChannel, sender_id: &EntityID, receiver_id: &WorkerID, message_id: &MessageID, message_instance_id: MessageInstanceID, message_data: &TMessageData, timeout_ms: Option<u64>, priority: bool) -> Result<(), MWFError>
 where

@@ -122,6 +122,9 @@ pub enum MWFError {
     /// The current worker has no active message flow to complete.
     MessageFlow_NotActive,
 
+    /// The worker task terminated while message flows were still active.
+    MessageFlow_WorkerTaskTerminated { worker_id: WorkerID },
+
     /// The ErrorInstanceID counter has reached its maximum value
     /// and can no longer generate unique identifiers.
     Error_InstanceIDExhausted,
@@ -282,6 +285,10 @@ impl fmt::Display for MWFError {
 
             MWFError::MessageFlow_NotActive => {
                 write!(f, "No active message flow is associated with the current worker context.")
+            }
+
+            MWFError::MessageFlow_WorkerTaskTerminated { worker_id } => {
+                write!(f, "Worker task '{worker_id}' terminated before completing its message flow.")
             }
 
             MWFError::Error_InstanceIDExhausted => {

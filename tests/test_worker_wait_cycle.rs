@@ -87,3 +87,41 @@ async fn test_worker_wait_cycle() {
     let second_error = second_result.unwrap_err();
     assert!(is_wait_would_deadlock(&second_error), "Expected Worker_WaitWouldDeadlock on the second attempt, got: {second_error:?}");
 }
+
+/// Verify that aborting a worker completes its active message flows with a termination error.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+async fn test_worker_abort_cleans_up_active_message_flow() {
+    MWF::init().unwrap();
+    MWF::register_worker_type::<SimulationWorker>().unwrap();
+
+    let parent_id = EntityID::new_external("MAIN");
+    let worker_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &parent_id).unwrap();
+
+    let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Wait { message_delay_ms: 2_000 }, wait_children_close: false, wait_children_close_timeout_ms: None };
+
+    MWFWrk::init_worker(&worker_id, &configuration).await.unwrap();
+    MWFWrk::wait_worker_list_init(&vec![worker_id.clone()], Some(1_000)).await.unwrap();
+
+    // WaitMessageFlow is owned by the receiver, so aborting this worker must
+    // notify the caller even though its message callback has not completed.
+    let sender_id = EntityID::new_external("TEST");
+    let message_id = MessageID::new("ACTIVE_FLOW");
+    let worker_id_for_wait = worker_id.clone();
+    let wait_handle = tokio::spawn(async move { MWFWrk::send_message_and_wait(&sender_id, &worker_id_for_wait, &message_id, MessageWaitMode::WaitMessageFlow, &(), Some(3_000)).await });
+
+    // Give the send operation time to register the flow and start the callback.
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    MWFWrk::abort_worker(&worker_id).unwrap();
+
+    let result = tokio::time::timeout(std::time::Duration::from_secs(2), wait_handle).await.expect("Message flow waiter did not complete after worker abort").expect("Message flow waiter task panicked");
+
+    MWF::close().unwrap();
+
+    match result {
+        Err(MWFError::MessageFlow_WorkerTaskTerminated { worker_id: terminated_worker_id }) => {
+            assert_eq!(terminated_worker_id, worker_id);
+        }
+        other => panic!("Expected MessageFlow_WorkerTaskTerminated, got: {other:?}"),
+    }
+}

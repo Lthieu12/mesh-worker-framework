@@ -35,7 +35,7 @@ use crate::MWFLog;
 use crate::channel::{WorkerCommand, WorkerNormalReceiverChannel, WorkerPriorityReceiverChannel};
 use crate::framework_error::MWFPanic;
 use crate::message::{MessageInheritanceContext, WorkerMessage};
-use crate::message_wait::is_message_flow_active_for_worker;
+use crate::message_wait::{cleanup_worker_task_message_flows, is_message_flow_active_for_worker};
 use crate::mwf::{MWF_WRK_CLOSE_NOTIFY, MWF_WRK_DATA, MWF_WRK_INIT_NOTIFY};
 use crate::mwf_log::{LogAction, LogStatus};
 use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerState};
@@ -55,6 +55,25 @@ struct WorkerExecutionContext {
 
     /// ID of the entity that spawned the current worker.
     parent_id: EntityID,
+}
+
+/// Cleans up active message flows when a worker task terminates.
+struct WorkerTaskCleanupGuard {
+    /// ID of the worker whose message flows must be cleaned up.
+    worker_id: WorkerID,
+}
+
+impl Drop for WorkerTaskCleanupGuard {
+    fn drop(&mut self) {
+        // Remove remaining message flows and notify their waiters.
+        if let Err(error) = cleanup_worker_task_message_flows(&self.worker_id) {
+            // Convert MWFError to anyhow::Error for internal error logging.
+            let error = anyhow::Error::new(error);
+
+            // Do not panic while cleaning up a terminating worker task.
+            let _ = MWFErr::add_error_internal(&EntityID::Worker(self.worker_id.clone()), Some("cleanup_worker_task_message_flows".into()), &error);
+        }
+    }
 }
 
 /// Return the ID of the worker executing the current MWF task.
@@ -288,6 +307,8 @@ async fn execute_message(worker: &mut Box<dyn Worker + Send>, worker_id: &Worker
 /// - Report errors and log worker activity.
 /// - Terminate when the worker is closed.
 async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: WorkerNormalReceiverChannel, priority_receiver_channel: WorkerPriorityReceiverChannel, worker_id: WorkerID, parent_id: EntityID) {
+    let _cleanup_guard = WorkerTaskCleanupGuard { worker_id: worker_id.clone() };
+
     // WorkerTask owns the worker instance.
     //
     // All worker callbacks are executed
