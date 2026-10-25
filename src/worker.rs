@@ -471,7 +471,7 @@ pub trait Worker {
         Self: Sized;
 
     /// Called once when the worker is initialized.
-    async fn on_init(&mut self, worker_id: WorkerID, parent_id: EntityID, init_data: MessageData) -> Result<(), WorkerError>;
+    async fn on_init(&mut self, init_data: MessageData) -> Result<(), WorkerError>;
 
     /// Called when a message is received by the worker.
     async fn on_message(&mut self, message: WorkerMessage) -> Result<(), WorkerError>;

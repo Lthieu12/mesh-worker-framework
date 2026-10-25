@@ -40,18 +40,34 @@ use crate::mwf_log::{LogAction, LogStatus};
 use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerState};
 
 tokio::task_local! {
-    /// Worker currently executing a message callback.
-    static CURRENT_WORKER_ID: WorkerID;
+    /// Execution context of the current MWF worker task.
+    static CURRENT_WORKER_CONTEXT: WorkerExecutionContext;
     /// Inheritance context of the message currently being processed.
     static CURRENT_MESSAGE_INHERITANCE_CONTEXT: MessageInheritanceContext;
 }
 
-/// Return the ID of the worker currently executing a message callback.
-///
-/// Returns `None` when called outside a worker message callback.
+/// Execution context associated with a worker task.
+#[derive(Debug)]
+struct WorkerExecutionContext {
+    /// ID of the worker executing the current task.
+    worker_id: WorkerID,
+
+    /// ID of the entity that spawned the current worker.
+    parent_id: EntityID,
+}
+
+/// Return the ID of the worker executing the current MWF task.
 pub(crate) fn current_worker_id() -> Option<WorkerID> {
-    match CURRENT_WORKER_ID.try_with(|worker_id| worker_id.clone()) {
+    match CURRENT_WORKER_CONTEXT.try_with(|context| context.worker_id.clone()) {
         Ok(worker_id) => Some(worker_id),
+        Err(_) => None,
+    }
+}
+
+/// Return the parent entity ID of the current worker.
+pub(crate) fn current_parent_id() -> Option<EntityID> {
+    match CURRENT_WORKER_CONTEXT.try_with(|context| context.parent_id.clone()) {
+        Ok(parent_id) => Some(parent_id),
         Err(_) => None,
     }
 }
@@ -154,58 +170,59 @@ impl PendingCommands {
 /// and shutdown.
 pub(crate) fn spawn_worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: WorkerNormalReceiverChannel, priority_receiver_channel: WorkerPriorityReceiverChannel, worker_id: WorkerID, parent_id: EntityID) -> JoinHandle<()> {
     tokio::spawn(async move {
-        // Keep the worker ID available throughout the complete task lifecycle.
-        let context_worker_id = worker_id.clone();
-        // Keep a separate copy for panic reporting and registry cleanup.       
+        // Keep the worker ID and parent ID available throughout the complete task lifecycle.
+        let worker_context = WorkerExecutionContext { worker_id: worker_id.clone(), parent_id: parent_id.clone() };
+        // Keep a separate copy for panic reporting and registry cleanup.
         let task_worker_id = worker_id.clone();
-        
-        // Execute the worker lifecycle with its ID available through the task-local context.
-        CURRENT_WORKER_ID.scope(context_worker_id, async move {
 
-            // Execute the worker task while catching Rust panics.
-            //
-            // Ok(())           => normal termination.
-            // Err(payload)     => worker panicked.
-            //
-            // Native crashes (unsafe/DLL) are not recoverable.
-            let result = AssertUnwindSafe(worker_task(worker, normal_receiver_channel, priority_receiver_channel, worker_id, parent_id)).catch_unwind().await;
+        // Keep the worker execution context available throughout the task lifecycle.
+        CURRENT_WORKER_CONTEXT
+            .scope(worker_context, async move {
+                // Execute the worker task while catching Rust panics.
+                //
+                // Ok(())           => normal termination.
+                // Err(payload)     => worker panicked.
+                //
+                // Native crashes (unsafe/DLL) are not recoverable.
+                let result = AssertUnwindSafe(worker_task(worker, normal_receiver_channel, priority_receiver_channel, worker_id, parent_id)).catch_unwind().await;
 
-            match result {
-                Ok(()) => {
-                    // Nothing to do.
+                match result {
+                    Ok(()) => {
+                        // Nothing to do.
+                    }
+
+                    Err(payload) => {
+                        let panic_error = if let Some(message) = payload.downcast_ref::<&str>() {
+                            anyhow::anyhow!("{}", message)
+                        } else if let Some(message) = payload.downcast_ref::<String>() {
+                            anyhow::anyhow!("{}", message)
+                        } else {
+                            anyhow::anyhow!("Unknown panic")
+                        };
+
+                        // Store the panic in MWFErr.
+                        MWFErr::add_error_internal(&EntityID::Worker(task_worker_id.clone()), Some("worker_task".into()), &panic_error).expect(MWFPanic::ErrorBuffer_AddErrorFailed.message());
+                        // Log the panic in MWFLog
+                        MWFLog::add_log(Instant::now(), &task_worker_id, LogAction::WorkerPanic, LogStatus::Error).expect(MWFPanic::LogBuffer_AddLogFailed.message());
+
+                        let mut mwf_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
+                        let mwf_data = mwf_data_guard.as_mut().expect(MWFPanic::MWFWrkData_Missing.message());
+
+                        // Update the worker state.
+                        mwf_data.worker_registry.set_worker_state(&task_worker_id, WorkerState::Panicked).expect(MWFPanic::Registry_WorkerMissing.message());
+
+                        // Remove the worker from the Registry.
+                        mwf_data.worker_registry.remove_worker(&task_worker_id).expect(MWFPanic::Registry_WorkerMissing.message());
+
+                        drop(mwf_data_guard);
+
+                        // Wake up all waiters interested in worker
+                        // shutdown events.
+                        MWF_WRK_CLOSE_NOTIFY.notify_waiters();
+                    }
                 }
-
-                Err(payload) => {
-                    let panic_error = if let Some(message) = payload.downcast_ref::<&str>() {
-                        anyhow::anyhow!("{}", message)
-                    } else if let Some(message) = payload.downcast_ref::<String>() {
-                        anyhow::anyhow!("{}", message)
-                    } else {
-                        anyhow::anyhow!("Unknown panic")
-                    };
-
-                    // Store the panic in MWFErr.
-                    MWFErr::add_error_internal(&EntityID::Worker(task_worker_id.clone()), Some("worker_task".into()), &panic_error).expect(MWFPanic::ErrorBuffer_AddErrorFailed.message());
-                    // Log the panic in MWFLog
-                    MWFLog::add_log(Instant::now(), &task_worker_id, LogAction::WorkerPanic, LogStatus::Error).expect(MWFPanic::LogBuffer_AddLogFailed.message());
-
-                    let mut mwf_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
-                    let mwf_data = mwf_data_guard.as_mut().expect(MWFPanic::MWFWrkData_Missing.message());
-
-                    // Update the worker state.
-                    mwf_data.worker_registry.set_worker_state(&task_worker_id, WorkerState::Panicked).expect(MWFPanic::Registry_WorkerMissing.message());
-
-                    // Remove the worker from the Registry.
-                    mwf_data.worker_registry.remove_worker(&task_worker_id).expect(MWFPanic::Registry_WorkerMissing.message());
-
-                    drop(mwf_data_guard);
-
-                    // Wake up all waiters interested in worker
-                    // shutdown events.
-                    MWF_WRK_CLOSE_NOTIFY.notify_waiters();
-                }
-            }
-        }).await;
+            })
+            .await;
     })
 }
 
@@ -334,7 +351,7 @@ async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: Wo
                 let action_start_timer = Instant::now();
                 MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerInit, LogStatus::Start).expect(MWFPanic::LogBuffer_AddLogFailed.message());
 
-                let result_init = worker.on_init(worker_id.clone(), parent_id.clone(), init_data).await;
+                let result_init = worker.on_init(init_data).await;
 
                 // Publish successful initialization.
                 //

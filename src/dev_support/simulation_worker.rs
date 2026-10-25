@@ -97,7 +97,7 @@ impl Worker for SimulationWorker {
         Self { worker_id: None, parent_id: None, init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None }
     }
 
-    async fn on_init(&mut self, worker_id: WorkerID, parent_id: EntityID, init_data: MessageData) -> Result<(), WorkerError> {
+    async fn on_init(&mut self, init_data: MessageData) -> Result<(), WorkerError> {
         // Deserialize the simulation worker configuration.
         let configuration = init_data.into::<SimulationWorkerConfig>()?;
 
@@ -107,9 +107,9 @@ impl Worker for SimulationWorker {
         self.wait_children_close = configuration.wait_children_close;
         self.wait_children_close_timeout_ms = configuration.wait_children_close_timeout_ms;
 
-        // Store runtime identifiers provided by MWF.
-        self.worker_id = Some(worker_id);
-        self.parent_id = Some(parent_id);
+        // Store runtime identifiers from the current worker execution context.
+        self.worker_id = Some(MWFWrk::get_current_worker_id()?);
+        self.parent_id = Some(MWFWrk::get_current_parent_id()?);
 
         // Simulate init work.
         if self.init_delay_ms > 0 {

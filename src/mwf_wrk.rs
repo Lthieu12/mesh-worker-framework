@@ -14,7 +14,7 @@ use crate::mwf::{MWF_DATA, MWF_WRK_CLOSE_NOTIFY, MWF_WRK_DATA, MWF_WRK_INIT_NOTI
 use crate::mwf_log::{LogAction, LogStatus};
 use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerList, WorkerState, WorkerStatus, WorkerTypeID};
 use crate::worker_registry::Registry;
-use crate::worker_task::{current_message_inheritance_context, spawn_worker_task};
+use crate::worker_task::{current_message_inheritance_context, current_parent_id, current_worker_id, spawn_worker_task};
 
 /// Internal MWFWrk runtime data.
 #[derive(Debug)]
@@ -48,6 +48,26 @@ impl MWFWrk {
     /// Generate a unique MessageFlowID.
     fn generate_message_flow_id() -> Result<MessageFlowID, MWFError> {
         MWF_WRK_MESSAGE_FLOW_COUNTER.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current_id| current_id.checked_add(1)).map_err(|_| MWFError::Message_FlowIDExhausted)
+    }
+
+    /// Return the ID of the worker executing the current MWF task.
+    ///
+    /// Returns an error when called outside an MWF worker task.
+    pub fn get_current_worker_id() -> Result<WorkerID, MWFError> {
+        match current_worker_id() {
+            Some(worker_id) => Ok(worker_id),
+            None => Err(MWFError::Worker_CurrentContextUnavailable),
+        }
+    }
+
+    /// Return the parent entity ID of the current worker.
+    ///
+    /// Returns an error when called outside an MWF worker task.
+    pub fn get_current_parent_id() -> Result<EntityID, MWFError> {
+        match current_parent_id() {
+            Some(parent_id) => Ok(parent_id),
+            None => Err(MWFError::Worker_CurrentContextUnavailable),
+        }
     }
 
     /// Create and register a new worker instance from its WorkerTypeID.

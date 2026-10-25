@@ -40,11 +40,11 @@ impl Worker for DemoWorker {
         Self { worker_id: None, parent_id: None }
     }
 
-    async fn on_init(&mut self, worker_id: WorkerID, parent_id: EntityID, _init_data: MessageData) -> Result<(), WorkerError> {
+    async fn on_init(&mut self, _init_data: MessageData) -> Result<(), WorkerError> {
         // Store identifiers for later use (for example to send messages or
         // spawn child workers from within the worker).
-        self.worker_id = Some(worker_id);
-        self.parent_id = Some(parent_id);
+        self.worker_id = Some(MWFWrk::get_current_worker_id()?);
+        self.parent_id = Some(MWFWrk::get_current_parent_id()?);
 
         Ok(())
     }

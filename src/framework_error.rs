@@ -93,6 +93,9 @@ pub enum MWFError {
     /// The requested wait would create a deadlock cycle.
     Worker_WaitWouldDeadlock { sender_id: WorkerID, receiver_id: WorkerID, waiting_worker_id: WorkerID, waiting_receiver_id: WorkerID, waiting_message_id: MessageID, waiting_message_instance_id: MessageInstanceID, waiting_mode: MessageWaitMode, wait_chain: Vec<WorkerID> },
 
+    /// The current execution is not associated with an MWF worker task.
+    Worker_CurrentContextUnavailable,
+
     /// The requested father worker was not found.
     ParentWorker_NotFound,
 
@@ -237,6 +240,10 @@ impl fmt::Display for MWFError {
                     (MessageInstanceID: {waiting_message_instance_id}, wait mode: {waiting_mode:?}). \
                     This would create a circular wait: {wait_chain}."
                 )
+            }
+
+            MWFError::Worker_CurrentContextUnavailable => {
+                write!(f, "This operation requires an active MWF worker execution context.")
             }
 
             MWFError::ParentWorker_NotFound => {
