@@ -1,13 +1,14 @@
 //! Internal message wait and flow management.
 
 use std::collections::{HashMap, HashSet};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tokio::sync::oneshot;
 
-use crate::framework_error::{MWFError, MWFPanic};
-use crate::message::{MessageFlowID, MessageID, MessageInstanceID, MessageWaitMode};
+use crate::channel::{WorkerCommand, WorkerSenderChannel};
+use crate::framework_error::{MWFError, MWFPanic, WorkerError};
+use crate::message::{MessageFlowID, MessageID, MessageInheritanceContext, MessageInstanceID, MessageWaitMode, WorkerMessage};
 use crate::mwf::MWF_MESSAGE_WAIT_DATA;
-use crate::worker::WorkerID;
+use crate::worker::{EntityID, WorkerID};
 
 /// Runtime state associated with an active message flow.
 #[derive(Debug)]
@@ -190,14 +191,6 @@ pub(crate) fn complete_message_flow(message_flow_id: MessageFlowID, worker_id: &
     Ok(())
 }
 
-/// Remove a message flow without sending a completion result.
-///
-/// Used when the initial message cannot be processed successfully.
-pub(crate) fn remove_message_flow(message_flow_id: MessageFlowID, worker_id: &WorkerID) -> Result<(), MWFError> {
-    drop(take_message_flow(message_flow_id, worker_id)?);
-    Ok(())
-}
-
 /// Remove a message flow and return its state.
 ///
 /// Only the worker that owns the flow may remove it.
@@ -215,6 +208,80 @@ fn take_message_flow(message_flow_id: MessageFlowID, worker_id: &WorkerID) -> Re
 
     // Remove the entry while still holding the write lock.
     message_wait_data.message_flow_registry.remove(&message_flow_id).ok_or(MWFError::MessageFlow_NotActive)
+}
+
+/// Send a message and wait until its callback has completed.
+pub(crate) async fn wait_this_message<TMessageData>(sender_channel: WorkerSenderChannel, sender_id: &EntityID, receiver_id: &WorkerID, message_id: &MessageID, message_instance_id: MessageInstanceID, message_data: &TMessageData, timeout_ms: Option<u64>, priority: bool) -> Result<(), MWFError>
+where
+    TMessageData: Clone + Send + Sync + 'static,
+{
+    // Messages waiting for a callback do not inherit a workflow.
+    let framework_message = WorkerMessage::new(sender_id, receiver_id, message_id, message_instance_id, message_data, MessageInheritanceContext::default());
+
+    let (reply_sender, reply_receiver) = oneshot::channel::<Result<(), WorkerError>>();
+
+    // Submit a message whose completion is reported by the worker task.
+    sender_channel.send(WorkerCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
+
+    // Wait for the callback result or the timeout.
+    let worker_result = match timeout_ms {
+        Some(timeout_ms) => match tokio::time::timeout(Duration::from_millis(timeout_ms), reply_receiver).await {
+            Ok(Ok(worker_result)) => worker_result,
+            Ok(Err(_)) => return Err(MWFError::Worker_ChannelClosed),
+            Err(_) => return Err(MWFError::Operation_Timeout),
+        },
+        None => match reply_receiver.await {
+            Ok(worker_result) => worker_result,
+            Err(_) => return Err(MWFError::Worker_ChannelClosed),
+        },
+    };
+
+    worker_result.map_err(MWFError::Worker_MessageError)
+}
+
+/// Send a message and wait until its entire message flow has completed.
+pub(crate) async fn wait_message_flow<TMessageData>(
+    sender_channel: WorkerSenderChannel,
+    sender_id: &EntityID,
+    receiver_id: &WorkerID,
+    message_id: &MessageID,
+    message_instance_id: MessageInstanceID,
+    message_flow_id: MessageFlowID,
+    message_data: &TMessageData,
+    timeout_ms: Option<u64>,
+    priority: bool,
+) -> Result<(), MWFError>
+where
+    TMessageData: Clone + Send + Sync + 'static,
+{
+    // Register the new flow before submitting its initial message.
+    let (flow_reply_sender, flow_reply_receiver) = oneshot::channel::<Result<(), MWFError>>();
+
+    let mut flow_registration_guard = register_message_flow(message_flow_id, receiver_id.clone(), flow_reply_sender)?;
+
+    // Associate the new flow with its initial message.
+    let inheritance_context = MessageInheritanceContext { message_flow_id: Some(message_flow_id) };
+
+    let framework_message = WorkerMessage::new(sender_id, receiver_id, message_id, message_instance_id, message_data, inheritance_context);
+
+    // Submit a regular message: workflow_end() reports completion.
+    sender_channel.send(WorkerCommand::Message { message: framework_message, priority, unique: false }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
+
+    // Preserve the registration after successful submission.
+    flow_registration_guard.disarm();
+
+    // Wait for the result explicitly provided by workflow_end().
+    match timeout_ms {
+        Some(timeout_ms) => match tokio::time::timeout(Duration::from_millis(timeout_ms), flow_reply_receiver).await {
+            Ok(Ok(workflow_result)) => workflow_result,
+            Ok(Err(_)) => Err(MWFError::Worker_ChannelClosed),
+            Err(_) => Err(MWFError::Operation_Timeout),
+        },
+        None => match flow_reply_receiver.await {
+            Ok(workflow_result) => workflow_result,
+            Err(_) => Err(MWFError::Worker_ChannelClosed),
+        },
+    }
 }
 
 /// Automatically removes a registered wait when the guard is dropped.

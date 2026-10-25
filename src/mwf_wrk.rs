@@ -10,7 +10,7 @@ use crate::MWFLog;
 use crate::channel::{WorkerChannel, WorkerCommand, get_sender_channel};
 use crate::framework_error::{MWFError, MWFPanic};
 use crate::message::{MessageData, MessageFlowID, MessageID, MessageInheritanceContext, MessageInstanceID, MessageWaitMode, WorkerMessage};
-use crate::message_wait::{WorkerWaitGuard, WorkerWaitState, complete_message_flow, is_message_flow_active_for_worker, register_message_flow, register_worker_wait, remove_message_flow};
+use crate::message_wait::{WorkerWaitGuard, WorkerWaitState, complete_message_flow, is_message_flow_active_for_worker, register_message_flow, register_worker_wait, wait_message_flow, wait_this_message};
 use crate::mwf::{MWF_DATA, MWF_WRK_CLOSE_NOTIFY, MWF_WRK_DATA, MWF_WRK_INIT_NOTIFY, MWF_WRK_MESSAGE_FLOW_COUNTER, MWF_WRK_MESSAGE_INSTANCE_COUNTER, MWFConfiguration};
 use crate::mwf_log::{LogAction, LogStatus};
 use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerList, WorkerState, WorkerStatus, WorkerTypeID};
@@ -700,30 +700,14 @@ impl MWFWrk {
         // Register the current worker's wait to detect deadlocks.
         let _worker_wait_guard = Self::register_current_worker_wait(receiver_id, &message_id, message_instance_id, wait_mode)?;
 
-        // Workflow propagation will be implemented in the dedicated wait handlers.
-        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, MessageInheritanceContext::default());
+        match wait_mode {
+            MessageWaitMode::WaitThisMessage => wait_this_message(sender_channel, sender_id, receiver_id, &message_id, message_instance_id, message_data, timeout_ms, priority).await,
+            MessageWaitMode::WaitMessageFlow => {
+                let message_flow_id = Self::generate_message_flow_id()?;
 
-        // Create a reply channel for the message callback result.
-        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<Result<(), WorkerError>>();
-
-        // Submit the message to the selected channel.
-        sender_channel.send(WorkerCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
-
-        // Wait for callback completion or timeout.
-        let worker_result = match timeout_ms {
-            Some(timeout_ms) => match tokio::time::timeout(Duration::from_millis(timeout_ms), reply_receiver).await {
-                Ok(Ok(worker_result)) => worker_result,
-                Ok(Err(_)) => return Err(MWFError::Worker_ChannelClosed),
-                Err(_) => return Err(MWFError::Operation_Timeout),
-            },
-            None => match reply_receiver.await {
-                Ok(worker_result) => worker_result,
-                Err(_) => return Err(MWFError::Worker_ChannelClosed),
-            },
-        };
-
-        // Forward any error returned by the worker callback.
-        worker_result.map_err(MWFError::Worker_MessageError)
+                wait_message_flow(sender_channel, sender_id, receiver_id, &message_id, message_instance_id, message_flow_id, message_data, timeout_ms, priority).await
+            }
+        }
     }
 
     /// Send a message to a worker.
