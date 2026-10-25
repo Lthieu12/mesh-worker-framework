@@ -701,7 +701,7 @@ impl MWFWrk {
 
         // Register the current worker's wait before sending the message.
         // The guard removes the registration when this function returns or is cancelled.
-        let _worker_wait_guard = MWFWrk::register_current_worker_wait(receiver_id, &message_id, message_instance_id, MessageWaitMode::WaitThisMessage)?;
+        let _worker_wait_guard = MWFWrk::register_current_worker_wait(receiver_id, &message_id, message_instance_id, wait_mode)?;
 
         // Select the message flow context according to the requested wait mode.
         let inheritance_context = match wait_mode {
@@ -847,7 +847,7 @@ impl MWFWrk {
 
         // Register the current worker's wait before sending the message.
         // The guard removes the registration when this function returns or is cancelled.
-        let _worker_wait_guard = MWFWrk::register_current_worker_wait(receiver_id, &message_id, message_instance_id, MessageWaitMode::WaitThisMessage)?;
+        let _worker_wait_guard = MWFWrk::register_current_worker_wait(receiver_id, &message_id, message_instance_id, wait_mode)?;
 
         // Select the message flow context according to the requested wait mode.
         let inheritance_context = match wait_mode {

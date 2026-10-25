@@ -182,6 +182,6 @@ impl WorkerMessage {
     where
         TMessageData: Clone + Send + Sync + 'static,
     {
-        Self { sender_id: sender_id.clone(), receiver_id: receiver_id.clone(), message_id: message_id.clone(), message_instance_id, message_data: MessageData::new(message_data), inheritance_context: MessageInheritanceContext::default() }
+        Self { sender_id: sender_id.clone(), receiver_id: receiver_id.clone(), message_id: message_id.clone(), message_instance_id, message_data: MessageData::new(message_data), inheritance_context }
     }
 }
