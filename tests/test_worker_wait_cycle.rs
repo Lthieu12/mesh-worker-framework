@@ -66,11 +66,11 @@ async fn test_worker_wait_cycle() {
     let test_sender_id = EntityID::new_external("TEST");
     let trigger_message_id = MessageID::new("TRIGGER");
 
-    let first_result = MWFWrk::send_message_and_wait(&test_sender_id, &worker_a_id, &trigger_message_id, &(), Some(3000)).await;
+    let first_result = MWFWrk::send_message_and_wait(&test_sender_id, &worker_a_id, &trigger_message_id, MessageWaitMode::WaitThisMessage, &(), Some(3000)).await;
 
     // Repeat the cycle. A stale registration would reject A's new wait
     // with Worker_AlreadyWaiting instead of detecting the circular wait.
-    let second_result = MWFWrk::send_message_and_wait(&test_sender_id, &worker_a_id, &trigger_message_id, &(), Some(3000)).await;
+    let second_result = MWFWrk::send_message_and_wait(&test_sender_id, &worker_a_id, &trigger_message_id, MessageWaitMode::WaitThisMessage, &(), Some(3000)).await;
 
     // Close both workers before asserting, so framework cleanup still runs
     // if an assertion below fails.

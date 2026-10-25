@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 use crate::MWFWrk;
-use crate::message::{MessageData, MessageID, WorkerMessage};
+use crate::message::{MessageData, MessageID, MessageWaitMode, WorkerMessage};
 use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerTypeID};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -138,7 +138,7 @@ impl Worker for SimulationWorker {
                     tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
                 }
                 let worker_id = self.worker_id.as_ref().expect("worker_id should be initialized");
-                MWFWrk::send_message_and_wait(&EntityID::new_worker(worker_id.clone()), target_worker_id, message_id, &(), *timeout_ms).await?;
+                MWFWrk::send_message_and_wait(&EntityID::new_worker(worker_id.clone()), target_worker_id, message_id, MessageWaitMode::WaitThisMessage, &(), *timeout_ms).await?;
             }
 
             SimulationBehavior::Message_SendPriorityAndWait { target_worker_id, message_id, timeout_ms, message_delay_ms } => {
@@ -150,7 +150,7 @@ impl Worker for SimulationWorker {
                 let worker_id = self.worker_id.as_ref().expect("worker_id should be initialized");
 
                 // Send a priority message and wait for its completion.
-                MWFWrk::send_priority_message_and_wait(&EntityID::new_worker(worker_id.clone()), target_worker_id, message_id, &(), *timeout_ms).await?;
+                MWFWrk::send_priority_message_and_wait(&EntityID::new_worker(worker_id.clone()), target_worker_id, message_id, MessageWaitMode::WaitThisMessage, &(), *timeout_ms).await?;
             }
 
             SimulationBehavior::Message_Wait { message_delay_ms } => {

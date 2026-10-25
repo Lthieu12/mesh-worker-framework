@@ -49,9 +49,9 @@ async fn test_worker_current_context() {
     // Send a message to each worker and wait for its context validation.
     let message_id = MessageID::new("CHECK_CONTEXT");
 
-    let worker_a_result = MWFWrk::send_message_and_wait(&parent_a_id, &worker_a_id, &message_id, &(), Some(1000)).await;
+    let worker_a_result = MWFWrk::send_message_and_wait(&parent_a_id, &worker_a_id, &message_id, MessageWaitMode::WaitThisMessage, &(), Some(1000)).await;
 
-    let worker_b_result = MWFWrk::send_message_and_wait(&parent_b_id, &worker_b_id, &message_id, &(), Some(1000)).await;
+    let worker_b_result = MWFWrk::send_message_and_wait(&parent_b_id, &worker_b_id, &message_id, MessageWaitMode::WaitThisMessage, &(), Some(1000)).await;
 
     // Shutdown both workers before asserting message results,
     // so the framework can still be closed if a context check fails.

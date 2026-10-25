@@ -662,7 +662,7 @@ impl MWFWrk {
     /// - Ok(()) if on_message() completed successfully.
     /// - workerError if on_message() returned an error.
     /// - Operation_Timeout if the timeout expires.
-    pub async fn send_message_and_wait<TMessageID, TMessageData>(sender_id: &EntityID, receiver_id: &WorkerID, message_id: &TMessageID, message_data: &TMessageData, timeout_ms: Option<u64>) -> Result<(), MWFError>
+    pub async fn send_message_and_wait<TMessageID, TMessageData>(sender_id: &EntityID, receiver_id: &WorkerID, message_id: &TMessageID, wait_mode: MessageWaitMode, message_data: &TMessageData, timeout_ms: Option<u64>) -> Result<(), MWFError>
     where
         TMessageID: Into<MessageID> + Clone,
         TMessageData: Clone + Send + Sync + 'static,
@@ -805,7 +805,7 @@ impl MWFWrk {
     /// - Ok(()) if on_message() completed successfully.
     /// - workerError if on_message() returned an error.
     /// - Operation_Timeout if the timeout expires.
-    pub async fn send_priority_message_and_wait<TMessageID, TMessageData>(sender_id: &EntityID, receiver_id: &WorkerID, message_id: &TMessageID, message_data: &TMessageData, timeout_ms: Option<u64>) -> Result<(), MWFError>
+    pub async fn send_priority_message_and_wait<TMessageID, TMessageData>(sender_id: &EntityID, receiver_id: &WorkerID, message_id: &TMessageID, wait_mode: MessageWaitMode, message_data: &TMessageData, timeout_ms: Option<u64>) -> Result<(), MWFError>
     where
         TMessageID: Into<MessageID> + Clone,
         TMessageData: Clone + Send + Sync + 'static,

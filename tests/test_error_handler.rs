@@ -138,7 +138,7 @@ async fn test_mwf_err_buffer_overflow() {
 
     // Generate more errors than the buffer can hold.
     for _ in 0..15 {
-        let _ = MWFWrk::send_message_and_wait(&EntityID::new_external("Test"), &worker_id, &"TEST", &(), Some(1000)).await;
+        let _ = MWFWrk::send_message_and_wait(&EntityID::new_external("Test"), &worker_id, &"TEST", MessageWaitMode::WaitThisMessage, &(), Some(1000)).await;
     }
 
     let error_list = MWFErr::wait_error(Some(0)).await.unwrap();
