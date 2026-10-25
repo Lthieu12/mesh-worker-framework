@@ -9,8 +9,8 @@ use std::time::{Duration, Instant};
 use crate::MWFLog;
 use crate::channel::{WorkerChannel, WorkerCommand, get_sender_channel};
 use crate::framework_error::{MWFError, MWFPanic};
-use crate::message::{MessageData, MessageFlowID, MessageID, MessageInstanceID, MessageWaitMode, WorkerMessage};
-use crate::message_wait::{WorkerWaitGuard, WorkerWaitState, register_worker_wait};
+use crate::message::{MessageData, MessageFlowID, MessageID, MessageInheritanceContext, MessageInstanceID, MessageWaitMode, WorkerMessage};
+use crate::message_wait::{WorkerWaitGuard, WorkerWaitState, is_message_flow_active_for_worker, register_worker_wait};
 use crate::mwf::{MWF_DATA, MWF_WRK_CLOSE_NOTIFY, MWF_WRK_DATA, MWF_WRK_INIT_NOTIFY, MWF_WRK_MESSAGE_FLOW_COUNTER, MWF_WRK_MESSAGE_INSTANCE_COUNTER, MWFConfiguration};
 use crate::mwf_log::{LogAction, LogStatus};
 use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerList, WorkerState, WorkerStatus, WorkerTypeID};
@@ -49,6 +49,26 @@ impl MWFWrk {
     /// Generate a unique MessageFlowID.
     fn generate_message_flow_id() -> Result<MessageFlowID, MWFError> {
         MWF_WRK_MESSAGE_FLOW_COUNTER.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current_id| current_id.checked_add(1)).map_err(|_| MWFError::Message_FlowIDExhausted)
+    }
+
+    /// Returns the current message flow context only for messages sent to the current worker.
+    ///
+    /// The workflow must still be active and owned by that worker.
+    /// Messages sent to another worker never inherit the current workflow.
+    fn get_message_inheritance_context_for_receiver(receiver_id: &WorkerID) -> MessageInheritanceContext {
+        // Avoid registry access when no message flow is active in the current context.
+        let inheritance_context = current_message_inheritance_context();
+        let Some(message_flow_id) = inheritance_context.message_flow_id else {
+            return MessageInheritanceContext::default();
+        };
+
+        // Workflow contexts are only propagated to the current worker itself.
+        if current_worker_id().as_ref() != Some(receiver_id) {
+            return MessageInheritanceContext::default();
+        }
+
+        // Ignore a workflow that has already been closed or belongs to another worker.
+        if is_message_flow_active_for_worker(message_flow_id, receiver_id) { inheritance_context } else { MessageInheritanceContext::default() }
     }
 
     /// Register the current worker's active message wait, when applicable.
@@ -642,8 +662,8 @@ impl MWFWrk {
         // Generate the unique id and build the message
         let message_instance_id = MWFWrk::generate_message_instance_id()?;
 
-        // Retrieve the inheritance context of the currently processed message.
-        let inheritance_context = current_message_inheritance_context();
+        // Inherit the current workflow only when sending a message to this same worker.
+        let inheritance_context = MWFWrk::get_message_inheritance_context_for_receiver(receiver_id);
 
         let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, inheritance_context);
 
@@ -683,8 +703,11 @@ impl MWFWrk {
         // The guard removes the registration when this function returns or is cancelled.
         let _worker_wait_guard = MWFWrk::register_current_worker_wait(receiver_id, &message_id, message_instance_id, MessageWaitMode::WaitThisMessage)?;
 
-        // Retrieve the inheritance context of the currently processed message.
-        let inheritance_context = current_message_inheritance_context();
+        // Select the message flow context according to the requested wait mode.
+        let inheritance_context = match wait_mode {
+            MessageWaitMode::WaitThisMessage => MessageInheritanceContext::default(),
+            MessageWaitMode::WaitMessageFlow => MessageInheritanceContext::default(),
+        };
 
         let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, inheritance_context);
 
@@ -782,8 +805,8 @@ impl MWFWrk {
         // Generate the unique id and build the message
         let message_instance_id = MWFWrk::generate_message_instance_id()?;
 
-        // Retrieve the inheritance context of the currently processed message.
-        let inheritance_context = current_message_inheritance_context();
+        // Inherit the current workflow only when sending a message to this same worker.
+        let inheritance_context = MWFWrk::get_message_inheritance_context_for_receiver(receiver_id);
 
         let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, inheritance_context);
 
@@ -826,8 +849,11 @@ impl MWFWrk {
         // The guard removes the registration when this function returns or is cancelled.
         let _worker_wait_guard = MWFWrk::register_current_worker_wait(receiver_id, &message_id, message_instance_id, MessageWaitMode::WaitThisMessage)?;
 
-        // Retrieve the inheritance context of the currently processed message.
-        let inheritance_context = current_message_inheritance_context();
+        // Select the message flow context according to the requested wait mode.
+        let inheritance_context = match wait_mode {
+            MessageWaitMode::WaitThisMessage => MessageInheritanceContext::default(),
+            MessageWaitMode::WaitMessageFlow => MessageInheritanceContext::default(),
+        };
 
         let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, inheritance_context);
 
@@ -928,8 +954,8 @@ impl MWFWrk {
         // Generate the unique id and build the message
         let message_instance_id = MWFWrk::generate_message_instance_id()?;
 
-        // Retrieve the inheritance context of the currently processed message.
-        let inheritance_context = current_message_inheritance_context();
+        // Inherit the current workflow only when sending a message to this same worker.
+        let inheritance_context = MWFWrk::get_message_inheritance_context_for_receiver(receiver_id);
 
         let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, inheritance_context);
 
