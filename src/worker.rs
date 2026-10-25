@@ -209,7 +209,7 @@ impl From<&WorkerID> for WorkerID {
 pub type WorkerError = anyhow::Error;
 
 /// Identifier of an entity interacting with MWF.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EntityID {
     /// MWF worker entity.
     Worker(WorkerID),

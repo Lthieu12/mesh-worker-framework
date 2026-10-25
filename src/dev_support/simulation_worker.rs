@@ -42,6 +42,8 @@ pub enum SimulationBehavior {
     Message_Fail,
 
     Message_Panic,
+
+    Message_CheckMyContext { expected_worker_id: WorkerID, expected_parent_id: EntityID },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -150,6 +152,26 @@ impl Worker for SimulationWorker {
 
             SimulationBehavior::Message_Panic => {
                 panic!("Simulation message panic");
+            }
+
+            SimulationBehavior::Message_CheckMyContext { expected_worker_id, expected_parent_id } => {
+                // Retrieve identifiers from the current worker execution context.
+                let current_worker_id = MWFWrk::get_current_worker_id()?;
+                let current_parent_id = MWFWrk::get_current_parent_id()?;
+
+                // Validate the current worker ID.
+                if &current_worker_id != expected_worker_id {
+                    return Err(anyhow::anyhow!(
+                        "Unexpected current WorkerID: expected '{expected_worker_id}', got '{current_worker_id}'"
+                    ));
+                }
+
+                // Validate the current parent ID.
+                if &current_parent_id != expected_parent_id {
+                    return Err(anyhow::anyhow!(
+                        "Unexpected current parent ID: expected '{expected_parent_id}', got '{current_parent_id}'"
+                    ));
+                }
             }
 
             _ => {}
