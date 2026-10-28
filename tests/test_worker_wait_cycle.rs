@@ -1,10 +1,16 @@
-//! Validate runtime deadlock detection and wait registration cleanup.
+//! Validate message wait cycle detection and active message flow cleanup.
 //!
-//! Scenario:
-//! - Create two workers that wait for each other.
-//! - Verify that MWF rejects the circular wait.
-//! - Repeat the operation to verify that the previous wait was cleaned up.
-//! - Shutdown both workers and MWF.
+//! Test scenarios:
+//! - `test_worker_wait_cycle`:
+//!   - Create two workers that wait for each other.
+//!   - Verify that MWF rejects the circular wait.
+//!   - Repeat the operation to verify that the previous wait registration was cleaned up.
+//!   - Close both workers and MWF.
+//! - `test_worker_abort_cleans_up_active_message_flow`:
+//!   - Start a message flow and wait for the receiver to begin processing the message.
+//!   - Abort the receiver while its message callback is still running.
+//!   - Verify that the waiting caller receives a worker termination error.
+//!   - Close MWF.
 
 use serial_test::serial;
 
@@ -88,33 +94,81 @@ async fn test_worker_wait_cycle() {
     assert!(is_wait_would_deadlock(&second_error), "Expected Worker_WaitWouldDeadlock on the second attempt, got: {second_error:?}");
 }
 
+
 /// Verify that aborting a worker completes its active message flows with a termination error.
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 async fn test_worker_abort_cleans_up_active_message_flow() {
     MWF::init().unwrap();
+    MWFLog::set_log_mode(LogMode::LogAll, None).unwrap();
     MWF::register_worker_type::<SimulationWorker>().unwrap();
 
     let parent_id = EntityID::new_external("MAIN");
     let worker_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &parent_id).unwrap();
 
-    let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Wait { message_delay_ms: 2_000 }, wait_children_close: false, wait_children_close_timeout_ms: None };
+    let configuration = SimulationWorkerConfig {
+        init_delay_ms: 0,
+        close_delay_ms: 0,
+        simulation_behavior: SimulationBehavior::Message_Wait { message_delay_ms: 2_000 },
+        wait_children_close: false,
+        wait_children_close_timeout_ms: None,
+    };
 
     MWFWrk::init_worker(&worker_id, &configuration).await.unwrap();
     MWFWrk::wait_worker_list_init(&vec![worker_id.clone()], Some(1_000)).await.unwrap();
+
+    // Capture the latest log ID so the test can wait for this specific callback to start.
+    let initial_log_list = MWFLog::wait_log(None).await.unwrap();
+    let mut last_log_instance_id = initial_log_list.last_log_instance_id;
 
     // WaitMessageFlow is owned by the receiver, so aborting this worker must
     // notify the caller even though its message callback has not completed.
     let sender_id = EntityID::new_external("TEST");
     let message_id = MessageID::new("ACTIVE_FLOW");
     let worker_id_for_wait = worker_id.clone();
-    let wait_handle = tokio::spawn(async move { MWFWrk::send_message_and_wait(&sender_id, &worker_id_for_wait, &message_id, MessageWaitMode::WaitMessageFlow, &(), Some(3_000)).await });
+    let message_id_for_wait = message_id.clone();
+    let wait_handle = tokio::spawn(async move {
+        MWFWrk::send_message_and_wait(
+            &sender_id,
+            &worker_id_for_wait,
+            &message_id_for_wait,
+            MessageWaitMode::WaitMessageFlow,
+            &(),
+            Some(3_000),
+        )
+        .await
+    });
 
-    // Give the send operation time to register the flow and start the callback.
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    // Wait for the receiver's START log instead of relying on a scheduling delay.
+    tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        loop {
+            let log_list = MWFLog::wait_log(last_log_instance_id).await.unwrap();
+            last_log_instance_id = log_list.last_log_instance_id;
+
+            let callback_started = log_list.log_event_list.iter().any(|log_event| {
+                log_event.worker_id == worker_id
+                    && log_event.log_status == LogStatus::Start
+                    && matches!(
+                        &log_event.log_action,
+                        LogAction::WorkerMessage { message_id: logged_message_id, .. }
+                            if logged_message_id == &message_id
+                    )
+            });
+
+            if callback_started {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("SimulationWorker did not start processing the message");
+
     MWFWrk::abort_worker(&worker_id).unwrap();
 
-    let result = tokio::time::timeout(std::time::Duration::from_secs(2), wait_handle).await.expect("Message flow waiter did not complete after worker abort").expect("Message flow waiter task panicked");
+    let result = tokio::time::timeout(std::time::Duration::from_secs(2), wait_handle)
+        .await
+        .expect("Message flow waiter did not complete after worker abort")
+        .expect("Message flow waiter task panicked");
 
     MWF::close().unwrap();
 
