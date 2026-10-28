@@ -6,17 +6,17 @@
 //!   - Verify that MWF rejects the circular wait.
 //!   - Repeat the operation to verify that the previous wait registration was cleaned up.
 //!   - Close both workers and MWF.
-//! 
+//!
 //! - `test_worker_abort_cleans_up_active_message_flow`:
 //!   - Start a message flow and wait for the receiver to begin processing the message.
 //!   - Abort the receiver while its message callback is still running.
 //!   - Verify that the waiting caller receives `MessageFlow_WorkerTaskTerminated` directly.
 //!   - Close MWF.
-//! 
+//!
 //! - `test_message_flow_completes_with_workflow_end`:
 //!   - Execute a message flow that completes successfully through `workflow_end()`.
 //!   - Verify that the waiting caller receives `Ok(())`.
-//! 
+//!
 //! - `test_message_flow_returns_workflow_error`:
 //!   - Execute a message flow that fails through `workflow_end()`.
 //!   - Verify that the waiting caller receives `Worker_MessageError` containing the original business error.
@@ -104,7 +104,6 @@ async fn test_worker_wait_cycle() {
     assert!(is_wait_would_deadlock(&second_error), "Expected Worker_WaitWouldDeadlock on the second attempt, got: {second_error:?}");
 }
 
-
 /// Verify that aborting a worker completes its active message flows with a termination error.
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
@@ -116,13 +115,7 @@ async fn test_worker_abort_cleans_up_active_message_flow() {
     let parent_id = EntityID::new_external("MAIN");
     let worker_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &parent_id).unwrap();
 
-    let configuration = SimulationWorkerConfig {
-        init_delay_ms: 0,
-        close_delay_ms: 0,
-        simulation_behavior: SimulationBehavior::Message_Wait { message_delay_ms: 2_000 },
-        wait_children_close: false,
-        wait_children_close_timeout_ms: None,
-    };
+    let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Wait { message_delay_ms: 2_000 }, wait_children_close: false, wait_children_close_timeout_ms: None };
 
     MWFWrk::init_worker(&worker_id, &configuration).await.unwrap();
     MWFWrk::wait_worker_list_init(&vec![worker_id.clone()], Some(1_000)).await.unwrap();
@@ -137,17 +130,7 @@ async fn test_worker_abort_cleans_up_active_message_flow() {
     let message_id = MessageID::new("ACTIVE_FLOW");
     let worker_id_for_wait = worker_id.clone();
     let message_id_for_wait = message_id.clone();
-    let wait_handle = tokio::spawn(async move {
-        MWFWrk::send_message_and_wait(
-            &sender_id,
-            &worker_id_for_wait,
-            &message_id_for_wait,
-            MessageWaitMode::WaitMessageFlow,
-            &(),
-            Some(3_000),
-        )
-        .await
-    });
+    let wait_handle = tokio::spawn(async move { MWFWrk::send_message_and_wait(&sender_id, &worker_id_for_wait, &message_id_for_wait, MessageWaitMode::WaitMessageFlow, &(), Some(3_000)).await });
 
     // Wait for the receiver's START log instead of relying on a scheduling delay.
     tokio::time::timeout(std::time::Duration::from_secs(2), async {
@@ -175,10 +158,7 @@ async fn test_worker_abort_cleans_up_active_message_flow() {
 
     MWFWrk::abort_worker(&worker_id).unwrap();
 
-    let result = tokio::time::timeout(std::time::Duration::from_secs(2), wait_handle)
-        .await
-        .expect("Message flow waiter did not complete after worker abort")
-        .expect("Message flow waiter task panicked");
+    let result = tokio::time::timeout(std::time::Duration::from_secs(2), wait_handle).await.expect("Message flow waiter did not complete after worker abort").expect("Message flow waiter task panicked");
 
     MWF::close().unwrap();
 
@@ -190,7 +170,6 @@ async fn test_worker_abort_cleans_up_active_message_flow() {
     }
 }
 
-
 /// Verify that workflow_end() completes an active message flow successfully.
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
@@ -201,15 +180,7 @@ async fn test_message_flow_completes_with_workflow_end() {
     let parent_id = EntityID::new_external("MAIN");
     let worker_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &parent_id).unwrap();
 
-    let configuration = SimulationWorkerConfig {
-        init_delay_ms: 0,
-        close_delay_ms: 0,
-        simulation_behavior: SimulationBehavior::Message_WorkflowEnd {
-            message_delay_ms: 100,
-        },
-        wait_children_close: false,
-        wait_children_close_timeout_ms: None,
-    };
+    let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_WorkflowEnd { message_delay_ms: 100 }, wait_children_close: false, wait_children_close_timeout_ms: None };
 
     MWFWrk::init_worker(&worker_id, &configuration).await.unwrap();
     MWFWrk::wait_worker_list_init(&vec![worker_id.clone()], Some(1_000)).await.unwrap();
@@ -217,15 +188,7 @@ async fn test_message_flow_completes_with_workflow_end() {
     let sender_id = EntityID::new_external("TEST");
     let message_id = MessageID::new("WORKFLOW_END");
 
-    let result = MWFWrk::send_message_and_wait(
-        &sender_id,
-        &worker_id,
-        &message_id,
-        MessageWaitMode::WaitMessageFlow,
-        &(),
-        Some(2_000),
-    )
-    .await;
+    let result = MWFWrk::send_message_and_wait(&sender_id, &worker_id, &message_id, MessageWaitMode::WaitMessageFlow, &(), Some(2_000)).await;
 
     MWFWrk::close_worker(&worker_id, &()).await.unwrap();
     MWFWrk::wait_worker_list_close(&vec![worker_id], Some(1_000)).await.unwrap();
@@ -244,15 +207,7 @@ async fn test_message_flow_returns_workflow_error() {
     let parent_id = EntityID::new_external("MAIN");
     let worker_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &parent_id).unwrap();
 
-    let configuration = SimulationWorkerConfig {
-        init_delay_ms: 0,
-        close_delay_ms: 0,
-        simulation_behavior: SimulationBehavior::Message_WorkflowEndFail {
-            message_delay_ms: 100,
-        },
-        wait_children_close: false,
-        wait_children_close_timeout_ms: None,
-    };
+    let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_WorkflowEndFail { message_delay_ms: 100 }, wait_children_close: false, wait_children_close_timeout_ms: None };
 
     MWFWrk::init_worker(&worker_id, &configuration).await.unwrap();
     MWFWrk::wait_worker_list_init(&vec![worker_id.clone()], Some(1_000)).await.unwrap();
@@ -260,15 +215,7 @@ async fn test_message_flow_returns_workflow_error() {
     let sender_id = EntityID::new_external("TEST");
     let message_id = MessageID::new("WORKFLOW_END_FAIL");
 
-    let result = MWFWrk::send_message_and_wait(
-        &sender_id,
-        &worker_id,
-        &message_id,
-        MessageWaitMode::WaitMessageFlow,
-        &(),
-        Some(2_000),
-    )
-    .await;
+    let result = MWFWrk::send_message_and_wait(&sender_id, &worker_id, &message_id, MessageWaitMode::WaitMessageFlow, &(), Some(2_000)).await;
 
     MWFWrk::close_worker(&worker_id, &()).await.unwrap();
     MWFWrk::wait_worker_list_close(&vec![worker_id], Some(1_000)).await.unwrap();
@@ -276,10 +223,7 @@ async fn test_message_flow_returns_workflow_error() {
 
     match result {
         Err(MWFError::Worker_MessageError(error)) => {
-            assert!(
-                error.to_string().contains("Simulation message failure"),
-                "Expected the original workflow error message, got: {error}"
-            );
+            assert!(error.to_string().contains("Simulation message failure"), "Expected the original workflow error message, got: {error}");
         }
         other => panic!("Expected Worker_MessageError, got: {other:?}"),
     }

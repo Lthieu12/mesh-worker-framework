@@ -186,9 +186,7 @@ pub(crate) fn complete_message_flow(message_flow_id: MessageFlowID, worker_id: &
     let flow_state = take_message_flow(message_flow_id, worker_id)?;
 
     // The caller may already have stopped waiting, for example because of a timeout.
-    let _ = flow_state
-        .reply_sender
-        .send(result.map_err(MWFError::Worker_MessageError));
+    let _ = flow_state.reply_sender.send(result.map_err(MWFError::Worker_MessageError));
 
     Ok(())
 }
@@ -229,9 +227,7 @@ pub(crate) fn cleanup_worker_task_message_flows(worker_id: &WorkerID) -> Result<
 
     // Notify waiters only after releasing the registry lock.
     for flow_state in flow_states {
-        let _ = flow_state.reply_sender.send(Err(MWFError::MessageFlow_WorkerTaskTerminated {
-            worker_id: worker_id.clone(),
-        }));
+        let _ = flow_state.reply_sender.send(Err(MWFError::MessageFlow_WorkerTaskTerminated { worker_id: worker_id.clone() }));
     }
 
     Ok(())
