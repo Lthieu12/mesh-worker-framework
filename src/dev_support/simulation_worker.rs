@@ -46,6 +46,10 @@ pub enum SimulationBehavior {
     Message_Panic,
 
     Message_CheckMyContext { expected_worker_id: WorkerID, expected_parent_id: EntityID },
+
+    Message_WorkflowEnd { message_delay_ms: u64 },
+
+    Message_WorkflowEndFail { message_delay_ms: u64 },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -182,6 +186,24 @@ impl Worker for SimulationWorker {
                 if &current_parent_id != expected_parent_id {
                     return Err(anyhow::anyhow!("Unexpected current parent ID: expected '{expected_parent_id}', got '{current_parent_id}'"));
                 }
+            }
+
+            SimulationBehavior::Message_WorkflowEnd { message_delay_ms } => {
+                // Simulate message work before explicitly completing the message flow.
+                if *message_delay_ms > 0 {
+                    tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
+                }
+
+                MWFWrk::workflow_end(Ok(()))?;
+            }
+
+            SimulationBehavior::Message_WorkflowEndFail { message_delay_ms } => {
+                // Simulate message work before explicitly failing the flow.
+                if *message_delay_ms > 0 {
+                    tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
+                }
+
+                MWFWrk::workflow_end(Err(anyhow::anyhow!("Simulation message failure")))?;
             }
 
             _ => {}

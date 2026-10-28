@@ -813,12 +813,13 @@ impl MWFWrk {
     ///
     /// `workflow_result` is returned by the caller waiting for the message flow.
     ///
-    /// The returned result indicates whether MWF successfully completed the active flow.
+    /// The workflow result represents the outcome of the application-level processing.
+    /// The returned MWFError only indicates that the framework could not signal completion.
     ///
     /// Returns:
     /// - Worker_CurrentContextUnavailable if called outside an MWF worker task.
     /// - MessageFlow_NotActive if the current message has no active flow.
-    pub fn workflow_end(workflow_result: Result<(), MWFError>) -> Result<(), MWFError> {
+    pub fn workflow_end(workflow_result: Result<(), WorkerError>) -> Result<(), MWFError> {
         // Identify the worker executing the current callback.
         let worker_id = current_worker_id().ok_or(MWFError::Worker_CurrentContextUnavailable)?;
 

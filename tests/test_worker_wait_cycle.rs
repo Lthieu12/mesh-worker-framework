@@ -1,4 +1,4 @@
-//! Validate message wait cycle detection and active message flow cleanup.
+//! Validate message wait cycle detection and message flow lifecycle handling.
 //!
 //! Test scenarios:
 //! - `test_worker_wait_cycle`:
@@ -6,11 +6,21 @@
 //!   - Verify that MWF rejects the circular wait.
 //!   - Repeat the operation to verify that the previous wait registration was cleaned up.
 //!   - Close both workers and MWF.
+//! 
 //! - `test_worker_abort_cleans_up_active_message_flow`:
 //!   - Start a message flow and wait for the receiver to begin processing the message.
 //!   - Abort the receiver while its message callback is still running.
-//!   - Verify that the waiting caller receives a worker termination error.
+//!   - Verify that the waiting caller receives `MessageFlow_WorkerTaskTerminated` directly.
 //!   - Close MWF.
+//! 
+//! - `test_message_flow_completes_with_workflow_end`:
+//!   - Execute a message flow that completes successfully through `workflow_end()`.
+//!   - Verify that the waiting caller receives `Ok(())`.
+//! 
+//! - `test_message_flow_returns_workflow_error`:
+//!   - Execute a message flow that fails through `workflow_end()`.
+//!   - Verify that the waiting caller receives `Worker_MessageError` containing the original business error.
+//!   - Close the worker and MWF.
 
 use serial_test::serial;
 
@@ -177,5 +187,100 @@ async fn test_worker_abort_cleans_up_active_message_flow() {
             assert_eq!(terminated_worker_id, worker_id);
         }
         other => panic!("Expected MessageFlow_WorkerTaskTerminated, got: {other:?}"),
+    }
+}
+
+
+/// Verify that workflow_end() completes an active message flow successfully.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+async fn test_message_flow_completes_with_workflow_end() {
+    MWF::init().unwrap();
+    MWF::register_worker_type::<SimulationWorker>().unwrap();
+
+    let parent_id = EntityID::new_external("MAIN");
+    let worker_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &parent_id).unwrap();
+
+    let configuration = SimulationWorkerConfig {
+        init_delay_ms: 0,
+        close_delay_ms: 0,
+        simulation_behavior: SimulationBehavior::Message_WorkflowEnd {
+            message_delay_ms: 100,
+        },
+        wait_children_close: false,
+        wait_children_close_timeout_ms: None,
+    };
+
+    MWFWrk::init_worker(&worker_id, &configuration).await.unwrap();
+    MWFWrk::wait_worker_list_init(&vec![worker_id.clone()], Some(1_000)).await.unwrap();
+
+    let sender_id = EntityID::new_external("TEST");
+    let message_id = MessageID::new("WORKFLOW_END");
+
+    let result = MWFWrk::send_message_and_wait(
+        &sender_id,
+        &worker_id,
+        &message_id,
+        MessageWaitMode::WaitMessageFlow,
+        &(),
+        Some(2_000),
+    )
+    .await;
+
+    MWFWrk::close_worker(&worker_id, &()).await.unwrap();
+    MWFWrk::wait_worker_list_close(&vec![worker_id], Some(1_000)).await.unwrap();
+    MWF::close().unwrap();
+
+    assert!(result.is_ok(), "Expected workflow_end() to complete the message flow successfully, got: {result:?}");
+}
+
+/// Verify that workflow_end() returns a business error through the message flow.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+async fn test_message_flow_returns_workflow_error() {
+    MWF::init().unwrap();
+    MWF::register_worker_type::<SimulationWorker>().unwrap();
+
+    let parent_id = EntityID::new_external("MAIN");
+    let worker_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &parent_id).unwrap();
+
+    let configuration = SimulationWorkerConfig {
+        init_delay_ms: 0,
+        close_delay_ms: 0,
+        simulation_behavior: SimulationBehavior::Message_WorkflowEndFail {
+            message_delay_ms: 100,
+        },
+        wait_children_close: false,
+        wait_children_close_timeout_ms: None,
+    };
+
+    MWFWrk::init_worker(&worker_id, &configuration).await.unwrap();
+    MWFWrk::wait_worker_list_init(&vec![worker_id.clone()], Some(1_000)).await.unwrap();
+
+    let sender_id = EntityID::new_external("TEST");
+    let message_id = MessageID::new("WORKFLOW_END_FAIL");
+
+    let result = MWFWrk::send_message_and_wait(
+        &sender_id,
+        &worker_id,
+        &message_id,
+        MessageWaitMode::WaitMessageFlow,
+        &(),
+        Some(2_000),
+    )
+    .await;
+
+    MWFWrk::close_worker(&worker_id, &()).await.unwrap();
+    MWFWrk::wait_worker_list_close(&vec![worker_id], Some(1_000)).await.unwrap();
+    MWF::close().unwrap();
+
+    match result {
+        Err(MWFError::Worker_MessageError(error)) => {
+            assert!(
+                error.to_string().contains("Simulation message failure"),
+                "Expected the original workflow error message, got: {error}"
+            );
+        }
+        other => panic!("Expected Worker_MessageError, got: {other:?}"),
     }
 }
