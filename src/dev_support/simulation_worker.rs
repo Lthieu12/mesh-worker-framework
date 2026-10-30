@@ -50,6 +50,8 @@ pub enum SimulationBehavior {
     Message_WorkflowEnd { message_delay_ms: u64 },
 
     Message_WorkflowEndFail { message_delay_ms: u64 },
+
+    Message_WorkflowEndChained { message_delay_ms: u64 },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,6 +87,10 @@ pub struct SimulationWorker {
     /// all direct children to terminate.
     pub wait_children_close: bool,
     pub wait_children_close_timeout_ms: Option<u64>,
+
+    /// Number of messages processed by the worker
+    /// during on_message(Message_WorkflowEndChained)
+    message_count: usize,
 }
 
 /// Defines the unique behavior simulated by this worker.
@@ -102,7 +108,7 @@ impl Worker for SimulationWorker {
     }
 
     fn new() -> Self {
-        Self { worker_id: None, parent_id: None, init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None }
+        Self { worker_id: None, parent_id: None, init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None, message_count: 0 }
     }
 
     async fn on_init(&mut self, init_data: MessageData) -> Result<(), WorkerError> {
@@ -114,6 +120,7 @@ impl Worker for SimulationWorker {
         self.simulation_behavior = configuration.simulation_behavior;
         self.wait_children_close = configuration.wait_children_close;
         self.wait_children_close_timeout_ms = configuration.wait_children_close_timeout_ms;
+        self.message_count = 0;
 
         // Store runtime identifiers from the current worker execution context.
         self.worker_id = Some(MWFWrk::get_current_worker_id()?);
@@ -204,6 +211,30 @@ impl Worker for SimulationWorker {
                 }
 
                 MWFWrk::workflow_end(Err(anyhow::anyhow!("Simulation message failure")))?;
+            }
+
+            SimulationBehavior::Message_WorkflowEndChained { message_delay_ms } => {
+                // Simulate message processing work.
+                if *message_delay_ms > 0 {
+                    tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
+                }
+
+                self.message_count += 1;
+
+                if self.message_count < 3 {
+                    let worker_id = self.worker_id.as_ref().expect("worker_id should be initialized");
+
+                    // Send the next message to the same worker.
+                    MWFWrk::send_message(
+                        &EntityID::new_worker(worker_id.clone()),
+                        worker_id,
+                        &MessageID::new("WORKFLOW_END_CHAINED"),
+                        &(),
+                    ).await?;
+                } else {
+                    // Complete the message flow after the third message.
+                    MWFWrk::workflow_end(Ok(()))?;
+                }
             }
 
             _ => {}

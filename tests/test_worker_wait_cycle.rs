@@ -24,6 +24,7 @@
 
 use serial_test::serial;
 
+use dev_support::dev_helper::*;
 use dev_support::simulation_worker::{SimulationBehavior, SimulationWorker, SimulationWorkerConfig};
 use mwf::*;
 
@@ -175,20 +176,25 @@ async fn test_worker_abort_cleans_up_active_message_flow() {
 #[serial]
 async fn test_message_flow_completes_with_workflow_end() {
     MWF::init().unwrap();
+    MWFLog::set_log_mode(LogMode::LogAll, None).unwrap();
     MWF::register_worker_type::<SimulationWorker>().unwrap();
 
     let parent_id = EntityID::new_external("MAIN");
     let worker_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &parent_id).unwrap();
 
-    let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_WorkflowEnd { message_delay_ms: 100 }, wait_children_close: false, wait_children_close_timeout_ms: None };
+    let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_WorkflowEndChained { message_delay_ms: 100 }, wait_children_close: false, wait_children_close_timeout_ms: None };
 
     MWFWrk::init_worker(&worker_id, &configuration).await.unwrap();
     MWFWrk::wait_worker_list_init(&vec![worker_id.clone()], Some(1_000)).await.unwrap();
 
     let sender_id = EntityID::new_external("TEST");
-    let message_id = MessageID::new("WORKFLOW_END");
+    let message_id = MessageID::new("WORKFLOW_END_CHAINED");
 
     let result = MWFWrk::send_message_and_wait(&sender_id, &worker_id, &message_id, MessageWaitMode::WaitMessageFlow, &(), Some(2_000)).await;
+
+    let log_list = MWFLog::wait_log(None).await.unwrap();
+
+    print_log_list().await;
 
     MWFWrk::close_worker(&worker_id, &()).await.unwrap();
     MWFWrk::wait_worker_list_close(&vec![worker_id], Some(1_000)).await.unwrap();
@@ -227,4 +233,49 @@ async fn test_message_flow_returns_workflow_error() {
         }
         other => panic!("Expected Worker_MessageError, got: {other:?}"),
     }
+}
+
+/// Verify that workflow_end() fails when no message flow is active.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+async fn test_workflow_end_without_active_message_flow() {
+    MWF::init().unwrap();
+    MWF::register_worker_type::<SimulationWorker>().unwrap();
+
+    let parent_id = EntityID::new_external("MAIN");
+    let worker_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &parent_id).unwrap();
+
+    let configuration = SimulationWorkerConfig {
+        init_delay_ms: 0,
+        close_delay_ms: 0,
+        simulation_behavior: SimulationBehavior::Message_WorkflowEnd { message_delay_ms: 0 },
+        wait_children_close: false,
+        wait_children_close_timeout_ms: None,
+    };
+
+    MWFWrk::init_worker(&worker_id, &configuration).await.unwrap();
+    MWFWrk::wait_worker_list_init(&vec![worker_id.clone()], Some(1_000)).await.unwrap();
+
+    let sender_id = EntityID::new_external("TEST");
+    let message_id = MessageID::new("WORKFLOW_END_WITHOUT_FLOW");
+
+    let result = MWFWrk::send_message_and_wait(
+        &sender_id,
+        &worker_id,
+        &message_id,
+        MessageWaitMode::WaitThisMessage,
+        &(),
+        Some(2_000),
+    )
+    .await;
+
+    MWFWrk::close_worker(&worker_id, &()).await.unwrap();
+    MWFWrk::wait_worker_list_close(&vec![worker_id], Some(1_000)).await.unwrap();
+    MWF::close().unwrap();
+
+    assert!(
+        matches!(result, Err(MWFError::Worker_MessageError(ref error))
+            if error.downcast_ref::<MWFError>().is_some_and(|error| matches!(error, MWFError::MessageFlow_NotActive))),
+        "Expected MessageFlow_NotActive wrapped in Worker_MessageError, got: {result:?}"
+    );
 }
