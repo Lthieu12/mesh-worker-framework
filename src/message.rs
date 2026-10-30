@@ -32,10 +32,12 @@ impl MessageID {
         string_helper::to_short_string(self.as_str(), max_len)
     }
 
+    /// Returns true if the identifier is valid.
+    ///
     // Validation only rejects identifiers that would break MWF itself
     // (logging, formatting, diagnostics, etc.).
     // Application-specific naming rules are intentionally left to the user.
-    pub(crate) fn is_valid(&self) -> bool {
+    pub fn is_valid(&self) -> bool {
         let id = self.0.trim();
         !id.is_empty() && !id.contains('\n') && !id.contains('\r')
     }

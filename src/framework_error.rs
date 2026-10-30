@@ -6,7 +6,7 @@ use std::error::Error;
 use std::fmt;
 
 use crate::message::{MessageID, MessageInstanceID, MessageWaitMode};
-use crate::worker::{WorkerID, WorkerTypeID};
+use crate::worker::{WorkerID, WorkerTypeID, EntityID};
 
 pub type WorkerError = anyhow::Error;
 
@@ -95,6 +95,9 @@ pub enum MWFError {
 
     /// The current execution is not associated with an MWF worker task.
     Worker_CurrentContextUnavailable,
+
+    /// The entity identifier is invalid.
+    Entity_Invalid { entity_id: EntityID },
 
     /// The requested father worker was not found.
     ParentWorker_NotFound,
@@ -253,6 +256,10 @@ impl fmt::Display for MWFError {
 
             MWFError::Worker_CurrentContextUnavailable => {
                 write!(f, "This operation requires an active MWF worker execution context.")
+            }
+
+            MWFError::Entity_Invalid { entity_id } => {
+                write!(f, "The entity identifier is invalid (EntityID: '{entity_id}').")
             }
 
             MWFError::ParentWorker_NotFound => {

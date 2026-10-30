@@ -119,8 +119,15 @@ impl MWFWrk {
         TWorkerTypeID: Into<WorkerTypeID> + Clone,
     {
         let worker_type_id = worker_type_id.clone().into();
+        
+        // Ensure the worker type and parent entity identifiers are valid.
         if !worker_type_id.is_valid() {
             return Err(MWFError::WorkerType_Invalid { worker_type_id });
+        }
+        if !parent_id.is_valid() {
+            return Err(MWFError::Entity_Invalid {
+                entity_id: parent_id.clone(),
+            });
         }
 
         // Ensure the framework has been initialized.
@@ -384,6 +391,12 @@ impl MWFWrk {
 
     /// Get the child WorkerIDs of an entity.
     pub fn get_children_ids(entity_id: &EntityID) -> Result<Vec<WorkerID>, MWFError> {
+        // Validate the entity identifier.
+        if !entity_id.is_valid() {
+            return Err(MWFError::Entity_Invalid {
+                entity_id: entity_id.clone(),
+            });
+        }
         let mwf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
         let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
 
@@ -392,6 +405,12 @@ impl MWFWrk {
 
     /// Get the number of child workers of an entity.
     pub fn get_children_count(entity_id: &EntityID) -> Result<usize, MWFError> {
+        // Validate the entity identifier.
+        if !entity_id.is_valid() {
+            return Err(MWFError::Entity_Invalid {
+                entity_id: entity_id.clone(),
+            });
+        }        
         let mwf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
         let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
         let children_count = mwf_data.worker_registry.get_children_count(entity_id)?;
@@ -648,6 +667,13 @@ impl MWFWrk {
         TMessageID: Into<MessageID> + Clone,
         TMessageData: Clone + Send + Sync + 'static,
     {
+        // Validate the sender entity identifier.
+        if !sender_id.is_valid() {
+            return Err(MWFError::Entity_Invalid {
+                entity_id: sender_id.clone(),
+            });
+        }
+
         // Validate the message identifier.
         let message_id = message_id.clone().into();
         if !message_id.is_valid() {
@@ -681,6 +707,13 @@ impl MWFWrk {
         TMessageID: Into<MessageID> + Clone,
         TMessageData: Clone + Send + Sync + 'static,
     {
+        // Validate the sender entity identifier.
+        if !sender_id.is_valid() {
+            return Err(MWFError::Entity_Invalid {
+                entity_id: sender_id.clone(),
+            });
+        }
+
         // Validate the message identifier.
         let message_id = message_id.clone().into();
         if !message_id.is_valid() {
@@ -786,6 +819,12 @@ impl MWFWrk {
         TMessageID: Into<MessageID> + Clone,
         TMessageData: Clone + Send + Sync + 'static,
     {
+        // Validate the entity identifier.
+        if !sender_id.is_valid() {
+            return Err(MWFError::Entity_Invalid {
+                entity_id: sender_id.clone(),
+            });
+        }
         // Convert the message identifier.
         let message_id = message_id.clone().into();
         if !message_id.is_valid() {

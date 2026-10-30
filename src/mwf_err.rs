@@ -252,6 +252,12 @@ impl MWFErr {
     /// Error events are stored in a circular buffer and
     /// notify all MWFErr waiters.
     pub fn add_error(error_source: &EntityID, error: &anyhow::Error) -> Result<(), MWFError> {
+    // Validate the entity identifier.
+    if !error_source.is_valid() {
+        return Err(MWFError::Entity_Invalid {
+            entity_id: error_source.clone(),
+        });
+    }        
         MWFErr::add_error_internal(error_source, None, error)
     }
 

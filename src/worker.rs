@@ -55,10 +55,12 @@ impl WorkerTypeID {
         string_helper::to_short_string(self.as_str(), max_len)
     }
 
-    // Validation only rejects identifiers that would break MWF itself
-    // (logging, formatting, diagnostics, etc.).
-    // Application-specific naming rules are intentionally left to the user.
-    pub(crate) fn is_valid(&self) -> bool {
+    /// Returns true if the identifier is valid.
+    ///
+    /// Validation only rejects identifiers that would break MWF itself
+    /// (logging, formatting, diagnostics, etc.).
+    /// Application-specific naming rules are intentionally left to the user.
+    pub fn is_valid(&self) -> bool {
         let id = self.0.trim();
         !id.is_empty() && !id.contains('\n') && !id.contains('\r')
     }
@@ -107,6 +109,16 @@ impl ExternalID {
     /// Returns the identifier as a string slice.
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    /// Returns true if the identifier is valid.
+    ///
+    /// Validation only rejects identifiers that would break MWF itself
+    /// (logging, formatting, diagnostics, etc.).
+    /// Application-specific naming rules are intentionally left to the user.
+    pub fn is_valid(&self) -> bool {
+        let id = self.0.trim();
+        !id.is_empty() && !id.contains('\n') && !id.contains('\r')
     }
 }
 
@@ -241,6 +253,15 @@ impl EntityID {
     pub fn new_external(external_id: impl Into<ExternalID>) -> Self {
         Self::External(external_id.into())
     }
+
+    /// Returns true if the identifier is valid.
+    pub fn is_valid(&self) -> bool {
+        match self {
+            Self::Worker(_) => true,
+            Self::External(external_id) => external_id.is_valid(),
+        }
+    }
+
     /// Returns a shortened human-readable representation of the entity.
     ///
     /// worker entities preserve the instance suffix whenever possible.
