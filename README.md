@@ -275,13 +275,11 @@ MWF::register_worker_type::<FFTWorker>()?;
 MWF::register_worker_type::<DisplayWorker>()?;
 ```
 
-Once registered, worker instances can be spawned normally.
+MWF associates each `WorkerTypeID` with a constructor
+capable of creating new worker instances.
 
 This registration step allows MWF to associate each
 `WorkerTypeID` with its corresponding Rust worker type.
-
-Future MWF features, such as workflow-based worker
-instantiation, will rely on this information.
 
 ---
 
@@ -290,8 +288,8 @@ instantiation, will rely on this information.
 All messaging functions are asynchronous.
 
 MWF uses asynchronous backpressure.
-When a worker queue reaches its configured capacity, message senders are suspended asynchronously until space becomes available. 
-This prevents message loss while allowing the Tokio runtime to continue executing other workers.
+When a worker queue reaches its configured capacity, message senders are suspended asynchronously until space becomes available.
+This prevents messages from being dropped because of a full queue, while allowing the Tokio runtime to continue executing other workers.
 Backpressure is transparent to the application and never blocks a Tokio worker thread.
 
 ### `send_message()`
@@ -302,7 +300,7 @@ Fire-and-forget message.
 
 ### `send_priority_message()`
 
-Fire-and-forget message processed before normal messages.
+Fire-and-forget message processed before pending normal messages.
 
 Priority messages are handled using a Last-In, First-Out
 (LIFO) policy.
@@ -504,34 +502,37 @@ MWF is designed to be fully cross-platform and currently supports:
 * Windows
 * Linux
 
-No platform-specific application code should be required when developing workers with MWF.
+MWF provides a consistent worker API across supported platforms, without requiring platform-specific code for framework operations.
 
-To help guarantee cross-platform compatibility, the repository includes a verification script (scripts/verify.ps1) that automatically validates the framework on both Windows and Linux (WSL2). The script performs formatting, linting, testing, example compilation, and documentation generation on each supported platform.
+To help guarantee cross-platform compatibility, the repository includes a verification script (`scripts/verify.ps1`) that automatically validates the framework on both Windows and Linux (WSL2). The script performs formatting, linting, testing, example compilation, and documentation generation on each supported platform.
 
 ---
 
 ## 10. Quality Requirements
 
-MWF includes automated tests.
+The repository includes a verification script (`scripts/verify.ps1`)
+that runs the quality checks on both Windows and Linux (WSL2).
 
-A build must fail if a test fails.
+The script performs:
 
-The long-term objective is to validate:
+* Formatting (`cargo fmt`)
+* Linting (`cargo clippy`)
+* Unit and integration tests (`cargo test`)
+* Documentation generation (`cargo doc`)
+* Build (`cargo build`)
+* Example compilation (`cargo build --examples`)
 
-* Compilation
-* Unit tests
-* Integration tests
-* Windows compatibility
-* Linux compatibility
+The process fails if any check fails.
 
 ---
 
 ## 11. Project Status
 
-The core runtime is implemented and continuously evolving.
+The core runtime is implemented and entering a stabilization phase.
 
-Current work focuses on additional runtime features,
-workflow support and production hardening. 
+Development now focuses primarily on reliability, testing,
+documentation and production readiness, with targeted improvements
+introduced when necessary.
 
 ---
 
@@ -611,9 +612,11 @@ These measurements represent the runtime overhead of MWF using
 
 ## 14. Documentation
 
-Additional design information is available in:
+The project documentation includes:
 
-- Architecture.md
+- `README.md`: Getting started, core concepts and usage examples.
+- `Architecture.md`: Architectural principles and runtime design.
+- API documentation: Detailed reference for public types and functions.
 
 ---
 
