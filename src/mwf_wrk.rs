@@ -735,7 +735,7 @@ impl MWFWrk {
 
         match wait_mode {
             MessageWaitMode::WaitThisMessage => wait_this_message(sender_channel, sender_id, receiver_id, &message_id, message_instance_id, message_data, timeout_ms, priority).await,
-            MessageWaitMode::WaitMessageFlow => {
+            MessageWaitMode::WaitThisMessageFlow => {
                 let message_flow_id = Self::generate_message_flow_id()?;
 
                 wait_message_flow(sender_channel, sender_id, receiver_id, &message_id, message_instance_id, message_flow_id, message_data, timeout_ms, priority).await

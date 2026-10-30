@@ -14,12 +14,18 @@
 //!   - Close MWF.
 //!
 //! - `test_message_flow_completes_with_workflow_end`:
-//!   - Execute a message flow that completes successfully through `workflow_end()`.
+//!   - Execute a message flow that propagates across three successive messages handled by the same worker.
+//!   - Complete the message flow through `workflow_end()` on the third message.
 //!   - Verify that the waiting caller receives `Ok(())`.
 //!
 //! - `test_message_flow_returns_workflow_error`:
 //!   - Execute a message flow that fails through `workflow_end()`.
 //!   - Verify that the waiting caller receives `Worker_MessageError` containing the original business error.
+//!   - Close the worker and MWF.
+//!
+//! - `test_workflow_end_without_active_message_flow`:
+//!   - Execute a message that calls `workflow_end()` without an active message flow.
+//!   - Verify that the worker returns `MessageFlow_NotActive` wrapped in `Worker_MessageError`.
 //!   - Close the worker and MWF.
 
 use serial_test::serial;
@@ -131,7 +137,7 @@ async fn test_worker_abort_cleans_up_active_message_flow() {
     let message_id = MessageID::new("ACTIVE_FLOW");
     let worker_id_for_wait = worker_id.clone();
     let message_id_for_wait = message_id.clone();
-    let wait_handle = tokio::spawn(async move { MWFWrk::send_message_and_wait(&sender_id, &worker_id_for_wait, &message_id_for_wait, MessageWaitMode::WaitMessageFlow, &(), Some(3_000)).await });
+    let wait_handle = tokio::spawn(async move { MWFWrk::send_message_and_wait(&sender_id, &worker_id_for_wait, &message_id_for_wait, MessageWaitMode::WaitThisMessageFlow, &(), Some(3_000)).await });
 
     // Wait for the receiver's START log instead of relying on a scheduling delay.
     tokio::time::timeout(std::time::Duration::from_secs(2), async {
@@ -190,7 +196,7 @@ async fn test_message_flow_completes_with_workflow_end() {
     let sender_id = EntityID::new_external("TEST");
     let message_id = MessageID::new("WORKFLOW_END_CHAINED");
 
-    let result = MWFWrk::send_message_and_wait(&sender_id, &worker_id, &message_id, MessageWaitMode::WaitMessageFlow, &(), Some(2_000)).await;
+    let result = MWFWrk::send_message_and_wait(&sender_id, &worker_id, &message_id, MessageWaitMode::WaitThisMessageFlow, &(), Some(2_000)).await;
 
     let _log_list = MWFLog::wait_log(None).await.unwrap();
 
@@ -221,7 +227,7 @@ async fn test_message_flow_returns_workflow_error() {
     let sender_id = EntityID::new_external("TEST");
     let message_id = MessageID::new("WORKFLOW_END_FAIL");
 
-    let result = MWFWrk::send_message_and_wait(&sender_id, &worker_id, &message_id, MessageWaitMode::WaitMessageFlow, &(), Some(2_000)).await;
+    let result = MWFWrk::send_message_and_wait(&sender_id, &worker_id, &message_id, MessageWaitMode::WaitThisMessageFlow, &(), Some(2_000)).await;
 
     MWFWrk::close_worker(&worker_id, &()).await.unwrap();
     MWFWrk::wait_worker_list_close(&vec![worker_id], Some(1_000)).await.unwrap();
