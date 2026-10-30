@@ -6,7 +6,7 @@ use std::error::Error;
 use std::fmt;
 
 use crate::message::{MessageID, MessageInstanceID, MessageWaitMode};
-use crate::worker::{WorkerID, WorkerTypeID, EntityID};
+use crate::worker::{EntityID, WorkerID, WorkerTypeID};
 
 pub type WorkerError = anyhow::Error;
 

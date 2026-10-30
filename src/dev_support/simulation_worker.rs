@@ -225,12 +225,7 @@ impl Worker for SimulationWorker {
                     let worker_id = self.worker_id.as_ref().expect("worker_id should be initialized");
 
                     // Send the next message to the same worker.
-                    MWFWrk::send_message(
-                        &EntityID::new_worker(worker_id.clone()),
-                        worker_id,
-                        &MessageID::new("WORKFLOW_END_CHAINED"),
-                        &(),
-                    ).await?;
+                    MWFWrk::send_message(&EntityID::new_worker(worker_id.clone()), worker_id, &MessageID::new("WORKFLOW_END_CHAINED"), &()).await?;
                 } else {
                     // Complete the message flow after the third message.
                     MWFWrk::workflow_end(Ok(()))?;

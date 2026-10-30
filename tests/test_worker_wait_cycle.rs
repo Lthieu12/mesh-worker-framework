@@ -251,13 +251,7 @@ async fn test_workflow_end_without_active_message_flow() {
     let parent_id = EntityID::new_external("MAIN");
     let worker_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &parent_id).unwrap();
 
-    let configuration = SimulationWorkerConfig {
-        init_delay_ms: 0,
-        close_delay_ms: 0,
-        simulation_behavior: SimulationBehavior::Message_WorkflowEnd { message_delay_ms: 0 },
-        wait_children_close: false,
-        wait_children_close_timeout_ms: None,
-    };
+    let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_WorkflowEnd { message_delay_ms: 0 }, wait_children_close: false, wait_children_close_timeout_ms: None };
 
     MWFWrk::init_worker(&worker_id, &configuration).await.unwrap();
     MWFWrk::wait_worker_list_init(&vec![worker_id.clone()], Some(1_000)).await.unwrap();
@@ -265,15 +259,7 @@ async fn test_workflow_end_without_active_message_flow() {
     let sender_id = EntityID::new_external("TEST");
     let message_id = MessageID::new("WORKFLOW_END_WITHOUT_FLOW");
 
-    let result = MWFWrk::send_message_and_wait(
-        &sender_id,
-        &worker_id,
-        &message_id,
-        MessageWaitMode::WaitThisMessage,
-        &(),
-        Some(2_000),
-    )
-    .await;
+    let result = MWFWrk::send_message_and_wait(&sender_id, &worker_id, &message_id, MessageWaitMode::WaitThisMessage, &(), Some(2_000)).await;
 
     MWFWrk::close_worker(&worker_id, &()).await.unwrap();
     MWFWrk::wait_worker_list_close(&vec![worker_id], Some(1_000)).await.unwrap();
