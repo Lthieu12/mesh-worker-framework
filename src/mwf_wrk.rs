@@ -10,7 +10,7 @@ use crate::MWFLog;
 use crate::channel::{WorkerChannel, WorkerCommand, get_sender_channel};
 use crate::framework_error::{MWFError, MWFPanic};
 use crate::message::{MessageData, MessageFlowID, MessageID, MessageInheritanceContext, MessageInstanceID, MessageWaitMode, WorkerMessage};
-use crate::message_wait::{WorkerWaitGuard, WorkerWaitState, complete_message_flow, is_message_flow_active_for_worker, register_message_flow, register_worker_wait, wait_message_flow, wait_this_message};
+use crate::message_wait::{WorkerWaitGuard, WorkerWaitState, complete_message_flow, is_message_flow_active_for_worker, register_worker_wait, wait_message_flow, wait_this_message};
 use crate::mwf::{MWF_DATA, MWF_WRK_CLOSE_NOTIFY, MWF_WRK_DATA, MWF_WRK_INIT_NOTIFY, MWF_WRK_MESSAGE_FLOW_COUNTER, MWF_WRK_MESSAGE_INSTANCE_COUNTER, MWFConfiguration};
 use crate::mwf_log::{LogAction, LogStatus};
 use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerList, WorkerState, WorkerStatus, WorkerTypeID};
@@ -82,7 +82,7 @@ impl MWFWrk {
         };
 
         // Register the wait and reject any operation that would create a deadlock.
-        let worker_wait_guard = register_worker_wait(&waiting_worker_id, WorkerWaitState { receiver_id: receiver_id.clone(), message_id: message_id.clone(), message_instance_id, wait_mode, started_at: Instant::now() })?;
+        let worker_wait_guard = register_worker_wait(&waiting_worker_id, WorkerWaitState { receiver_id: receiver_id.clone(), message_id: message_id.clone(), message_instance_id, wait_mode, _started_at: Instant::now() })?;
 
         Ok(Some(worker_wait_guard))
     }

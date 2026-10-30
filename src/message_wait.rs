@@ -36,7 +36,7 @@ pub(crate) struct WorkerWaitState {
     pub(crate) wait_mode: MessageWaitMode,
 
     /// Time when the wait started.
-    pub(crate) started_at: Instant,
+    pub(crate) _started_at: Instant,
 }
 
 /// Internal data used to manage message waits and flows.
@@ -408,7 +408,7 @@ mod tests {
 
     /// Create a registered wait targeting the specified worker.
     fn test_wait_state(receiver_id: &str) -> WorkerWaitState {
-        WorkerWaitState { receiver_id: test_worker_id(receiver_id), message_id: MessageID::new("TestMessage"), message_instance_id: 1, wait_mode: MessageWaitMode::WaitThisMessage, started_at: Instant::now() }
+        WorkerWaitState { receiver_id: test_worker_id(receiver_id), message_id: MessageID::new("TestMessage"), message_instance_id: 1, wait_mode: MessageWaitMode::WaitThisMessage, _started_at: Instant::now() }
     }
 
     #[test]
