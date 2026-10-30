@@ -192,7 +192,7 @@ async fn test_message_flow_completes_with_workflow_end() {
 
     let result = MWFWrk::send_message_and_wait(&sender_id, &worker_id, &message_id, MessageWaitMode::WaitMessageFlow, &(), Some(2_000)).await;
 
-    let log_list = MWFLog::wait_log(None).await.unwrap();
+    let _log_list = MWFLog::wait_log(None).await.unwrap();
 
     print_log_list().await;
 
