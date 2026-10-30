@@ -143,9 +143,14 @@ impl MWFWrk {
         // Create a new worker instance.
         let worker = worker_constructor();
 
+        // Register the worker before releasing the MWF data lock.
+        // This prevents MWF::close() from passing its shutdown synchronization
+        // while a worker is still being created.
+        let result = MWFWrk::spawn_worker_instance(worker_type_id, worker, parent_id);
+
         drop(mwf_data_guard);
 
-        MWFWrk::spawn_worker_instance(worker_type_id, worker, parent_id)
+        result
     }
 
     /// Spawn and register a worker instance.
@@ -423,6 +428,8 @@ impl MWFWrk {
                 // Register interest in the next initialization event
                 // before checking worker states to avoid lost notifications.
                 let init_notify = MWF_WRK_INIT_NOTIFY.notified();
+                tokio::pin!(init_notify);
+                init_notify.as_mut().enable();
 
                 // Read Registry state under a short-lived lock.
                 //
@@ -508,6 +515,8 @@ impl MWFWrk {
                 // Register interest in the next closing event
                 // before checking worker states to avoid lost notifications.
                 let close_notify = MWF_WRK_CLOSE_NOTIFY.notified();
+                tokio::pin!(close_notify);
+                close_notify.as_mut().enable();
 
                 // Read Registry state under a short-lived lock.
                 //

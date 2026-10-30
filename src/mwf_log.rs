@@ -462,6 +462,8 @@ impl MWFLog {
             // current log list to avoid missing a notification between the
             // state check and the await.
             let log_notify = MWF_LOG_NOTIFY.notified();
+            tokio::pin!(log_notify);
+            log_notify.as_mut().enable();
 
             let log_list = MWFLog::get_log_list(last_log_instance_id)?;
 

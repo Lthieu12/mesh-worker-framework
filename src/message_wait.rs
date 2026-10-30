@@ -197,7 +197,10 @@ pub(crate) fn cleanup_worker_task_message_flows(worker_id: &WorkerID) -> Result<
     let flow_states = {
         let mut message_wait_data_guard = MWF_MESSAGE_WAIT_DATA.write().map_err(|_| MWFError::MessageWait_RegistryInconsistent)?;
 
-        let message_wait_data = message_wait_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
+        // Nothing to clean up if the framework data has already been destroyed.
+        let Some(message_wait_data) = message_wait_data_guard.as_mut() else {
+            return Ok(());
+        };
 
         let message_flow_ids = message_wait_data.message_flow_registry.iter().filter_map(|(message_flow_id, flow_state)| (&flow_state.worker_id == worker_id).then_some(*message_flow_id)).collect::<Vec<_>>();
 

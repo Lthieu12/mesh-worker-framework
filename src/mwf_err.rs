@@ -280,6 +280,8 @@ impl MWFErr {
             // current error list to avoid missing a notification between the
             // state check and the await.
             let error_notify = MWF_ERR_NOTIFY.notified();
+            tokio::pin!(error_notify);
+            error_notify.as_mut().enable();
 
             let error_list = MWFErr::get_error_list(last_error_instance_id)?;
 
