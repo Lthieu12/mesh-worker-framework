@@ -27,6 +27,12 @@
 //!   - Execute a message that calls `workflow_end()` without an active message flow.
 //!   - Verify that the worker returns `MessageFlow_NotActive` wrapped in `Worker_MessageError`.
 //!   - Close the worker and MWF.
+//!
+//! - `test_message_flow_completes_after_waiter_timeout`:
+//!   - Start a message flow with a short waiter timeout.
+//!   - Verify that the caller receives `Operation_Timeout` before the worker completes the message.
+//!   - Verify that the worker subsequently completes the message flow through `workflow_end()`.
+//!   - Verify that the worker remains operational after the late completion.
 
 use serial_test::serial;
 
@@ -270,4 +276,63 @@ async fn test_workflow_end_without_active_message_flow() {
             if error.downcast_ref::<MWFError>().is_some_and(|error| matches!(error, MWFError::MessageFlow_NotActive))),
         "Expected MessageFlow_NotActive wrapped in Worker_MessageError, got: {result:?}"
     );
+}
+
+/// Verify that workflow_end() completes a message flow even after its waiter timed out.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+async fn test_message_flow_completes_after_waiter_timeout() {
+    MWF::init().unwrap();
+    MWFLog::set_log_mode(LogMode::LogAll, None).unwrap();
+    MWF::register_worker_type::<SimulationWorker>().unwrap();
+
+    let parent_id = EntityID::new_external("MAIN");
+    let worker_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &parent_id).unwrap();
+
+    // The worker must finish processing after the caller's timeout.
+    let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_WorkflowEnd { message_delay_ms: 300 }, wait_children_close: false, wait_children_close_timeout_ms: None };
+
+    MWFWrk::init_worker(&worker_id, &configuration).await.unwrap();
+    MWFWrk::wait_worker_list_init(&vec![worker_id.clone()], Some(1_000)).await.unwrap();
+
+    let initial_log_list = MWFLog::wait_log(None).await.unwrap();
+    let mut last_log_instance_id = initial_log_list.last_log_instance_id;
+
+    let sender_id = EntityID::new_external("TEST");
+    let message_id = MessageID::new("WORKFLOW_END_TIMEOUT");
+
+    // The waiter must time out before the worker calls workflow_end().
+    let result = MWFWrk::send_message_and_wait(&sender_id, &worker_id, &message_id, MessageWaitMode::WaitThisMessageFlow, &(), Some(50)).await;
+
+    assert!(matches!(result, Err(MWFError::Operation_Timeout)), "Expected Operation_Timeout, got: {result:?}");
+
+    // Wait until the worker has completed its callback through workflow_end().
+    tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        loop {
+            let log_list = MWFLog::wait_log(last_log_instance_id).await.unwrap();
+            last_log_instance_id = log_list.last_log_instance_id;
+
+            let callback_completed = log_list.log_event_list.iter().any(|log_event| {
+                log_event.worker_id == worker_id
+                    && log_event.log_status == LogStatus::Ok
+                    && matches!(
+                        &log_event.log_action,
+                        LogAction::WorkerMessage { message_id: logged_message_id, .. }
+                            if logged_message_id == &message_id
+                    )
+            });
+
+            if callback_completed {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("SimulationWorker did not complete the message callback after the waiter timed out");
+
+    // The worker must remain operational after completing the timed-out flow.
+    MWFWrk::close_worker(&worker_id, &()).await.unwrap();
+    MWFWrk::wait_worker_list_close(&vec![worker_id], Some(1_000)).await.unwrap();
+
+    MWF::close().unwrap();
 }
