@@ -22,6 +22,10 @@ use crate::mwf_wrk::WorkerData;
 use crate::worker::{Worker, WorkerConstructor};
 use crate::worker_type_registry::WorkerTypeRegistry;
 
+/// Global MWF instance counter.
+pub(crate) static MWF_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(0);
+pub(crate) type MWFInstanceID = u64;
+
 /// Global MWF runtime storage shared by all
 /// framework components.
 pub(crate) static MWF_DATA: LazyLock<RwLock<Option<MWFData>>> = LazyLock::new(|| RwLock::new(None));
@@ -169,11 +173,17 @@ impl MWF {
     }
 
     /// Initialize MWF using the default configuration.
+    ///
+    /// Each successful initialization after a previous shutdown receives a new
+    /// instance ID, used to ensure WorkerID uniqueness within the current process.
     pub fn init() -> Result<(), MWFError> {
         Self::init_with_configuration(MWFConfiguration::default())
     }
 
     /// Initialize the MWF framework with custom configuration.
+    ///
+    /// Each successful initialization after a previous shutdown receives a new
+    /// instance ID, used to ensure WorkerID uniqueness within the current process.
     pub fn init_with_configuration(mut mwf_configuration: MWFConfiguration) -> Result<(), MWFError> {
         // Verify that MWF is running on a multi-threaded Tokio runtime.
         let runtime_handle = match tokio::runtime::Handle::try_current() {
@@ -195,8 +205,14 @@ impl MWF {
         }
         // Initialize the MWF log file if file logging is enabled.
         let log_file = if mwf_configuration.log_file_path.is_some() { Some(log_file::init_log_file(&mut mwf_configuration)?) } else { None };
+
         *mwf_data_guard = Some(MWFData::new());
+
         drop(mwf_data_guard);
+
+        // Generate a unique identifier for this MWF instance.
+        // This prevents workers from previous instances from being mistaken for current workers.
+        let mwf_instance_id = MWF_INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed);
 
         MWF_WRK_MESSAGE_INSTANCE_COUNTER.store(1, Ordering::Relaxed);
         MWF_WRK_MESSAGE_FLOW_COUNTER.store(1, Ordering::Relaxed);
@@ -206,7 +222,7 @@ impl MWF {
         MWF_LOG_MODE.store(LogMode::NoLog as u8, Ordering::Relaxed);
 
         let mut mwf_wrk_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
-        *mwf_wrk_data_guard = Some(WorkerData::new(&mwf_configuration));
+        *mwf_wrk_data_guard = Some(WorkerData::new(&mwf_configuration, mwf_instance_id));
         drop(mwf_wrk_data_guard);
 
         let mut mwf_err_data_guard = MWF_ERR_DATA.write().expect(MWFPanic::MWFErrData_WriteLockPoisoned.message());
@@ -294,9 +310,17 @@ impl MWF {
         Ok(())
     }
 
-    /// Check whether the framework is initialized.
+    /// Check whether the framework is fully initialized.
     pub fn is_initialized() -> bool {
-        MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message()).is_some()
+        let mwf_wrk_initialized = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message()).is_some();
+        let mwf_err_initialized = MWF_ERR_DATA.read().expect(MWFPanic::MWFErrData_ReadLockPoisoned.message()).is_some();
+        let mwf_log_initialized = MWF_LOG_DATA.read().expect(MWFPanic::MWFLogData_ReadLockPoisoned.message()).is_some();
+        let message_wait_initialized = MWF_MESSAGE_WAIT_DATA.read().expect(MWFPanic::MWFMessageWaitData_ReadLockPoisoned.message()).is_some();
+
+        // Check MWF_DATA last because it is initialized first and destroyed first.
+        let mwf_initialized = MWF_DATA.read().expect(MWFPanic::MWFData_ReadLockPoisoned.message()).is_some();
+
+        mwf_initialized && mwf_wrk_initialized && mwf_err_initialized && mwf_log_initialized && message_wait_initialized
     }
 
     /// Register a worker type.

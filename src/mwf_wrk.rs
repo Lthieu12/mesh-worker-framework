@@ -11,7 +11,7 @@ use crate::channel::{WorkerChannel, WorkerCommand, get_sender_channel};
 use crate::framework_error::{MWFError, MWFPanic};
 use crate::message::{MessageData, MessageFlowID, MessageID, MessageInheritanceContext, MessageInstanceID, MessageWaitMode, WorkerMessage};
 use crate::message_wait::{WorkerWaitGuard, WorkerWaitState, complete_message_flow, is_message_flow_active_for_worker, register_worker_wait, wait_message_flow, wait_this_message};
-use crate::mwf::{MWF_DATA, MWF_WRK_CLOSE_NOTIFY, MWF_WRK_DATA, MWF_WRK_INIT_NOTIFY, MWF_WRK_MESSAGE_FLOW_COUNTER, MWF_WRK_MESSAGE_INSTANCE_COUNTER, MWFConfiguration};
+use crate::mwf::{MWF_DATA, MWF_WRK_CLOSE_NOTIFY, MWF_WRK_DATA, MWF_WRK_INIT_NOTIFY, MWF_WRK_MESSAGE_FLOW_COUNTER, MWF_WRK_MESSAGE_INSTANCE_COUNTER, MWFConfiguration, MWFInstanceID};
 use crate::mwf_log::{LogAction, LogStatus};
 use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerList, WorkerState, WorkerStatus, WorkerTypeID};
 use crate::worker_registry::Registry;
@@ -32,8 +32,8 @@ pub(crate) struct WorkerData {
 
 impl WorkerData {
     /// Create a new MWF runtime instance.
-    pub(crate) fn new(mwf_configuration: &MWFConfiguration) -> Self {
-        Self { worker_registry: Registry::new(), worker_normal_channel_capacity: mwf_configuration.worker_normal_channel_capacity, worker_priority_channel_capacity: mwf_configuration.worker_priority_channel_capacity }
+    pub(crate) fn new(mwf_configuration: &MWFConfiguration, mwf_instance_id: MWFInstanceID) -> Self {
+        Self { worker_registry: Registry::new(mwf_instance_id), worker_normal_channel_capacity: mwf_configuration.worker_normal_channel_capacity, worker_priority_channel_capacity: mwf_configuration.worker_priority_channel_capacity }
     }
 }
 
@@ -585,72 +585,104 @@ impl MWFWrk {
         MWFWrk::wait_worker_list_close(&MWFWrk::get_children_ids(entity_id)?, timeout_ms).await
     }
 
-    /// Forcefully terminate a list of workers.
+    /// Aborts a list of workers.
     ///
-    /// This operation aborts the Tokio tasks associated with the
-    /// workers and removes them from the Registry without executing
-    /// any additional worker code.
+    /// This function requests the immediate cancellation of each worker task through Tokio.
+    /// Workers are removed from the Registry regardless of whether their JoinHandle could be
+    /// retrieved or whether task cancellation can actually complete.
     ///
-    /// This function should only be used as a recovery mechanism
-    /// when normal shutdown has failed.
+    /// This is a best-effort operation intended as a last resort when workers cannot be closed
+    /// normally. It does not wait for task termination.
+    ///
+    /// Any worker-related error is recorded, but does not prevent the remaining workers from
+    /// being processed. The first encountered error is returned after all workers have been processed.
+    ///
+    /// # Important
+    ///
+    /// Removing a worker from the Registry does not guarantee that its Tokio task has terminated.
+    /// Tasks blocked in synchronous code or native DLL calls may continue executing.
+    ///
+    /// MWF-managed resources are cleaned up as far as possible, but resources owned by code that
+    /// remains blocked cannot be guaranteed to be released.
     pub fn abort_worker_list(worker_ids: &Vec<WorkerID>) -> Result<(), MWFError> {
+        let mut first_error: Option<MWFError> = None;
+        let mut worker_action_list = Vec::with_capacity(worker_ids.len());
+
         let mut mwf_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
         let mwf_data = mwf_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
 
+        // Request cancellation of all worker tasks.
         for worker_id in worker_ids {
             let action_start_timer = Instant::now();
 
-            let join_handle = match mwf_data.worker_registry.take_join_handle(worker_id) {
-                Ok(join_handle) => join_handle,
-
-                Err(error) => {
-                    MWFLog::add_log(action_start_timer, worker_id, LogAction::WorkerAbort, LogStatus::Error)?;
-                    return Err(error);
+            match mwf_data.worker_registry.take_join_handle(worker_id) {
+                Ok(join_handle) => {
+                    // Request immediate cancellation without waiting for task termination.
+                    join_handle.abort();
                 }
-            };
+                Err(error) => {
+                    // Keep processing the remaining workers.
+                    let _ = MWFLog::add_log(action_start_timer, worker_id, LogAction::WorkerAbort, LogStatus::Error);
 
-            // Abort the Tokio task immediately.
-            join_handle.abort();
-
-            // Remove the worker from the Registry.
-            if let Err(error) = mwf_data.worker_registry.remove_worker(worker_id) {
-                MWFLog::add_log(action_start_timer, worker_id, LogAction::WorkerAbort, LogStatus::Error)?;
-                return Err(error);
+                    if first_error.is_none() {
+                        first_error = Some(error);
+                    }
+                }
             }
 
-            MWFLog::add_log(action_start_timer, worker_id, LogAction::WorkerAbort, LogStatus::Ok)?;
-            let _ = MWFLog::remove_logged_worker(worker_id);
+            worker_action_list.push((worker_id.clone(), action_start_timer));
+        }
+
+        // Remove all targeted workers from the Registry, regardless of cancellation results.
+        for (worker_id, action_start_timer) in &worker_action_list {
+            match mwf_data.worker_registry.remove_worker(worker_id) {
+                Ok(()) => {
+                    let _ = MWFLog::add_log(*action_start_timer, worker_id, LogAction::WorkerAbort, LogStatus::Ok);
+                    let _ = MWFLog::remove_logged_worker(worker_id);
+                }
+                Err(error) => {
+                    let _ = MWFLog::add_log(*action_start_timer, worker_id, LogAction::WorkerAbort, LogStatus::Error);
+
+                    if first_error.is_none() {
+                        first_error = Some(error);
+                    }
+                }
+            }
         }
 
         drop(mwf_data_guard);
 
-        // Wake up all waiters interested in worker
-        // shutdown events.
+        // Wake up all waiters interested in worker shutdown events.
         MWF_WRK_CLOSE_NOTIFY.notify_waiters();
 
-        Ok(())
+        match first_error {
+            Some(error) => Err(error),
+            None => Ok(()),
+        }
     }
 
-    /// Forcefully terminate a worker.
+    /// Aborts a worker.
     ///
-    /// This operation aborts the Tokio tasks associated with the
-    /// worker and removes them from the Registry without executing
-    /// any additional worker code.
+    /// This is a best-effort operation intended as a last resort when a worker cannot be closed
+    /// normally.
     ///
-    /// This function should only be used as a recovery mechanism
-    /// when normal shutdown has failed.
+    /// The worker is removed from the Registry regardless of whether its Tokio task can actually
+    /// be terminated. This function does not wait for task termination.
+    ///
+    /// Tasks blocked in synchronous code or native DLL calls may continue executing.
     pub fn abort_worker(worker_id: &WorkerID) -> Result<(), MWFError> {
         MWFWrk::abort_worker_list(&vec![worker_id.to_owned()])
     }
 
-    /// Forcefully terminate all direct children workers of an entity.
+    /// Aborts all children of an entity.
     ///
-    /// This operation aborts the Tokio tasks associated with the
-    /// workers and removes them from the Registry without executing
-    /// any additional worker code.
+    /// This is a best-effort operation intended as a last resort when a workers cannot be closed
+    /// normally.
     ///
-    /// This function should only be used as a recovery mechanism
-    /// when normal shutdown has failed.
+    /// Each child worker is removed from the Registry regardless of whether its Tokio task can
+    /// actually be terminated. This function does not wait for task termination.
+    ///
+    /// Tasks blocked in synchronous code or native DLL calls may continue executing.
     pub fn abort_children(entity_id: &EntityID) -> Result<(), MWFError> {
         MWFWrk::abort_worker_list(&MWFWrk::get_children_ids(entity_id)?)
     }

@@ -8,6 +8,7 @@ use tokio::task::JoinHandle;
 
 use crate::channel::{WorkerNormalSenderChannel, WorkerPrioritySenderChannel};
 use crate::framework_error::{MWFError, MWFPanic};
+use crate::mwf::MWFInstanceID;
 use crate::worker::{EntityID, WorkerID, WorkerInfo, WorkerState, WorkerTypeID};
 
 /// Information associated with a registered worker.
@@ -42,6 +43,8 @@ impl RegistryEntry {
 /// Stores all workers known by the framework.
 #[derive(Debug)]
 pub(crate) struct Registry {
+    /// Identifier of the MWF instance owning this registry.
+    mwf_instance_id: MWFInstanceID,
     /// Maps a WorkerID to its registry entry.
     /// Source of truth for worker existence.
     worker_map: HashMap<WorkerID, RegistryEntry>,
@@ -55,8 +58,8 @@ pub(crate) struct Registry {
 
 impl Registry {
     /// Create an empty registry.
-    pub(crate) fn new() -> Self {
-        Self { worker_map: HashMap::new(), child_worker_map: HashMap::new(), worker_counter_map: HashMap::new() }
+    pub(crate) fn new(mwf_instance_id: MWFInstanceID) -> Self {
+        Self { mwf_instance_id, worker_map: HashMap::new(), child_worker_map: HashMap::new(), worker_counter_map: HashMap::new() }
     }
 
     /// Get worker registry entry from WorkerID.
@@ -106,10 +109,11 @@ impl Registry {
 
     /// Generate a unique WorkerID for a worker type.
     pub(crate) fn generate_worker_id(&mut self, worker_type_id: &WorkerTypeID) -> WorkerID {
+        let mwf_instance_id = self.mwf_instance_id;
         let counter = self.worker_counter_map.entry(worker_type_id.clone()).or_insert(0);
         *counter += 1;
 
-        WorkerID::new(format!("{}:{:05}", worker_type_id, *counter))
+        WorkerID::new(format!("{}:{}:{:05}", worker_type_id, mwf_instance_id, *counter))
     }
 
     /// Check if the registry is empty.

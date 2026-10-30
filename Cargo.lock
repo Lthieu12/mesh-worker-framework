@@ -262,7 +262,7 @@ dependencies = [
 
 [[package]]
 name = "mwf"
-version = "0.9.1"
+version = "0.10.0"
 dependencies = [
  "anyhow",
  "async-trait",
