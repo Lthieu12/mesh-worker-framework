@@ -82,7 +82,7 @@ impl MWFWrk {
         };
 
         // Register the wait and reject any operation that would create a deadlock.
-        let worker_wait_guard = register_worker_wait(&waiting_worker_id, WorkerWaitState { receiver_id: receiver_id.clone(), message_id: message_id.clone(), message_instance_id, wait_mode, _started_at: Instant::now() })?;
+        let worker_wait_guard = register_worker_wait(&waiting_worker_id, WorkerWaitState { receiver_id: receiver_id.clone(), message_id: message_id.clone(), message_instance_id, _wait_mode: wait_mode, _started_at: Instant::now() })?;
 
         Ok(Some(worker_wait_guard))
     }

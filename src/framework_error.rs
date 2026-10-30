@@ -5,7 +5,7 @@
 use std::error::Error;
 use std::fmt;
 
-use crate::message::{MessageID, MessageInstanceID, MessageWaitMode};
+use crate::message::MessageID;
 use crate::worker::{EntityID, WorkerID, WorkerTypeID};
 
 pub type WorkerError = anyhow::Error;
@@ -88,10 +88,10 @@ pub enum MWFError {
     Worker_CannotWaitForSelf,
 
     /// The worker already has an active message wait.
-    Worker_AlreadyWaiting { sender_id: WorkerID, receiver_id: WorkerID, waiting_worker_id: WorkerID, waiting_receiver_id: WorkerID, waiting_message_id: MessageID, waiting_message_instance_id: MessageInstanceID, waiting_mode: MessageWaitMode },
+    Worker_AlreadyWaiting { sender_id: WorkerID, waiting_receiver_id: WorkerID, waiting_message_id: MessageID },
 
     /// The requested wait would create a deadlock cycle.
-    Worker_WaitWouldDeadlock { sender_id: WorkerID, receiver_id: WorkerID, waiting_worker_id: WorkerID, waiting_receiver_id: WorkerID, waiting_message_id: MessageID, waiting_message_instance_id: MessageInstanceID, waiting_mode: MessageWaitMode, wait_chain: Vec<WorkerID> },
+    Worker_WaitWouldDeadlock { sender_id: WorkerID, waiting_receiver_id: WorkerID, waiting_message_id: MessageID, wait_chain: Vec<WorkerID> },
 
     /// The current execution is not associated with an MWF worker task.
     Worker_CurrentContextUnavailable,
@@ -231,27 +231,14 @@ impl fmt::Display for MWFError {
                 write!(f, "A worker cannot wait for a message sent to itself.")
             }
 
-            MWFError::Worker_AlreadyWaiting { sender_id, receiver_id, waiting_worker_id, waiting_receiver_id, waiting_message_id, waiting_message_instance_id, waiting_mode } => {
-                write!(
-                    f,
-                    "Cannot start send-and-wait from worker '{sender_id}' to worker '{receiver_id}': \
-                    worker '{waiting_worker_id}' is already waiting for worker '{waiting_receiver_id}' \
-                    to complete message '{waiting_message_id}' \
-                    (MessageInstanceID: {waiting_message_instance_id}, wait mode: {waiting_mode:?})."
-                )
+            MWFError::Worker_AlreadyWaiting { sender_id, waiting_receiver_id, waiting_message_id } => {
+                write!(f, "Cannot start send-and-wait. Worker '{sender_id}' is already waiting for worker '{waiting_receiver_id}' to complete message '{waiting_message_id}'.")
             }
 
-            MWFError::Worker_WaitWouldDeadlock { sender_id, receiver_id, waiting_worker_id, waiting_receiver_id, waiting_message_id, waiting_message_instance_id, waiting_mode, wait_chain } => {
+            MWFError::Worker_WaitWouldDeadlock { sender_id, waiting_receiver_id, waiting_message_id, wait_chain } => {
                 let wait_chain = wait_chain.iter().map(ToString::to_string).collect::<Vec<_>>().join(" -> ");
 
-                write!(
-                    f,
-                    "Cannot start send-and-wait from worker '{sender_id}' to worker '{receiver_id}': \
-                    worker '{waiting_worker_id}' is already waiting for worker '{waiting_receiver_id}' \
-                    to complete message '{waiting_message_id}' \
-                    (MessageInstanceID: {waiting_message_instance_id}, wait mode: {waiting_mode:?}). \
-                    This would create a circular wait: {wait_chain}."
-                )
+                write!(f, "Cannot start send-and-wait. Worker '{sender_id}' is already waiting for worker '{waiting_receiver_id}' to complete message '{waiting_message_id}'. This would create a circular wait: {wait_chain}.")
             }
 
             MWFError::Worker_CurrentContextUnavailable => {

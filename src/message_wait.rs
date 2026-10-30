@@ -33,7 +33,7 @@ pub(crate) struct WorkerWaitState {
     pub(crate) message_instance_id: MessageInstanceID,
 
     /// Type of completion being awaited.
-    pub(crate) wait_mode: MessageWaitMode,
+    pub(crate) _wait_mode: MessageWaitMode,
 
     /// Time when the wait started.
     pub(crate) _started_at: Instant,
@@ -85,15 +85,7 @@ pub(crate) fn register_worker_wait(sender_id: &WorkerID, wait_state: WorkerWaitS
 
     // Reject the request if the sender already has an active wait.
     if let Some(active_wait) = message_wait_data.waiting_worker_registry.get(sender_id) {
-        return Err(MWFError::Worker_AlreadyWaiting {
-            sender_id: sender_id.clone(),
-            receiver_id: wait_state.receiver_id.clone(),
-            waiting_worker_id: sender_id.clone(),
-            waiting_receiver_id: active_wait.receiver_id.clone(),
-            waiting_message_id: active_wait.message_id.clone(),
-            waiting_message_instance_id: active_wait.message_instance_id,
-            waiting_mode: active_wait.wait_mode,
-        });
+        return Err(MWFError::Worker_AlreadyWaiting { sender_id: sender_id.clone(), waiting_receiver_id: active_wait.receiver_id.clone(), waiting_message_id: active_wait.message_id.clone() });
     }
 
     // Reject the request if the receiver's existing wait chain leads back to the sender.
@@ -108,16 +100,7 @@ pub(crate) fn register_worker_wait(sender_id: &WorkerID, wait_state: WorkerWaitS
             }
         };
 
-        return Err(MWFError::Worker_WaitWouldDeadlock {
-            sender_id: sender_id.clone(),
-            receiver_id: wait_state.receiver_id.clone(),
-            waiting_worker_id,
-            waiting_receiver_id: active_wait.receiver_id.clone(),
-            waiting_message_id: active_wait.message_id.clone(),
-            waiting_message_instance_id: active_wait.message_instance_id,
-            waiting_mode: active_wait.wait_mode,
-            wait_chain,
-        });
+        return Err(MWFError::Worker_WaitWouldDeadlock { sender_id: sender_id.clone(), waiting_receiver_id: active_wait.receiver_id.clone(), waiting_message_id: active_wait.message_id.clone(), wait_chain });
     }
 
     // Register the wait only after all checks have succeeded.
@@ -154,12 +137,8 @@ fn find_wait_cycle(sender_id: &WorkerID, receiver_id: &WorkerID, waiting_worker_
         wait_chain.push(current_worker_id.clone());
 
         // Follow the current worker's existing wait, if any.
-        match waiting_worker_registry.get(&current_worker_id) {
-            Some(wait_state) => {
-                current_worker_id = wait_state.receiver_id.clone();
-            }
-            None => return None,
-        }
+        let wait_state = waiting_worker_registry.get(&current_worker_id)?;
+        current_worker_id = wait_state.receiver_id.clone();
     }
 }
 
@@ -234,6 +213,7 @@ pub(crate) fn cleanup_worker_task_message_flows(worker_id: &WorkerID) -> Result<
 }
 
 /// Send a message and wait until its callback has completed.
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn wait_this_message<TMessageData>(sender_channel: WorkerSenderChannel, sender_id: &EntityID, receiver_id: &WorkerID, message_id: &MessageID, message_instance_id: MessageInstanceID, message_data: &TMessageData, timeout_ms: Option<u64>, priority: bool) -> Result<(), MWFError>
 where
     TMessageData: Clone + Send + Sync + 'static,
@@ -263,6 +243,7 @@ where
 }
 
 /// Send a message and wait until its entire message flow has completed.
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn wait_message_flow<TMessageData>(
     sender_channel: WorkerSenderChannel,
     sender_id: &EntityID,
@@ -294,19 +275,17 @@ where
     flow_registration_guard.disarm();
 
     // Wait for the result explicitly provided by workflow_end().
-    let worker_result = match timeout_ms {
+    match timeout_ms {
         Some(timeout_ms) => match tokio::time::timeout(Duration::from_millis(timeout_ms), flow_reply_receiver).await {
             Ok(Ok(worker_result)) => worker_result,
-            Ok(Err(_)) => return Err(MWFError::Worker_ChannelClosed),
-            Err(_) => return Err(MWFError::Operation_Timeout),
+            Ok(Err(_)) => Err(MWFError::Worker_ChannelClosed),
+            Err(_) => Err(MWFError::Operation_Timeout),
         },
         None => match flow_reply_receiver.await {
             Ok(worker_result) => worker_result,
-            Err(_) => return Err(MWFError::Worker_ChannelClosed),
+            Err(_) => Err(MWFError::Worker_ChannelClosed),
         },
-    };
-
-    worker_result
+    }
 }
 
 /// Automatically removes a registered wait when the guard is dropped.
@@ -408,7 +387,7 @@ mod tests {
 
     /// Create a registered wait targeting the specified worker.
     fn test_wait_state(receiver_id: &str) -> WorkerWaitState {
-        WorkerWaitState { receiver_id: test_worker_id(receiver_id), message_id: MessageID::new("TestMessage"), message_instance_id: 1, wait_mode: MessageWaitMode::WaitThisMessage, _started_at: Instant::now() }
+        WorkerWaitState { receiver_id: test_worker_id(receiver_id), message_id: MessageID::new("TestMessage"), message_instance_id: 1, _wait_mode: MessageWaitMode::WaitThisMessage, _started_at: Instant::now() }
     }
 
     #[test]

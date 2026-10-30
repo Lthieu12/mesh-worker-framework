@@ -78,18 +78,12 @@ impl Drop for WorkerTaskCleanupGuard {
 
 /// Return the ID of the worker executing the current MWF task.
 pub(crate) fn current_worker_id() -> Option<WorkerID> {
-    match CURRENT_WORKER_CONTEXT.try_with(|context| context.worker_id.clone()) {
-        Ok(worker_id) => Some(worker_id),
-        Err(_) => None,
-    }
+    CURRENT_WORKER_CONTEXT.try_with(|context| context.worker_id.clone()).ok()
 }
 
 /// Return the parent entity ID of the current worker.
 pub(crate) fn current_parent_id() -> Option<EntityID> {
-    match CURRENT_WORKER_CONTEXT.try_with(|context| context.parent_id.clone()) {
-        Ok(parent_id) => Some(parent_id),
-        Err(_) => None,
-    }
+    CURRENT_WORKER_CONTEXT.try_with(|context| context.parent_id.clone()).ok()
 }
 
 /// Return the inheritance context of the currently processed message.
@@ -100,10 +94,7 @@ pub(crate) fn current_parent_id() -> Option<EntityID> {
 pub(crate) fn current_message_inheritance_context() -> MessageInheritanceContext {
     // `try_with()` provides a reference to the stored context.
     // Dereferencing it copies the value because MessageInheritanceContext implements Copy.
-    match CURRENT_MESSAGE_INHERITANCE_CONTEXT.try_with(|context| *context) {
-        Ok(context) => context,
-        Err(_) => MessageInheritanceContext::default(),
-    }
+    CURRENT_MESSAGE_INHERITANCE_CONTEXT.try_with(|context| *context).unwrap_or_default()
 }
 
 /// Internal command queue owned by WorkerTask.
