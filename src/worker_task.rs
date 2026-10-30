@@ -306,7 +306,7 @@ async fn execute_message(worker: &mut Box<dyn Worker + Send>, worker_id: &Worker
 /// - Update the Registry.
 /// - Report errors and log worker activity.
 /// - Terminate when the worker is closed.
-async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: WorkerNormalReceiverChannel, priority_receiver_channel: WorkerPriorityReceiverChannel, worker_id: WorkerID, parent_id: EntityID) {
+async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: WorkerNormalReceiverChannel, priority_receiver_channel: WorkerPriorityReceiverChannel, worker_id: WorkerID, _parent_id: EntityID) {
     let _cleanup_guard = WorkerTaskCleanupGuard { worker_id: worker_id.clone() };
 
     // WorkerTask owns the worker instance.
