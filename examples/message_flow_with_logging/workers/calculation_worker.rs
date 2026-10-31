@@ -43,7 +43,7 @@ impl Worker for CalculationWorker {
                     Ok(data) => data,
                     Err(error) => {
                         // Explicitly complete the flow when the payload type is unexpected.
-                        MWFWrk::workflow_end(Err(WorkerError::from(error)))?;
+                        MWFWrk::message_flow_end(Err(WorkerError::from(error)))?;
                         return Ok(());
                     }
                 };
@@ -54,7 +54,7 @@ impl Worker for CalculationWorker {
                 // MWF automatically propagates the active message flow.
                 if let Err(error) = MWFWrk::send_message(&worker_id.as_entity_id(), &worker_id, &CalculationMessages::PROCESS_CALCULATION, &calculation_data).await {
                     // Complete the flow if the next message cannot be queued.
-                    MWFWrk::workflow_end(Err(WorkerError::from(error)))?;
+                    MWFWrk::message_flow_end(Err(WorkerError::from(error)))?;
                 }
             }
 
@@ -63,7 +63,7 @@ impl Worker for CalculationWorker {
                     Ok(data) => data,
                     Err(error) => {
                         // Do not leave the caller waiting if payload recovery fails.
-                        MWFWrk::workflow_end(Err(WorkerError::from(error)))?;
+                        MWFWrk::message_flow_end(Err(WorkerError::from(error)))?;
                         return Ok(());
                     }
                 };
@@ -72,7 +72,7 @@ impl Worker for CalculationWorker {
                 let calculation_result = Self::process_calculation(calculation_data).await;
 
                 // Forward the business result to the application waiting for the flow.
-                MWFWrk::workflow_end(calculation_result)?;
+                MWFWrk::message_flow_end(calculation_result)?;
             }
 
             _ => {}

@@ -165,7 +165,7 @@ message with an active flow context, MWF propagates that context to
 those self-directed messages. The context is not automatically
 propagated to messages sent to other workers.
 
-`workflow_end()` completes the active flow associated with the current
+`message_flow_end()` completes the active flow associated with the current
 message context. Completion validates that the flow belongs to the
 calling worker, removes the flow from the registry and sends the
 supplied business result to the waiting caller.

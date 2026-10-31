@@ -94,7 +94,7 @@ pub enum MessageWaitMode {
     /// Wait until the receiver finishes processing this message.
     WaitThisMessage,
 
-    /// Wait until the receiver completes the message flow by calling `workflow_end()`.
+    /// Wait until the receiver completes the message flow by calling `message_flow_end()`.
     WaitThisMessageFlow,
 }
 

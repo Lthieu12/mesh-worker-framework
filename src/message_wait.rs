@@ -58,7 +58,7 @@ impl MessageWaitData {
 
 /// Returns whether a message flow is still active for the specified worker.
 ///
-/// A missing workflow is treated as inactive so stale message contexts
+/// A missing message flow is treated as inactive so stale message contexts
 /// can be safely ignored.
 pub(crate) fn is_message_flow_active_for_worker(message_flow_id: MessageFlowID, worker_id: &WorkerID) -> bool {
     let message_wait_data_guard = MWF_MESSAGE_WAIT_DATA.read().expect(MWFPanic::MWFMessageWaitData_ReadLockPoisoned.message());
@@ -221,7 +221,7 @@ pub(crate) async fn wait_this_message<TMessageData>(sender_channel: WorkerSender
 where
     TMessageData: Clone + Send + Sync + 'static,
 {
-    // Messages waiting for a callback do not inherit a workflow.
+    // Messages waiting for a callback do not inherit a message flow.
     let framework_message = WorkerMessage::new(sender_id, receiver_id, message_id, message_instance_id, message_data, MessageInheritanceContext::default());
 
     let (reply_sender, reply_receiver) = oneshot::channel::<Result<(), WorkerError>>();
@@ -271,13 +271,13 @@ where
 
     let framework_message = WorkerMessage::new(sender_id, receiver_id, message_id, message_instance_id, message_data, inheritance_context);
 
-    // Submit a regular message: workflow_end() reports completion.
+    // Submit a regular message: message_flow_end() reports completion.
     sender_channel.send(WorkerCommand::Message { message: framework_message, priority, unique: false }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
 
     // Preserve the registration after successful submission.
     flow_registration_guard.disarm();
 
-    // Wait for the result explicitly provided by workflow_end().
+    // Wait for the result explicitly provided by message_flow_end().
     match timeout_ms {
         Some(timeout_ms) => match tokio::time::timeout(Duration::from_millis(timeout_ms), flow_reply_receiver).await {
             Ok(Ok(worker_result)) => worker_result,

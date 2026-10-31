@@ -5,7 +5,7 @@
 //!
 //! The application sends START_CALCULATION and waits for the complete flow.
 //! The worker then sends PROCESS_CALCULATION to itself. The second message
-//! completes the flow using workflow_end().
+//! completes the flow using message_flow_end().
 //!
 //! MWF logs are enabled and displayed in the terminal to make message
 //! processing and flow completion visible.

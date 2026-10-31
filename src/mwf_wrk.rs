@@ -53,8 +53,8 @@ impl MWFWrk {
 
     /// Returns the current message flow context only for messages sent to the current worker.
     ///
-    /// The workflow must still be active and owned by that worker.
-    /// Messages sent to another worker never inherit the current workflow.
+    /// The message flow must still be active and owned by that worker.
+    /// Messages sent to another worker never inherit the current message flow.
     fn get_message_inheritance_context_for_receiver(receiver_id: &WorkerID) -> MessageInheritanceContext {
         // Avoid registry access when no message flow is active in the current context.
         let inheritance_context = current_message_inheritance_context();
@@ -62,12 +62,12 @@ impl MWFWrk {
             return MessageInheritanceContext::default();
         };
 
-        // Workflow contexts are only propagated to the current worker itself.
+        // Message flow contexts are only propagated to the current worker itself.
         if current_worker_id().as_ref() != Some(receiver_id) {
             return MessageInheritanceContext::default();
         }
 
-        // Ignore a workflow that has already been closed or belongs to another worker.
+        // Ignore a message flow that has already been closed or belongs to another worker.
         if is_message_flow_active_for_worker(message_flow_id, receiver_id) { inheritance_context } else { MessageInheritanceContext::default() }
     }
 
@@ -723,7 +723,7 @@ impl MWFWrk {
         // Generate a unique identifier for this message instance.
         let message_instance_id = Self::generate_message_instance_id()?;
 
-        // Inherit the current workflow only when sending to the same worker.
+        // Inherit the current message flow only when sending to the same worker.
         let inheritance_context = Self::get_message_inheritance_context_for_receiver(receiver_id);
 
         let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, inheritance_context);
@@ -791,7 +791,7 @@ impl MWFWrk {
     ///
     /// The completion mode determines what the caller waits for:
     /// - `WaitThisMessage`: completion of the receiver's `on_message()` callback.
-    /// - `WaitThisMessageFlow`: explicit completion of the message flow through `workflow_end()`.
+    /// - `WaitThisMessageFlow`: explicit completion of the message flow through `message_flow_end()`.
     ///
     /// Returns:
     /// - Ok(()) if the requested completion succeeds.
@@ -828,7 +828,7 @@ impl MWFWrk {
     ///
     /// The completion mode determines what the caller waits for:
     /// - `WaitThisMessage`: completion of the receiver's `on_message()` callback.
-    /// - `WaitThisMessageFlow`: explicit completion of the message flow through `workflow_end()`.
+    /// - `WaitThisMessageFlow`: explicit completion of the message flow through `message_flow_end()`.
     ///
     /// Returns:
     /// - Ok(()) if the requested completion succeeds.
@@ -872,7 +872,7 @@ impl MWFWrk {
         // Generate the unique id and build the message
         let message_instance_id = MWFWrk::generate_message_instance_id()?;
 
-        // Inherit the current workflow only when sending a message to this same worker.
+        // Inherit the current message flow only when sending a message to this same worker.
         let inheritance_context = MWFWrk::get_message_inheritance_context_for_receiver(receiver_id);
 
         let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, inheritance_context);
@@ -885,22 +885,22 @@ impl MWFWrk {
 
     /// Complete the message flow associated with the current message and forward its result.
     ///
-    /// `workflow_result` is returned by the caller waiting for the message flow.
+    /// `message flow_result` is returned by the caller waiting for the message flow.
     ///
-    /// The workflow result represents the outcome of the application-level processing.
+    /// The message flow result represents the outcome of the application-level processing.
     /// The returned MWFError only indicates that the framework could not signal completion.
     ///
     /// Returns:
     /// - Worker_CurrentContextUnavailable if called outside an MWF worker task.
     /// - MessageFlow_NotActive if the current message has no active flow.
-    pub fn workflow_end(workflow_result: Result<(), WorkerError>) -> Result<(), MWFError> {
+    pub fn message_flow_end(message_flow_result: Result<(), WorkerError>) -> Result<(), MWFError> {
         // Identify the worker executing the current callback.
         let worker_id = current_worker_id().ok_or(MWFError::Worker_CurrentContextUnavailable)?;
 
-        // Retrieve the workflow associated with the currently processed message.
+        // Retrieve the message flow associated with the currently processed message.
         let message_flow_id = current_message_inheritance_context().message_flow_id.ok_or(MWFError::MessageFlow_NotActive)?;
 
         // Remove the flow and forward its result to the waiting caller.
-        complete_message_flow(message_flow_id, &worker_id, workflow_result)
+        complete_message_flow(message_flow_id, &worker_id, message_flow_result)
     }
 }

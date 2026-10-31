@@ -13,25 +13,25 @@
 //!   - Verify that the waiting caller receives `MessageFlow_WorkerTaskTerminated` directly.
 //!   - Close MWF.
 //!
-//! - `test_message_flow_completes_with_workflow_end`:
+//! - `test_message_flow_completes_with_message_flow_end`:
 //!   - Execute a message flow that propagates across three successive messages handled by the same worker.
-//!   - Complete the message flow through `workflow_end()` on the third message.
+//!   - Complete the message flow through `message_flow_end()` on the third message.
 //!   - Verify that the waiting caller receives `Ok(())`.
 //!
 //! - `test_message_flow_returns_workflow_error`:
-//!   - Execute a message flow that fails through `workflow_end()`.
+//!   - Execute a message flow that fails through `message_flow_end()`.
 //!   - Verify that the waiting caller receives `Worker_MessageError` containing the original business error.
 //!   - Close the worker and MWF.
 //!
-//! - `test_workflow_end_without_active_message_flow`:
-//!   - Execute a message that calls `workflow_end()` without an active message flow.
+//! - `test_message_flow_end_without_active_message_flow`:
+//!   - Execute a message that calls `message_flow_end()` without an active message flow.
 //!   - Verify that the worker returns `MessageFlow_NotActive` wrapped in `Worker_MessageError`.
 //!   - Close the worker and MWF.
 //!
 //! - `test_message_flow_completes_after_waiter_timeout`:
 //!   - Start a message flow with a short waiter timeout.
 //!   - Verify that the caller receives `Operation_Timeout` before the worker completes the message.
-//!   - Verify that the worker subsequently completes the message flow through `workflow_end()`.
+//!   - Verify that the worker subsequently completes the message flow through `message_flow_end()`.
 //!   - Verify that the worker remains operational after the late completion.
 
 use serial_test::serial;
@@ -183,10 +183,10 @@ async fn test_worker_abort_cleans_up_active_message_flow() {
     }
 }
 
-/// Verify that workflow_end() completes an active message flow successfully.
+/// Verify that message_flow_end() completes an active message flow successfully.
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
-async fn test_message_flow_completes_with_workflow_end() {
+async fn test_message_flow_completes_with_message_flow_end() {
     MWF::init().unwrap();
     MWFLog::set_log_mode(LogMode::LogAll, None).unwrap();
     MWF::register_worker_type::<SimulationWorker>().unwrap();
@@ -212,10 +212,10 @@ async fn test_message_flow_completes_with_workflow_end() {
     MWFWrk::wait_worker_list_close(&vec![worker_id], Some(1_000)).await.unwrap();
     MWF::close().unwrap();
 
-    assert!(result.is_ok(), "Expected workflow_end() to complete the message flow successfully, got: {result:?}");
+    assert!(result.is_ok(), "Expected message_flow_end() to complete the message flow successfully, got: {result:?}");
 }
 
-/// Verify that workflow_end() returns a business error through the message flow.
+/// Verify that message_flow_end() returns a business error through the message flow.
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 async fn test_message_flow_returns_workflow_error() {
@@ -241,16 +241,16 @@ async fn test_message_flow_returns_workflow_error() {
 
     match result {
         Err(MWFError::Worker_MessageError(error)) => {
-            assert!(error.to_string().contains("Simulation message failure"), "Expected the original workflow error message, got: {error}");
+            assert!(error.to_string().contains("Simulation message failure"), "Expected the original message flow error message, got: {error}");
         }
         other => panic!("Expected Worker_MessageError, got: {other:?}"),
     }
 }
 
-/// Verify that workflow_end() fails when no message flow is active.
+/// Verify that message_flow_end() fails when no message flow is active.
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
-async fn test_workflow_end_without_active_message_flow() {
+async fn test_message_flow_end_without_active_message_flow() {
     MWF::init().unwrap();
     MWF::register_worker_type::<SimulationWorker>().unwrap();
 
@@ -278,7 +278,7 @@ async fn test_workflow_end_without_active_message_flow() {
     );
 }
 
-/// Verify that workflow_end() completes a message flow even after its waiter timed out.
+/// Verify that message_flow_end() completes a message flow even after its waiter timed out.
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 async fn test_message_flow_completes_after_waiter_timeout() {
@@ -301,12 +301,12 @@ async fn test_message_flow_completes_after_waiter_timeout() {
     let sender_id = EntityID::new_external("TEST");
     let message_id = MessageID::new("WORKFLOW_END_TIMEOUT");
 
-    // The waiter must time out before the worker calls workflow_end().
+    // The waiter must time out before the worker calls message_flow_end().
     let result = MWFWrk::send_message_and_wait(&sender_id, &worker_id, &message_id, MessageWaitMode::WaitThisMessageFlow, &(), Some(50)).await;
 
     assert!(matches!(result, Err(MWFError::Operation_Timeout)), "Expected Operation_Timeout, got: {result:?}");
 
-    // Wait until the worker has completed its callback through workflow_end().
+    // Wait until the worker has completed its callback through message_flow_end().
     tokio::time::timeout(std::time::Duration::from_secs(2), async {
         loop {
             let log_list = MWFLog::wait_log(last_log_instance_id).await.unwrap();

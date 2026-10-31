@@ -201,7 +201,7 @@ impl Worker for SimulationWorker {
                     tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
                 }
 
-                MWFWrk::workflow_end(Ok(()))?;
+                MWFWrk::message_flow_end(Ok(()))?;
             }
 
             SimulationBehavior::Message_WorkflowEndFail { message_delay_ms } => {
@@ -210,7 +210,7 @@ impl Worker for SimulationWorker {
                     tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
                 }
 
-                MWFWrk::workflow_end(Err(anyhow::anyhow!("Simulation message failure")))?;
+                MWFWrk::message_flow_end(Err(anyhow::anyhow!("Simulation message failure")))?;
             }
 
             SimulationBehavior::Message_WorkflowEndChained { message_delay_ms } => {
@@ -228,7 +228,7 @@ impl Worker for SimulationWorker {
                     MWFWrk::send_message(&EntityID::new_worker(worker_id.clone()), worker_id, &MessageID::new("WORKFLOW_END_CHAINED"), &()).await?;
                 } else {
                     // Complete the message flow after the third message.
-                    MWFWrk::workflow_end(Ok(()))?;
+                    MWFWrk::message_flow_end(Ok(()))?;
                 }
             }
 

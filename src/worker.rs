@@ -15,7 +15,7 @@ use crate::string_helper;
 /// that MWF stores in the WorkerTypeRegistry.
 ///
 /// Whenever MWF needs to spawn a worker from its
-/// WorkerTypeID (for example when executing a workflow),
+/// WorkerTypeID (for example when executing a message flow),
 /// this constructor is invoked to create a fresh worker
 /// instance.
 ///

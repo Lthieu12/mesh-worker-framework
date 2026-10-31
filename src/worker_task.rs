@@ -249,7 +249,7 @@ async fn execute_message(worker: &mut Box<dyn Worker + Send>, worker_id: &Worker
 
     MWFLog::add_log(action_start_timer, worker_id, log_action.clone(), LogStatus::Start).expect(MWFPanic::LogBuffer_AddLogFailed.message());
 
-    // Ignore the workflow context if its workflow has already been closed.
+    // Ignore the message flow context if its message flow has already been closed.
     let context_to_install = match message.inheritance_context.message_flow_id {
         Some(message_flow_id) if is_message_flow_active_for_worker(message_flow_id, worker_id) => message.inheritance_context,
         _ => MessageInheritanceContext::default(),

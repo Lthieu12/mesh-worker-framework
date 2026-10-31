@@ -312,7 +312,7 @@ Priority messages are handled using a Last-In, First-Out
 Send a message and wait for the requested completion mode:
 
 * WaitThisMessage: wait until the target worker finishes processing the message.
-* WaitThisMessageFlow: wait until the target worker explicitly completes the message flow using `workflow_end()`.
+* WaitThisMessageFlow: wait until the target worker explicitly completes the message flow using `message_flow_end()`.
 
 The caller receives the processing result or a timeout error.
 

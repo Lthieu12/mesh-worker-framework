@@ -24,8 +24,8 @@ async fn test_worker_current_context() {
     assert!(matches!(MWFWrk::get_current_worker_id(), Err(MWFError::Worker_CurrentContextUnavailable)));
     assert!(matches!(MWFWrk::get_current_parent_id(), Err(MWFError::Worker_CurrentContextUnavailable)));
 
-    // workflow_end() must fail outside an MWF worker task.
-    assert!(matches!(MWFWrk::workflow_end(Ok(())), Err(MWFError::Worker_CurrentContextUnavailable)));
+    // message_flow_end() must fail outside an MWF worker task.
+    assert!(matches!(MWFWrk::message_flow_end(Ok(())), Err(MWFError::Worker_CurrentContextUnavailable)));
 
     // Create two distinct external parent entities.
     let parent_a_id = EntityID::new_external("PARENT_A");
