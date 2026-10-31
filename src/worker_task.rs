@@ -86,11 +86,8 @@ pub(crate) fn current_parent_id() -> Option<EntityID> {
     CURRENT_WORKER_CONTEXT.try_with(|context| context.parent_id.clone()).ok()
 }
 
-/// Return the inheritance context of the currently processed message.
-///
-/// The context is available only while a message callback is executed inside
-/// `CURRENT_MESSAGE_INHERITANCE_CONTEXT.scope()`. If no context is installed,
-/// return the default context, which has no associated message flow.
+/// The context is available while a message callback is executed
+/// and is propagated to blocking closures spawned from that callback.
 pub(crate) fn current_message_inheritance_context() -> MessageInheritanceContext {
     // `try_with()` provides a reference to the stored context.
     // Dereferencing it copies the value because MessageInheritanceContext implements Copy.
