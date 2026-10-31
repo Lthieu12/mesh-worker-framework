@@ -211,27 +211,30 @@ pub(crate) fn spawn_worker_task(worker: Box<dyn Worker + Send>, normal_receiver_
                             anyhow::anyhow!("Unknown panic")
                         };
 
-                        // Store the panic in MWFErr.
-                        MWFErr::add_error_internal(&EntityID::Worker(task_worker_id.clone()), Some("worker_task".into()), &panic_error).expect(MWFPanic::ErrorBuffer_AddErrorFailed.message());
-                        // Log the panic in MWFLog
-                        MWFLog::add_log(Instant::now(), &task_worker_id, LogAction::WorkerPanic, LogStatus::Error).expect(MWFPanic::LogBuffer_AddLogFailed.message());
+                        // Store the panic in MWFErr if the framework is still initialized.
+                        let _ = MWFErr::add_error_internal(&EntityID::Worker(task_worker_id.clone()), Some("worker_task".into()), &panic_error);
 
+                        // Log the panic in MWFLog if the framework is still initialized.
+                        let _ = MWFLog::add_log(Instant::now(), &task_worker_id, LogAction::WorkerPanic, LogStatus::Error);
+
+                        // Abort or framework shutdown may already have removed the worker.
                         let mut mwf_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
-                        let mwf_data = mwf_data_guard.as_mut().expect(MWFPanic::MWFWrkData_Missing.message());
 
-                        // Update the worker state.
-                        mwf_data.worker_registry.set_worker_state(&task_worker_id, WorkerState::Panicked).expect(MWFPanic::Registry_WorkerMissing.message());
+                        if let Some(mwf_data) = mwf_data_guard.as_mut() {
+                            if mwf_data.worker_registry.contains_worker(&task_worker_id) {
+                                // Update the worker state before removing it from the Registry.
+                                let _ = mwf_data.worker_registry.set_worker_state(&task_worker_id, WorkerState::Panicked);
 
-                        // Remove the worker from the Registry.
-                        mwf_data.worker_registry.remove_worker(&task_worker_id).expect(MWFPanic::Registry_WorkerMissing.message());
+                                let _ = mwf_data.worker_registry.remove_worker(&task_worker_id);
+                            }
+                        }
 
                         // Remove the worker from the selected logging list.
                         let _ = MWFLog::remove_logged_worker(&task_worker_id);
 
                         drop(mwf_data_guard);
 
-                        // Wake up all waiters interested in worker
-                        // shutdown events.
+                        // Wake up all waiters interested in worker shutdown events.
                         MWF_WRK_CLOSE_NOTIFY.notify_waiters();
                     }
                 }
