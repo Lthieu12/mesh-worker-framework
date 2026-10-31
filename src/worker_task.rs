@@ -225,6 +225,9 @@ pub(crate) fn spawn_worker_task(worker: Box<dyn Worker + Send>, normal_receiver_
                         // Remove the worker from the Registry.
                         mwf_data.worker_registry.remove_worker(&task_worker_id).expect(MWFPanic::Registry_WorkerMissing.message());
 
+                        // Remove the worker from the selected logging list.
+                        let _ = MWFLog::remove_logged_worker(&task_worker_id);
+
                         drop(mwf_data_guard);
 
                         // Wake up all waiters interested in worker
