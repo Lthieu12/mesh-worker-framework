@@ -15,7 +15,7 @@ use crate::MWF;
 use crate::framework_error::{MWFError, MWFPanic};
 use crate::log_file::write_log_event;
 use crate::message::{MessageID, MessageInstanceID};
-use crate::mwf::{MWF_LOG_DATA, MWF_LOG_INSTANCE_COUNTER, MWF_LOG_MODE, MWF_LOG_NOTIFY};
+use crate::mwf::{MWF_DATA, MWF_LOG_DATA, MWF_LOG_INSTANCE_COUNTER, MWF_LOG_MODE, MWF_LOG_NOTIFY};
 use crate::string_helper;
 use crate::worker::{EntityID, WorkerID};
 
@@ -587,6 +587,12 @@ impl MWFLog {
     /// remaining log events, and is awaited until it has fully terminated.
     pub async fn set_log_terminal_enabled(enabled: bool) -> Result<(), MWFError> {
         if enabled {
+            // Prevent terminal logging from being enabled while MWF is shutting down.
+            let mwf_data_guard = MWF_DATA.read().expect(MWFPanic::MWFData_ReadLockPoisoned.message());
+            if mwf_data_guard.is_none() {
+                return Err(MWFError::Framework_NotInitialized);
+            }
+
             // Create a one-shot channel used to delay log consumption until the
             // terminal logging task has been fully registered.
             let (start_sender, start_receiver) = oneshot::channel();
@@ -672,6 +678,8 @@ impl MWFLog {
             // The terminal logging task is now fully registered and can start
             // consuming log events.
             let _ = start_sender.send(());
+
+            drop(mwf_data_guard);
         } else {
             // Retrieve the terminal logging task controls while updating its state.
             let (shutdown_sender, task_handle) = {

@@ -1,8 +1,8 @@
-//! Validate MWF framework lifecycle operations.
+//! Validate MWF framework lifecycle and shutdown synchronization.
 //!
 //! These tests verify framework initialization,
-//! shutdown and protection against invalid
-//! lifecycle transitions.
+//! shutdown, invalid lifecycle transitions and
+//! terminal logger activation during shutdown.
 use serial_test::serial;
 
 #[cfg(test)]
@@ -10,6 +10,8 @@ use serial_test::serial;
 mod tests {
 
     use mwf::*;
+    use std::sync::Arc;
+    use std::time::Duration;
 
     /// Verify that MWF rejects initialization without a Tokio runtime.
     #[test]
@@ -62,5 +64,44 @@ mod tests {
         runtime.block_on(async {
             assert!(matches!(MWF::close(), Err(MWFError::Framework_NotInitialized)));
         });
+    }
+
+    /// Verify that terminal logger activation is synchronized with framework shutdown.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn test_mwf_close_racing_with_terminal_logger_activation() {
+        MWF::init().unwrap();
+
+        // Synchronize both logger activation requests with framework shutdown.
+        let start_barrier = Arc::new(tokio::sync::Barrier::new(3));
+
+        let log_start_barrier = Arc::clone(&start_barrier);
+        let log_task = tokio::spawn(async move {
+            log_start_barrier.wait().await;
+            MWFLog::set_log_terminal_enabled(true).await
+        });
+
+        let error_start_barrier = Arc::clone(&start_barrier);
+        let error_task = tokio::spawn(async move {
+            error_start_barrier.wait().await;
+            MWFErr::set_error_terminal_enabled(true).await
+        });
+
+        // Release all three operations at approximately the same time.
+        start_barrier.wait().await;
+
+        // Shutdown is synchronous and may execute while both activation requests are pending.
+        MWF::close().unwrap();
+
+        // Both activation requests must eventually complete.
+        let log_result = tokio::time::timeout(Duration::from_secs(2), log_task).await.expect("Terminal log activation did not complete").expect("Terminal log activation task panicked");
+
+        let error_result = tokio::time::timeout(Duration::from_secs(2), error_task).await.expect("Terminal error activation did not complete").expect("Terminal error activation task panicked");
+
+        // Activation may succeed before shutdown or be rejected after shutdown.
+        assert!(matches!(&log_result, Ok(()) | Err(MWFError::Framework_NotInitialized)), "Unexpected terminal log activation result: {log_result:?}");
+
+        assert!(matches!(&error_result, Ok(()) | Err(MWFError::Framework_NotInitialized)), "Unexpected terminal error activation result: {error_result:?}");
+
+        assert!(!MWF::is_initialized());
     }
 }

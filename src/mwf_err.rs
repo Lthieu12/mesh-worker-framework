@@ -10,7 +10,7 @@ use tokio::task::JoinHandle;
 
 use crate::MWF;
 use crate::framework_error::{MWFError, MWFPanic};
-use crate::mwf::{MWF_ERR_DATA, MWF_ERR_INSTANCE_COUNTER, MWF_ERR_NOTIFY};
+use crate::mwf::{MWF_DATA, MWF_ERR_DATA, MWF_ERR_INSTANCE_COUNTER, MWF_ERR_NOTIFY};
 use crate::string_helper;
 use crate::worker::EntityID;
 
@@ -376,6 +376,12 @@ impl MWFErr {
     /// remaining error events, and is awaited until it has fully terminated.
     pub async fn set_error_terminal_enabled(enabled: bool) -> Result<(), MWFError> {
         if enabled {
+            // Prevent terminal error logging from being enabled while MWF is shutting down.
+            let mwf_data_guard = MWF_DATA.read().expect(MWFPanic::MWFData_ReadLockPoisoned.message());
+            if mwf_data_guard.is_none() {
+                return Err(MWFError::Framework_NotInitialized);
+            }
+
             // Create a one-shot channel used to delay error consumption until the
             // terminal error logging task has been fully registered.
             let (start_sender, start_receiver) = oneshot::channel();
@@ -461,6 +467,8 @@ impl MWFErr {
             // The terminal error logging task is now fully registered and can start
             // consuming error events.
             let _ = start_sender.send(());
+
+            drop(mwf_data_guard);
         } else {
             // Retrieve the terminal error logging task controls while updating its state.
             let (shutdown_sender, task_handle) = {
