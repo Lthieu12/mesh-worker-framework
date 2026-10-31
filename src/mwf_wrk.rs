@@ -20,7 +20,7 @@ use crate::worker_task::{current_message_inheritance_context, current_parent_id,
 /// Internal MWFWrk runtime data.
 #[derive(Debug)]
 pub(crate) struct WorkerData {
-    /// Registered workers and hierarchy information.
+    /// Registered workers and creation relationships.
     pub(crate) worker_registry: Registry,
 
     /// Capacity of normal worker event queues.

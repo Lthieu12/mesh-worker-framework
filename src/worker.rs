@@ -387,7 +387,7 @@ pub struct WorkerStatus {
 pub struct WorkerInfo {
     /// Unique identifier of the worker.
     pub worker_id: WorkerID,
-    /// Identifier of the worker's parent entity.
+    /// Identifier of the parent entity that created this worker.
     pub parent_id: EntityID,
     /// Current lifecycle state of the worker.
     pub worker_state: WorkerState,

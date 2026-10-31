@@ -249,8 +249,6 @@ impl MWF {
         *message_wait_data_guard = Some(MessageWaitData::new());
         drop(message_wait_data_guard);
 
-        drop(mwf_data_guard);
-
         Ok(())
     }
 
@@ -266,8 +264,10 @@ impl MWF {
     /// gracefully, or MWFWrk::abort_worker() as a last
     /// resort if a worker becomes unresponsive.
     pub fn close() -> Result<(), MWFError> {
-        // Check that MWF has been initialized.
-        if !Self::is_initialized() {
+        // Acquire exclusive access to prevent concurrent shutdown or initialization.
+        let mut mwf_data_guard = MWF_DATA.write().expect(MWFPanic::MWFData_WriteLockPoisoned.message());
+
+        if mwf_data_guard.is_none() {
             return Err(MWFError::Framework_NotInitialized);
         }
 
@@ -286,7 +286,6 @@ impl MWF {
         tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(async { MWFErr::set_error_terminal_enabled(false).await }))?;
 
         // Acquire all framework data write locks before destroying any data.
-        let mut mwf_data_guard = MWF_DATA.write().expect(MWFPanic::MWFData_WriteLockPoisoned.message());
         let mut mwf_wrk_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
         let mut mwf_err_data_guard = MWF_ERR_DATA.write().expect(MWFPanic::MWFErrData_WriteLockPoisoned.message());
         let mut mwf_log_data_guard = MWF_LOG_DATA.write().expect(MWFPanic::MWFLogData_WriteLockPoisoned.message());

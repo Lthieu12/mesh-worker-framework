@@ -19,7 +19,7 @@ Unlike general-purpose actor frameworks, MWF focuses on:
 - Type-safe worker and message identifiers
 - Worker-to-worker and external-to-worker messaging
 - Message prioritization
-- Parent/child hierarchy management
+- Parent/child creation relationships
 - Message completion tracking
 - Centralized logging and diagnostics
 - Cross-platform support (Windows and Linux)
@@ -166,6 +166,16 @@ impl Worker for DemoWorker {
 ---
 
 ## 3. Core Principles
+
+### Worker Creation Relationships
+
+When a worker is spawned, `parent_id` identifies the entity that created it. This is a creation-origin reference, not an ownership or automatic lifecycle relationship: MWF does not automatically close or wait for workers when their creator terminates.
+
+MWF provides `get_parent_id()` and `get_current_parent_id()` to retrieve this origin, and `get_children_ids()`, `get_children_count()`, `wait_children_init()`, `wait_children_close()` and `abort_children()` to inspect or explicitly manage workers created by an entity.
+
+The creator must still be registered to use child-list operations. Surviving workers retain their original `parent_id` for diagnostics even after their creator has terminated.
+
+---
 
 ### One Worker = One Message at a Time
 

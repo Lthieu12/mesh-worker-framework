@@ -1,7 +1,8 @@
 //! Worker registry for MWF.
 //!
-//! This file stores all registered workers, their hierarchy,
-//! their execution state and generates unique WorkerIDs.
+//! This file stores all registered workers, their worker
+//! creation relationships, their execution state and
+//! generates unique WorkerIDs.
 
 use std::collections::HashMap;
 use tokio::task::JoinHandle;
@@ -49,7 +50,7 @@ pub(crate) struct Registry {
     /// Source of truth for worker existence.
     worker_map: HashMap<WorkerID, RegistryEntry>,
 
-    /// Maps an entity to its child WorkerIDs.
+    /// Maps each parent entity to the WorkerIDs of the child workers it created.
     child_worker_map: HashMap<EntityID, Vec<WorkerID>>,
 
     /// Stores the instance counter for each worker type.
