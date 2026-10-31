@@ -7,7 +7,7 @@ use chrono::{Local, SecondsFormat, Utc};
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
-use std::sync::{LazyLock, RwLock};
+use std::sync::{LazyLock, RwLock, RwLockReadGuard};
 use tokio::sync::Notify;
 
 use crate::MWFErr;
@@ -20,6 +20,7 @@ use crate::mwf_err::ErrorData;
 use crate::mwf_log::{LogMode, LoggingData};
 use crate::mwf_wrk::WorkerData;
 use crate::worker::{Worker, WorkerConstructor};
+use crate::worker_task::current_worker_id;
 use crate::worker_type_registry::WorkerTypeRegistry;
 
 /// Global MWF instance counter.
@@ -185,6 +186,11 @@ impl MWF {
     /// Each successful initialization after a previous shutdown receives a new
     /// instance ID, used to ensure WorkerID uniqueness within the current process.
     pub fn init_with_configuration(mut mwf_configuration: MWFConfiguration) -> Result<(), MWFError> {
+        // Verify that this function is not called from an MWF worker context.
+        if current_worker_id().is_some() {
+            return Err(MWFError::Framework_FunctionNotAvailableFromWorkerContext);
+        }
+
         // Verify that MWF is running on a multi-threaded Tokio runtime.
         let runtime_handle = match tokio::runtime::Handle::try_current() {
             Ok(runtime_handle) => runtime_handle,
@@ -264,6 +270,11 @@ impl MWF {
     /// gracefully, or MWFWrk::abort_worker() as a last
     /// resort if a worker becomes unresponsive.
     pub fn close() -> Result<(), MWFError> {
+        // Verify that this function is not called from an MWF worker context.
+        if current_worker_id().is_some() {
+            return Err(MWFError::Framework_FunctionNotAvailableFromWorkerContext);
+        }
+
         // Acquire exclusive access to prevent concurrent shutdown or initialization.
         let mut mwf_data_guard = MWF_DATA.write().expect(MWFPanic::MWFData_WriteLockPoisoned.message());
 
@@ -281,9 +292,9 @@ impl MWF {
         }
 
         // Disable terminal logging and wait for the terminal logging task to terminate.
-        tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(async { MWFLog::set_log_terminal_enabled(false).await }))?;
+        tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(async { MWFLog::set_log_terminal_enabled_internal(false).await }))?;
         // Disable terminal error logging and wait for the terminal error task to terminate.
-        tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(async { MWFErr::set_error_terminal_enabled(false).await }))?;
+        tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(async { MWFErr::set_error_terminal_enabled_internal(false).await }))?;
 
         // Acquire all framework data write locks before destroying any data.
         let mut mwf_wrk_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
@@ -307,17 +318,31 @@ impl MWF {
         Ok(())
     }
 
-    /// Check whether the framework is fully initialized.
+    /// Check whether the framework is initialized.
     pub fn is_initialized() -> bool {
-        let mwf_wrk_initialized = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message()).is_some();
-        let mwf_err_initialized = MWF_ERR_DATA.read().expect(MWFPanic::MWFErrData_ReadLockPoisoned.message()).is_some();
-        let mwf_log_initialized = MWF_LOG_DATA.read().expect(MWFPanic::MWFLogData_ReadLockPoisoned.message()).is_some();
-        let message_wait_initialized = MWF_MESSAGE_WAIT_DATA.read().expect(MWFPanic::MWFMessageWaitData_ReadLockPoisoned.message()).is_some();
+        MWF_DATA.read().expect(MWFPanic::MWFData_ReadLockPoisoned.message()).is_some()
+    }
 
-        // Check MWF_DATA last because it is initialized first and destroyed first.
-        let mwf_initialized = MWF_DATA.read().expect(MWFPanic::MWFData_ReadLockPoisoned.message()).is_some();
+    /// Validate that MWF is initialized and that the current worker is still registered.
+    ///
+    /// Calls made outside an MWF worker task only check framework initialization.
+    ///
+    /// Returns the worker data read guard so callers can reuse it.
+    pub(crate) fn validate_api_context() -> Result<RwLockReadGuard<'static, Option<WorkerData>>, MWFError> {
+        // Check framework initialization.
+        if !MWF::is_initialized() {
+            return Err(MWFError::Framework_NotInitialized);
+        }
 
-        mwf_initialized && mwf_wrk_initialized && mwf_err_initialized && mwf_log_initialized && message_wait_initialized
+        // Acquire worker data and validate the current worker when applicable.
+        let mwf_wrk_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
+        let mwf_wrk_data = mwf_wrk_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+
+        if let Some(worker_id) = current_worker_id() {
+            mwf_wrk_data.worker_registry.get_registry_entry(&worker_id)?;
+        }
+
+        Ok(mwf_wrk_data_guard)
     }
 
     /// Register a worker type.
@@ -344,6 +369,9 @@ impl MWF {
     where
         TWorker: Worker + Send + 'static,
     {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
         let mut mwf_data_guard = MWF_DATA.write().expect(MWFPanic::MWFData_WriteLockPoisoned.message());
         let mwf_data = mwf_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
 

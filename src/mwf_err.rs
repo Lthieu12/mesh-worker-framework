@@ -252,6 +252,9 @@ impl MWFErr {
     /// Error events are stored in a circular buffer and
     /// notify all MWFErr waiters.
     pub fn add_error(error_source: &EntityID, error: &anyhow::Error) -> Result<(), MWFError> {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
         // Validate the entity identifier.
         if !error_source.is_valid() {
             return Err(MWFError::Entity_Invalid { entity_id: error_source.clone() });
@@ -275,28 +278,25 @@ impl MWFErr {
     /// Returns Framework_NotInitialized if MWFErr
     /// has not been initialized through MWF::init().
     pub async fn wait_error(last_error_instance_id: Option<ErrorInstanceID>) -> Result<ErrorList, MWFError> {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
+        MWFErr::wait_error_internal(last_error_instance_id).await
+    }
+
+    // Waits for error events without validating the API context.
+    // Used internally by the terminal error task during shutdown.
+    async fn wait_error_internal(last_error_instance_id: Option<ErrorInstanceID>) -> Result<ErrorList, MWFError> {
         loop {
-            // Register interest in the next error event before checking the
-            // current error list to avoid missing a notification between the
-            // state check and the await.
             let error_notify = MWF_ERR_NOTIFY.notified();
             tokio::pin!(error_notify);
             error_notify.as_mut().enable();
 
             let error_list = MWFErr::get_error_list(last_error_instance_id)?;
 
-            // New error events are already available.
-            //
-            // Return immediately without waiting for a
-            // notification.
             if !error_list.error_event_list.is_empty() {
                 return Ok(error_list);
             }
-
-            // No new error event is currently available.
-            //
-            // Wait until MWFErr is notified that a new
-            // error event has been added.
             error_notify.await;
         }
     }
@@ -375,6 +375,17 @@ impl MWFErr {
     /// When disabled, the terminal error logging task is requested to stop, prints any
     /// remaining error events, and is awaited until it has fully terminated.
     pub async fn set_error_terminal_enabled(enabled: bool) -> Result<(), MWFError> {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
+        MWFErr::set_error_terminal_enabled_internal(enabled).await
+    }
+
+    /// Enables or disables terminal error logging for internal framework operations.
+    ///
+    /// Unlike the public API, this function does not validate the API context.
+    /// It is intended for use by MWF internals, notably during framework shutdown.
+    pub(crate) async fn set_error_terminal_enabled_internal(enabled: bool) -> Result<(), MWFError> {
         if enabled {
             // Prevent terminal error logging from being enabled while MWF is shutting down.
             let mwf_data_guard = MWF_DATA.read().expect(MWFPanic::MWFData_ReadLockPoisoned.message());
@@ -404,7 +415,7 @@ impl MWFErr {
 
                 loop {
                     tokio::select! {
-                        error_result = MWFErr::wait_error(last_error_instance_id) => {
+                        error_result = MWFErr::wait_error_internal(last_error_instance_id) => {
                             match error_result {
                                 Ok(error_list) => {
                                     // Print all newly received error events.

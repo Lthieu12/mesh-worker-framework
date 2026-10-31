@@ -304,6 +304,9 @@ impl MWFLog {
     /// Returns Framework_NotInitialized if MWF has not
     /// been initialized through MWF::init().
     pub fn set_log_mode(log_mode: LogMode, logged_worker_list: Option<Vec<WorkerID>>) -> Result<(), MWFError> {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
         let mut mwf_log_data_guard = MWF_LOG_DATA.write().expect(MWFPanic::MWFLogData_WriteLockPoisoned.message());
         let mwf_log_data = mwf_log_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
 
@@ -322,6 +325,9 @@ impl MWFLog {
     /// Returns Framework_NotInitialized if MWF has not
     /// been initialized through MWF::init().
     pub fn get_log_mode() -> Result<LogMode, MWFError> {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
         let mwf_log_data_guard = MWF_LOG_DATA.read().expect(MWFPanic::MWFLogData_ReadLockPoisoned.message());
 
         if mwf_log_data_guard.is_none() {
@@ -345,6 +351,9 @@ impl MWFLog {
     /// Returns Framework_NotInitialized if MWF has not
     /// been initialized through MWF::init().
     pub fn get_logged_worker_list() -> Result<Vec<WorkerID>, MWFError> {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
         let mwf_log_data_guard = MWF_LOG_DATA.read().expect(MWFPanic::MWFLogData_ReadLockPoisoned.message());
         let mwf_log_data = mwf_log_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
         let logged_worker_list = mwf_log_data.logged_worker_list.clone();
@@ -457,28 +466,24 @@ impl MWFLog {
     /// Returns Framework_NotInitialized if MWFLog
     /// has not been initialized through MWF::init().
     pub async fn wait_log(last_log_instance_id: Option<LogInstanceID>) -> Result<LogList, MWFError> {
+        drop(MWF::validate_api_context()?);
+
+        MWFLog::wait_log_internal(last_log_instance_id).await
+    }
+
+    // Waits for log events without validating the API context.
+    // Used internally by the terminal logging task during shutdown.
+    async fn wait_log_internal(last_log_instance_id: Option<LogInstanceID>) -> Result<LogList, MWFError> {
         loop {
-            // Register interest in the next log event before checking the
-            // current log list to avoid missing a notification between the
-            // state check and the await.
             let log_notify = MWF_LOG_NOTIFY.notified();
             tokio::pin!(log_notify);
             log_notify.as_mut().enable();
 
             let log_list = MWFLog::get_log_list(last_log_instance_id)?;
 
-            // New log events are already available.
-            //
-            // Return immediately without waiting for a
-            // notification.
             if !log_list.log_event_list.is_empty() {
                 return Ok(log_list);
             }
-
-            // No new log event is currently available.
-            //
-            // Wait until MWFLog is notified that a new
-            // log event has been added.
             log_notify.await;
         }
     }
@@ -556,6 +561,9 @@ impl MWFLog {
     /// native DLL failures, but introduces additional disk I/O and may reduce
     /// overall framework performance.
     pub fn set_log_file_enabled(enabled: bool) -> Result<(), MWFError> {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
         let mut mwf_log_data_guard = MWF_LOG_DATA.write().expect(MWFPanic::MWFLogData_WriteLockPoisoned.message());
 
         let logging_data = mwf_log_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
@@ -571,6 +579,9 @@ impl MWFLog {
 
     /// Returns the current MWF log file path.
     pub fn get_log_file_path() -> Result<Option<PathBuf>, MWFError> {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
         let mwf_log_data_guard = MWF_LOG_DATA.read().expect(MWFPanic::MWFLogData_ReadLockPoisoned.message());
 
         let logging_data = mwf_log_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
@@ -586,6 +597,17 @@ impl MWFLog {
     /// When disabled, the terminal logging task is requested to stop, prints any
     /// remaining log events, and is awaited until it has fully terminated.
     pub async fn set_log_terminal_enabled(enabled: bool) -> Result<(), MWFError> {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
+        MWFLog::set_log_terminal_enabled_internal(enabled).await
+    }
+
+    /// Enables or disables terminal logging for internal framework operations.
+    ///
+    /// Unlike the public API, this function does not validate the API context.
+    /// It is intended for use by MWF internals, notably during framework shutdown.
+    pub(crate) async fn set_log_terminal_enabled_internal(enabled: bool) -> Result<(), MWFError> {
         if enabled {
             // Prevent terminal logging from being enabled while MWF is shutting down.
             let mwf_data_guard = MWF_DATA.read().expect(MWFPanic::MWFData_ReadLockPoisoned.message());
@@ -615,7 +637,7 @@ impl MWFLog {
 
                 loop {
                     tokio::select! {
-                        log_result = MWFLog::wait_log(last_log_instance_id) => {
+                        log_result = MWFLog::wait_log_internal(last_log_instance_id) => {
                             match log_result {
                                 Ok(log_list) => {
                                     // Print all newly received log events.

@@ -39,6 +39,9 @@ pub enum MWFError {
     /// The framework shutdown failed: one or more workers are still running.
     Framework_CannotClose_WorkersStillRunning,
 
+    /// This function is not available from an MWF worker context.
+    Framework_FunctionNotAvailableFromWorkerContext,
+
     /// The worker type identifier is invalid.
     WorkerType_Invalid { worker_type_id: WorkerTypeID },
 
@@ -173,6 +176,10 @@ impl fmt::Display for MWFError {
 
             MWFError::Framework_CannotClose_WorkersStillRunning => {
                 write!(f, "The framework shutdown failed: one or more workers are still running.")
+            }
+
+            MWFError::Framework_FunctionNotAvailableFromWorkerContext => {
+                write!(f, "This function is not available from an MWF worker context.")
             }
 
             MWFError::WorkerType_Invalid { worker_type_id } => {

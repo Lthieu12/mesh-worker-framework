@@ -11,7 +11,7 @@ use crate::channel::{WorkerChannel, WorkerCommand, send_worker_command};
 use crate::framework_error::{MWFError, MWFPanic};
 use crate::message::{MessageData, MessageFlowID, MessageID, MessageInheritanceContext, MessageInstanceID, MessageWaitMode, WorkerMessage};
 use crate::message_wait::{WorkerWaitGuard, WorkerWaitState, complete_message_flow, is_message_flow_active_for_worker, register_worker_wait, wait_message_flow, wait_this_message};
-use crate::mwf::{MWF_DATA, MWF_WRK_CLOSE_NOTIFY, MWF_WRK_DATA, MWF_WRK_INIT_NOTIFY, MWF_WRK_MESSAGE_FLOW_COUNTER, MWF_WRK_MESSAGE_INSTANCE_COUNTER, MWFConfiguration, MWFInstanceID};
+use crate::mwf::{MWF, MWF_DATA, MWF_WRK_CLOSE_NOTIFY, MWF_WRK_DATA, MWF_WRK_INIT_NOTIFY, MWF_WRK_MESSAGE_FLOW_COUNTER, MWF_WRK_MESSAGE_INSTANCE_COUNTER, MWFConfiguration, MWFInstanceID};
 use crate::mwf_log::{LogAction, LogStatus};
 use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerList, WorkerState, WorkerStatus, WorkerTypeID};
 use crate::worker_registry::Registry;
@@ -91,6 +91,9 @@ impl MWFWrk {
     ///
     /// Returns an error when called outside an MWF worker task.
     pub fn get_current_worker_id() -> Result<WorkerID, MWFError> {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
         match current_worker_id() {
             Some(worker_id) => Ok(worker_id),
             None => Err(MWFError::Worker_CurrentContextUnavailable),
@@ -101,6 +104,9 @@ impl MWFWrk {
     ///
     /// Returns an error when called outside an MWF worker task.
     pub fn get_current_parent_id() -> Result<EntityID, MWFError> {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
         match current_parent_id() {
             Some(parent_id) => Ok(parent_id),
             None => Err(MWFError::Worker_CurrentContextUnavailable),
@@ -118,6 +124,9 @@ impl MWFWrk {
     where
         TWorkerTypeID: Into<WorkerTypeID> + Clone,
     {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
         let worker_type_id = worker_type_id.clone().into();
 
         // Ensure the worker type and parent entity identifiers are valid.
@@ -245,6 +254,9 @@ impl MWFWrk {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
         tokio::task::spawn_blocking(f).await.map_err(|e| MWFError::BlockingTask_Failed(anyhow::anyhow!(e)))
     }
 
@@ -260,8 +272,10 @@ impl MWFWrk {
 
     /// Get the current status of a worker.
     pub fn get_worker_status(worker_id: &WorkerID) -> Result<WorkerStatus, MWFError> {
-        let mwf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
-        let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        let mwf_wrk_data_guard = MWF::validate_api_context()?;
+
+        let mwf_data = mwf_wrk_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
         let registry_entry = mwf_data.worker_registry.get_registry_entry(worker_id)?;
         let normal_channel_capacity = mwf_data.worker_normal_channel_capacity;
         let priority_channel_capacity = mwf_data.worker_priority_channel_capacity;
@@ -287,8 +301,10 @@ impl MWFWrk {
     /// Returns Framework_NotInitialized if MWF has not
     /// been initialized through MWF::init().
     pub fn get_worker_info_list() -> Result<WorkerList, MWFError> {
-        let mwf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
-        let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        let mwf_wrk_data_guard = MWF::validate_api_context()?;
+
+        let mwf_data = mwf_wrk_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
 
         Ok(WorkerList { worker_info_list: mwf_data.worker_registry.get_worker_info_list() })
     }
@@ -305,8 +321,10 @@ impl MWFWrk {
     /// - Framework_NotInitialized if MWF has not been initialized.
     /// - Worker_NotFound if the worker does not exist.
     pub fn get_worker_type_rust_path(worker_id: &WorkerID) -> Result<&'static str, MWFError> {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        let mwf_wrk_data_guard = MWF::validate_api_context()?;
+
         // Get the WorkerTypeID associated with the worker.
-        let mwf_wrk_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
         let mwf_wrk_data = mwf_wrk_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
         let worker_type_id = mwf_wrk_data.worker_registry.get_worker_type_id(worker_id)?;
         drop(mwf_wrk_data_guard);
@@ -328,6 +346,9 @@ impl MWFWrk {
     where
         TInitData: Clone + Send + Sync + 'static,
     {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
         // Change worker state to Initializing
         // and read MWF data to retrieve the worker channel
         // associated with the target worker.
@@ -360,6 +381,9 @@ impl MWFWrk {
     where
         TCloseData: Clone + Send + Sync + 'static,
     {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
         // Change worker state to Closing
         // and read MWF data to retrieve the worker channel
         // associated with the target worker.
@@ -384,36 +408,41 @@ impl MWFWrk {
 
     /// Get the ParentID of a worker.
     pub fn get_parent_id(worker_id: &WorkerID) -> Result<EntityID, MWFError> {
-        let mwf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
-        let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        let mwf_wrk_data_guard = MWF::validate_api_context()?;
+
+        let mwf_data = mwf_wrk_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
         let parent_id = mwf_data.worker_registry.get_parent_id(worker_id)?;
-        drop(mwf_data_guard);
 
         Ok(parent_id)
     }
 
     /// Get the child WorkerIDs of an entity.
     pub fn get_children_ids(entity_id: &EntityID) -> Result<Vec<WorkerID>, MWFError> {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        let mwf_wrk_data_guard = MWF::validate_api_context()?;
+
         // Validate the entity identifier.
         if !entity_id.is_valid() {
             return Err(MWFError::Entity_Invalid { entity_id: entity_id.clone() });
         }
-        let mwf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
-        let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+        let mwf_data = mwf_wrk_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
 
         mwf_data.worker_registry.get_children_ids(entity_id)
     }
 
     /// Get the number of child workers of an entity.
     pub fn get_children_count(entity_id: &EntityID) -> Result<usize, MWFError> {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        let mwf_wrk_data_guard = MWF::validate_api_context()?;
+
         // Validate the entity identifier.
         if !entity_id.is_valid() {
             return Err(MWFError::Entity_Invalid { entity_id: entity_id.clone() });
         }
-        let mwf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
-        let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+        let mwf_data = mwf_wrk_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
         let children_count = mwf_data.worker_registry.get_children_count(entity_id)?;
-        drop(mwf_data_guard);
+        drop(mwf_wrk_data_guard);
         Ok(children_count)
     }
 
@@ -423,6 +452,9 @@ impl MWFWrk {
     /// - None => wait indefinitely.
     /// - Some(value) => return Operation_Timeout if the delay expires.
     pub async fn wait_worker_list_init(worker_ids: &Vec<WorkerID>, timeout_ms: Option<u64>) -> Result<(), MWFError> {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
         let wait_future = async {
             loop {
                 // Register interest in the next initialization event
@@ -436,8 +468,8 @@ impl MWFWrk {
                 // The lock must be released before awaiting the
                 // next notification.
                 let (all_init_finished, one_init_failed) = {
-                    let mwf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
-                    let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+                    let mwf_wrk_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
+                    let mwf_data = mwf_wrk_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
 
                     let mut all_init_finished = true;
                     let mut one_init_failed = false;
@@ -510,6 +542,9 @@ impl MWFWrk {
     /// - None => wait indefinitely.
     /// - Some(value) => return Operation_Timeout if the delay expires.
     pub async fn wait_worker_list_close(worker_ids: &Vec<WorkerID>, timeout_ms: Option<u64>) -> Result<(), MWFError> {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
         let wait_future = async {
             loop {
                 // Register interest in the next closing event
@@ -523,8 +558,8 @@ impl MWFWrk {
                 // The lock must be released before awaiting the
                 // next notification.
                 let (all_close_finished, one_close_failed) = {
-                    let mwf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
-                    let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+                    let mwf_wrk_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
+                    let mwf_data = mwf_wrk_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
 
                     let mut all_close_finished = true;
                     let mut one_close_failed = false;
@@ -614,6 +649,9 @@ impl MWFWrk {
     /// MWF-managed resources are cleaned up as far as possible, but resources owned by code that
     /// remains blocked cannot be guaranteed to be released.
     pub fn abort_worker_list(worker_ids: &Vec<WorkerID>) -> Result<(), MWFError> {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
         let mut first_error: Option<MWFError> = None;
         let mut worker_action_list = Vec::with_capacity(worker_ids.len());
 
@@ -702,6 +740,9 @@ impl MWFWrk {
         TMessageID: Into<MessageID> + Clone,
         TMessageData: Clone + Send + Sync + 'static,
     {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
         // Validate the sender entity identifier.
         if !sender_id.is_valid() {
             return Err(MWFError::Entity_Invalid { entity_id: sender_id.clone() });
@@ -737,6 +778,9 @@ impl MWFWrk {
         TMessageID: Into<MessageID> + Clone,
         TMessageData: Clone + Send + Sync + 'static,
     {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
         // Validate the sender entity identifier.
         if !sender_id.is_valid() {
             return Err(MWFError::Entity_Invalid { entity_id: sender_id.clone() });
@@ -852,6 +896,9 @@ impl MWFWrk {
         TMessageID: Into<MessageID> + Clone,
         TMessageData: Clone + Send + Sync + 'static,
     {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
         // Validate the entity identifier.
         if !sender_id.is_valid() {
             return Err(MWFError::Entity_Invalid { entity_id: sender_id.clone() });
@@ -885,6 +932,9 @@ impl MWFWrk {
     /// - Worker_CurrentContextUnavailable if called outside an MWF worker task.
     /// - MessageFlow_NotActive if the current message has no active flow.
     pub fn message_flow_end(message_flow_result: Result<(), WorkerError>) -> Result<(), MWFError> {
+        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+        drop(MWF::validate_api_context()?);
+
         // Identify the worker executing the current callback.
         let worker_id = current_worker_id().ok_or(MWFError::Worker_CurrentContextUnavailable)?;
 
