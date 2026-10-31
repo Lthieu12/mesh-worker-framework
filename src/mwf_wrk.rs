@@ -7,7 +7,7 @@ use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
 use crate::MWFLog;
-use crate::channel::{WorkerChannel, WorkerCommand, get_sender_channel};
+use crate::channel::{WorkerChannel, WorkerCommand, send_worker_command};
 use crate::framework_error::{MWFError, MWFPanic};
 use crate::message::{MessageData, MessageFlowID, MessageID, MessageInheritanceContext, MessageInstanceID, MessageWaitMode, WorkerMessage};
 use crate::message_wait::{WorkerWaitGuard, WorkerWaitState, complete_message_flow, is_message_flow_active_for_worker, register_worker_wait, wait_message_flow, wait_this_message};
@@ -718,7 +718,6 @@ impl MWFWrk {
             WorkerChannel::Normal => false,
             WorkerChannel::Priority => true,
         };
-        let sender_channel = get_sender_channel(sender_id, receiver_id, channel)?;
 
         // Generate a unique identifier for this message instance.
         let message_instance_id = Self::generate_message_instance_id()?;
@@ -729,9 +728,7 @@ impl MWFWrk {
         let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, inheritance_context);
 
         // Send the message to the target worker.
-        sender_channel.send(WorkerCommand::Message { message: framework_message, priority, unique: false }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
-
-        Ok(())
+        send_worker_command(sender_id, receiver_id, channel, WorkerCommand::Message { message: framework_message, priority, unique: false }).await
     }
 
     /// Send a message and wait for the requested completion mode.
@@ -756,7 +753,6 @@ impl MWFWrk {
             WorkerChannel::Normal => false,
             WorkerChannel::Priority => true,
         };
-        let sender_channel = get_sender_channel(sender_id, receiver_id, channel)?;
 
         // Generate an identifier for this message instance.
         let message_instance_id = Self::generate_message_instance_id()?;
@@ -765,11 +761,11 @@ impl MWFWrk {
         let _worker_wait_guard = Self::register_current_worker_wait(receiver_id, &message_id, message_instance_id, wait_mode)?;
 
         match wait_mode {
-            MessageWaitMode::WaitThisMessage => wait_this_message(sender_channel, sender_id, receiver_id, &message_id, message_instance_id, message_data, timeout_ms, priority).await,
+            MessageWaitMode::WaitThisMessage => wait_this_message(sender_id, receiver_id, &message_id, message_instance_id, message_data, timeout_ms, priority, channel).await,
             MessageWaitMode::WaitThisMessageFlow => {
                 let message_flow_id = Self::generate_message_flow_id()?;
 
-                wait_message_flow(sender_channel, sender_id, receiver_id, &message_id, message_instance_id, message_flow_id, message_data, timeout_ms, priority).await
+                wait_message_flow(sender_id, receiver_id, &message_id, message_instance_id, message_flow_id, message_data, timeout_ms, priority, channel).await
             }
         }
     }
@@ -866,9 +862,6 @@ impl MWFWrk {
             return Err(MWFError::Message_Invalid { message_id });
         }
 
-        // Retrieve the normal sender channel.
-        let normal_sender_channel = get_sender_channel(sender_id, receiver_id, WorkerChannel::Normal)?;
-
         // Generate the unique id and build the message
         let message_instance_id = MWFWrk::generate_message_instance_id()?;
 
@@ -877,10 +870,8 @@ impl MWFWrk {
 
         let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, inheritance_context);
 
-        // Send the message to the target worker.
-        normal_sender_channel.send(WorkerCommand::Message { message: framework_message, priority: false, unique: true }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
-
-        Ok(())
+        // Send the unique message to the target worker.
+        send_worker_command(sender_id, receiver_id, WorkerChannel::Normal, WorkerCommand::Message { message: framework_message, priority: false, unique: true }).await
     }
 
     /// Complete the message flow associated with the current message and forward its result.

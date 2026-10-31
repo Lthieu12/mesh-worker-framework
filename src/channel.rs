@@ -21,6 +21,7 @@ use crate::framework_error::{MWFError, MWFPanic, WorkerError};
 use crate::message::{MessageData, MessageID, WorkerMessage};
 use crate::mwf::MWF_WRK_DATA;
 use crate::worker::{EntityID, WorkerID, WorkerState};
+use crate::worker_registry::Registry;
 
 pub(crate) type WorkerSenderChannel = Sender<WorkerCommand>;
 pub(crate) type WorkerReceiverChannel = Receiver<WorkerCommand>;
@@ -63,54 +64,63 @@ impl WorkerCommand {
     }
 }
 
+/// Validate that both the sender and receiver workers are initialized.
+fn validate_sender_and_receiver(worker_registry: &Registry, sender_id: &EntityID, receiver_id: &WorkerID) -> Result<(), MWFError> {
+    // External senders are not managed by MWF.
+    if let EntityID::Worker(sender_worker_id) = sender_id {
+        let worker_state = worker_registry.get_worker_state(sender_worker_id)?;
+
+        if worker_state != WorkerState::Initialized {
+            return Err(MWFError::Worker_NotInitialized);
+        }
+    }
+
+    // Messages can only be sent to initialized workers.
+    let worker_state = worker_registry.get_worker_state(receiver_id)?;
+
+    if worker_state != WorkerState::Initialized {
+        return Err(MWFError::Worker_NotInitialized);
+    }
+
+    Ok(())
+}
+
 /// Retrieve the sender channel associated with a worker.
 ///
 /// The sender and receiver states are validated before the
 /// channel is returned.
 pub(crate) fn get_sender_channel(sender_id: &EntityID, receiver_id: &WorkerID, channel: WorkerChannel) -> Result<WorkerSenderChannel, MWFError> {
-    let sender_channel: WorkerNormalSenderChannel = {
-        // Read MWF data.
-        //
-        // send_message() only requires a read lock because it does
-        // not modify the Registry or workerState.
-        let mwf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
+    let mwf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
+    let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
 
-        let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+    validate_sender_and_receiver(&mwf_data.worker_registry, sender_id, receiver_id)?;
 
-        // Validate the sender.
-        //
-        // MWF workers must be initialized before they can
-        // send messages through MWF.
-        //
-        // External senders are not validated.
-        match sender_id {
-            EntityID::Worker(worker_id) => {
-                let worker_state = mwf_data.worker_registry.get_worker_state(worker_id)?;
-                if worker_state != WorkerState::Initialized {
-                    return Err(MWFError::Worker_NotInitialized);
-                }
-            }
-            EntityID::External(_) => {}
-        }
+    // Retrieve the communication channel associated with the receiver.
+    match channel {
+        WorkerChannel::Normal => mwf_data.worker_registry.get_worker_normal_channel(receiver_id),
+        WorkerChannel::Priority => mwf_data.worker_registry.get_worker_priority_channel(receiver_id),
+    }
+}
 
-        // Validate the receiver worker state.
-        //
-        // Messages can only be sent to initialized workers.
-        let worker_state = mwf_data.worker_registry.get_worker_state(receiver_id)?;
-        if worker_state != WorkerState::Initialized {
-            return Err(MWFError::Worker_NotInitialized);
-        }
+/// Send a worker command while synchronizing message admission with worker shutdown.
+///
+/// The channel capacity is reserved before acquiring MWF_WRK_DATA.
+/// Worker states are checked again immediately before inserting the command.
+pub(crate) async fn send_worker_command(sender_id: &EntityID, receiver_id: &WorkerID, channel: WorkerChannel, command: WorkerCommand) -> Result<(), MWFError> {
+    // Validate the workers and retrieve the sender channel.
+    let sender_channel = get_sender_channel(sender_id, receiver_id, channel)?;
 
-        // Retrieve the communication channel associated with
-        // the receiver worker.
-        //
-        // State validation and channel retrieval are performed
-        // under the same lock to avoid race conditions with
-        // close_worker().
-        match channel {
-            WorkerChannel::Normal => mwf_data.worker_registry.get_worker_normal_channel(receiver_id),
-            WorkerChannel::Priority => mwf_data.worker_registry.get_worker_priority_channel(receiver_id),
-        }?
-    };
-    Ok(sender_channel)
+    // Reserve channel capacity without holding the registry lock.
+    let permit = sender_channel.reserve().await.map_err(|_| MWFError::Worker_ChannelClosed)?;
+
+    // Revalidate worker states while synchronizing with close_worker().
+    let mwf_data_guard = MWF_WRK_DATA.read().expect(MWFPanic::MWFWrkData_ReadLockPoisoned.message());
+    let mwf_data = mwf_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+
+    validate_sender_and_receiver(&mwf_data.worker_registry, sender_id, receiver_id)?;
+
+    // Insert the command before releasing the registry lock.
+    permit.send(command);
+
+    Ok(())
 }

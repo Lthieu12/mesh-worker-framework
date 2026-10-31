@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 use tokio::sync::oneshot;
 
-use crate::channel::{WorkerCommand, WorkerSenderChannel};
+use crate::channel::{WorkerChannel, WorkerCommand, send_worker_command};
 use crate::framework_error::{MWFError, MWFPanic, WorkerError};
 use crate::message::{MessageFlowID, MessageID, MessageInheritanceContext, MessageInstanceID, MessageWaitMode, WorkerMessage};
 use crate::mwf::MWF_MESSAGE_WAIT_DATA;
@@ -217,7 +217,7 @@ pub(crate) fn cleanup_worker_task_message_flows(worker_id: &WorkerID) -> Result<
 
 /// Send a message and wait until its callback has completed.
 #[allow(clippy::too_many_arguments)]
-pub(crate) async fn wait_this_message<TMessageData>(sender_channel: WorkerSenderChannel, sender_id: &EntityID, receiver_id: &WorkerID, message_id: &MessageID, message_instance_id: MessageInstanceID, message_data: &TMessageData, timeout_ms: Option<u64>, priority: bool) -> Result<(), MWFError>
+pub(crate) async fn wait_this_message<TMessageData>(sender_id: &EntityID, receiver_id: &WorkerID, message_id: &MessageID, message_instance_id: MessageInstanceID, message_data: &TMessageData, timeout_ms: Option<u64>, priority: bool, channel: WorkerChannel) -> Result<(), MWFError>
 where
     TMessageData: Clone + Send + Sync + 'static,
 {
@@ -227,7 +227,7 @@ where
     let (reply_sender, reply_receiver) = oneshot::channel::<Result<(), WorkerError>>();
 
     // Submit a message whose completion is reported by the worker task.
-    sender_channel.send(WorkerCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
+    send_worker_command(sender_id, receiver_id, channel, WorkerCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority }).await?;
 
     // Wait for the callback result or the timeout.
     let worker_result = match timeout_ms {
@@ -248,7 +248,6 @@ where
 /// Send a message and wait until its entire message flow has completed.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn wait_message_flow<TMessageData>(
-    sender_channel: WorkerSenderChannel,
     sender_id: &EntityID,
     receiver_id: &WorkerID,
     message_id: &MessageID,
@@ -257,6 +256,7 @@ pub(crate) async fn wait_message_flow<TMessageData>(
     message_data: &TMessageData,
     timeout_ms: Option<u64>,
     priority: bool,
+    channel: WorkerChannel,
 ) -> Result<(), MWFError>
 where
     TMessageData: Clone + Send + Sync + 'static,
@@ -272,7 +272,7 @@ where
     let framework_message = WorkerMessage::new(sender_id, receiver_id, message_id, message_instance_id, message_data, inheritance_context);
 
     // Submit a regular message: message_flow_end() reports completion.
-    sender_channel.send(WorkerCommand::Message { message: framework_message, priority, unique: false }).await.map_err(|_| MWFError::Worker_ChannelClosed)?;
+    send_worker_command(sender_id, receiver_id, channel, WorkerCommand::Message { message: framework_message, priority, unique: false }).await?;
 
     // Preserve the registration after successful submission.
     flow_registration_guard.disarm();
