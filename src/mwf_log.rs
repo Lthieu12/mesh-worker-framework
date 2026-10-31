@@ -465,10 +465,10 @@ impl MWFLog {
     ///
     /// Returns Framework_NotInitialized if MWFLog
     /// has not been initialized through MWF::init().
-    pub async fn wait_log(last_log_instance_id: Option<LogInstanceID>) -> Result<LogList, MWFError> {
+    pub async fn wait_log(last_log_instance_id: Option<LogInstanceID>) -> Result<Option<LogList>, MWFError> {
         drop(MWF::validate_api_context()?);
 
-        MWFLog::wait_log_internal(last_log_instance_id).await
+        MWFLog::wait_log_internal(last_log_instance_id).await.map(Some)
     }
 
     // Waits for log events without validating the API context.

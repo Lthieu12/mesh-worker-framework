@@ -37,14 +37,14 @@ async fn test_worker_message_panic() {
     assert!(MWFWrk::get_worker_status(&worker_id).is_err());
 
     // Wait for the panic to be recorded.
-    let error_list = MWFErr::wait_error(None).await.unwrap();
+    let error_list = MWFErr::wait_error(None).await.unwrap().expect("Expected error events");
 
     assert_eq!(error_list.error_event_list.len(), 1);
 
     assert!(error_list.error_event_list[0].error_description.contains("Simulation message panic"));
 
     // One panic event must be present in the log buffer.
-    let log_list = MWFLog::wait_log(None).await.unwrap();
+    let log_list = MWFLog::wait_log(None).await.unwrap().expect("Expected log events");
 
     assert!(log_list.log_event_list.iter().any(|log| matches!(log.log_action, LogAction::WorkerPanic)));
 

@@ -57,7 +57,7 @@ async fn test_worker_init_invalid_data_type() {
     assert!(matches!(result, Err(MWFError::Worker_InitializationFailed)));
 
     // Verify the root cause reported by MWF.
-    let error_list = MWFErr::wait_error(None).await.unwrap();
+    let error_list = MWFErr::wait_error(None).await.unwrap().expect("Expected error events");
 
     let error_event = error_list.error_event_list.last().unwrap();
     println!("error_event: {:?}", error_event);

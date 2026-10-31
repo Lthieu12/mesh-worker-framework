@@ -55,7 +55,7 @@ async fn test_mwf_log_worker_lifecycle() {
     MWFWrk::close_worker(&worker_id, &()).await.unwrap();
     MWFWrk::wait_worker_close(&worker_id, Some(1000)).await.unwrap();
 
-    let log_list = MWFLog::wait_log(None).await.unwrap();
+    let log_list = MWFLog::wait_log(None).await.unwrap().expect("Expected log events");
 
     print_log_list().await;
 
@@ -105,7 +105,7 @@ async fn test_mwf_log_messages() {
     MWFWrk::close_worker(&worker_id, &()).await.unwrap();
     MWFWrk::wait_worker_close(&worker_id, Some(1000)).await.unwrap();
 
-    let log_list = MWFLog::wait_log(None).await.unwrap();
+    let log_list = MWFLog::wait_log(None).await.unwrap().expect("Expected log events");
 
     let mut found_normal = false;
     let mut found_priority = false;
@@ -173,7 +173,7 @@ async fn test_mwf_log_buffer_overflow() {
     MWFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
 
     // Consume all logs currently present.
-    let log_list = MWFLog::wait_log(None).await.unwrap();
+    let log_list = MWFLog::wait_log(None).await.unwrap().expect("Expected log events");
 
     let last_log_instance_id = log_list.last_log_instance_id;
 
@@ -182,7 +182,7 @@ async fn test_mwf_log_buffer_overflow() {
         MWFWrk::send_message_and_wait(&EntityID::new_external("Test"), &worker_id, &format!("MSG_{index}"), MessageWaitMode::WaitThisMessage, &(), Some(1000)).await.unwrap();
     }
 
-    let log_list = MWFLog::wait_log(last_log_instance_id).await.unwrap();
+    let log_list = MWFLog::wait_log(last_log_instance_id).await.unwrap().expect("Expected log events");
 
     assert_eq!(log_list.missing_log_count, 20);
 

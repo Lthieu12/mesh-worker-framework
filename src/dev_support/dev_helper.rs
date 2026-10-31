@@ -23,13 +23,17 @@ pub fn print_worker_list() {
 #[allow(dead_code)]
 pub async fn print_log_list() {
     let log_list = MWFLog::wait_log(None).await.unwrap();
-    println!("{log_list}");
+    if let Some(log_list) = log_list {
+        println!("{log_list}");
+    }
 }
 
 #[allow(dead_code)]
 pub async fn print_error_list() {
     let error_list = MWFErr::wait_error(None).await.unwrap();
-    println!("{error_list}");
+    if let Some(error_list) = error_list {
+        println!("{error_list}");
+    }
 }
 
 #[allow(dead_code)]

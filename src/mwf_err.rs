@@ -277,11 +277,10 @@ impl MWFErr {
     ///
     /// Returns Framework_NotInitialized if MWFErr
     /// has not been initialized through MWF::init().
-    pub async fn wait_error(last_error_instance_id: Option<ErrorInstanceID>) -> Result<ErrorList, MWFError> {
-        // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
+    pub async fn wait_error(last_error_instance_id: Option<ErrorInstanceID>) -> Result<Option<ErrorList>, MWFError> {
         drop(MWF::validate_api_context()?);
 
-        MWFErr::wait_error_internal(last_error_instance_id).await
+        MWFErr::wait_error_internal(last_error_instance_id).await.map(Some)
     }
 
     // Waits for error events without validating the API context.

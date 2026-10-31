@@ -80,7 +80,7 @@ async fn test_message_priority_order() {
     // Wait until every message has been processed.
     tokio::time::sleep(Duration::from_millis(500)).await;
 
-    let log_list = MWFLog::wait_log(None).await.unwrap();
+    let log_list = MWFLog::wait_log(None).await.unwrap().expect("Expected log events");
 
     let messages = filter_messages(&log_list, &worker_a_id);
 
@@ -188,7 +188,7 @@ async fn test_send_message_and_wait() {
     //
     tokio::time::sleep(std::time::Duration::from_millis(250)).await;
 
-    let log_list = MWFLog::wait_log(None).await.unwrap();
+    let log_list = MWFLog::wait_log(None).await.unwrap().expect("Expected log events");
 
     let messages_a = filter_messages(&log_list, &worker_a_id);
     let messages_b = filter_messages(&log_list, &worker_b_id);
@@ -268,7 +268,7 @@ async fn test_send_unique_message() {
 
     // Verify that only the first and the last unique
     // messages have been processed.
-    let log_list = MWFLog::wait_log(None).await.unwrap();
+    let log_list = MWFLog::wait_log(None).await.unwrap().expect("Expected log events");
     print_log_list().await;
 
     let messages = filter_messages(&log_list, &worker_id);
@@ -329,14 +329,14 @@ async fn test_send_priority_message_racing_with_worker_close() {
     MWFWrk::wait_worker_init(&worker_id, Some(1000)).await.unwrap();
 
     // Retrieve the latest log ID before sending the first message.
-    let mut last_log_instance_id = MWFLog::wait_log(None).await.unwrap().last_log_instance_id;
+    let mut last_log_instance_id = MWFLog::wait_log(None).await.unwrap().expect("Expected log events").last_log_instance_id;
 
     // Start processing the first message.
     MWFWrk::send_message(&EntityID::new_external("MAIN"), &worker_id, &MESSAGE_BLOCKING, &()).await.unwrap();
 
     // Wait until the first message callback has actually started.
     loop {
-        let log_list = MWFLog::wait_log(last_log_instance_id).await.unwrap();
+        let log_list = MWFLog::wait_log(last_log_instance_id).await.unwrap().expect("Expected log events");
         last_log_instance_id = log_list.last_log_instance_id;
 
         let blocking_message_started = log_list.log_event_list.iter().any(|log_event| {
@@ -402,7 +402,7 @@ async fn test_send_priority_message_racing_with_worker_close() {
     // Wait until the worker has completely terminated.
     MWFWrk::wait_worker_close(&worker_id, Some(3000)).await.unwrap();
 
-    let log_list = MWFLog::wait_log(None).await.unwrap();
+    let log_list = MWFLog::wait_log(None).await.unwrap().expect("Expected log events");
 
     // Collect the messages whose callbacks actually started.
     let processed_message_ids = log_list

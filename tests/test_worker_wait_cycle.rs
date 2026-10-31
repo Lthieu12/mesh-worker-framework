@@ -134,7 +134,7 @@ async fn test_worker_abort_cleans_up_active_message_flow() {
     MWFWrk::wait_worker_list_init(&vec![worker_id.clone()], Some(1_000)).await.unwrap();
 
     // Capture the latest log ID so the test can wait for this specific callback to start.
-    let initial_log_list = MWFLog::wait_log(None).await.unwrap();
+    let initial_log_list = MWFLog::wait_log(None).await.unwrap().expect("Expected log events");
     let mut last_log_instance_id = initial_log_list.last_log_instance_id;
 
     // WaitMessageFlow is owned by the receiver, so aborting this worker must
@@ -148,7 +148,7 @@ async fn test_worker_abort_cleans_up_active_message_flow() {
     // Wait for the receiver's START log instead of relying on a scheduling delay.
     tokio::time::timeout(std::time::Duration::from_secs(2), async {
         loop {
-            let log_list = MWFLog::wait_log(last_log_instance_id).await.unwrap();
+            let log_list = MWFLog::wait_log(last_log_instance_id).await.unwrap().expect("Expected log events");
             last_log_instance_id = log_list.last_log_instance_id;
 
             let callback_started = log_list.log_event_list.iter().any(|log_event| {
@@ -295,7 +295,7 @@ async fn test_message_flow_completes_after_waiter_timeout() {
     MWFWrk::init_worker(&worker_id, &configuration).await.unwrap();
     MWFWrk::wait_worker_list_init(&vec![worker_id.clone()], Some(1_000)).await.unwrap();
 
-    let initial_log_list = MWFLog::wait_log(None).await.unwrap();
+    let initial_log_list = MWFLog::wait_log(None).await.unwrap().expect("Expected log events");
     let mut last_log_instance_id = initial_log_list.last_log_instance_id;
 
     let sender_id = EntityID::new_external("TEST");
@@ -309,7 +309,7 @@ async fn test_message_flow_completes_after_waiter_timeout() {
     // Wait until the worker has completed its callback through message_flow_end().
     tokio::time::timeout(std::time::Duration::from_secs(2), async {
         loop {
-            let log_list = MWFLog::wait_log(last_log_instance_id).await.unwrap();
+            let log_list = MWFLog::wait_log(last_log_instance_id).await.unwrap().expect("Expected log events");
             last_log_instance_id = log_list.last_log_instance_id;
 
             let callback_completed = log_list.log_event_list.iter().any(|log_event| {

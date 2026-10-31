@@ -68,7 +68,7 @@ async fn test_mwf_err_worker_failures() {
     let result = MWFWrk::wait_worker_close(&worker_c_id, Some(1000)).await;
     assert!(matches!(result, Err(MWFError::Worker_CloseFailed)));
 
-    let error_list = MWFErr::wait_error(None).await.unwrap();
+    let error_list = MWFErr::wait_error(None).await.unwrap().expect("Expected error events");
 
     print_error_list().await;
 
@@ -141,7 +141,7 @@ async fn test_mwf_err_buffer_overflow() {
         let _ = MWFWrk::send_message_and_wait(&EntityID::new_external("Test"), &worker_id, &"TEST", MessageWaitMode::WaitThisMessage, &(), Some(1000)).await;
     }
 
-    let error_list = MWFErr::wait_error(Some(0)).await.unwrap();
+    let error_list = MWFErr::wait_error(Some(0)).await.unwrap().expect("Expected error events");
 
     assert_eq!(error_list.missing_error_count, 5);
 
