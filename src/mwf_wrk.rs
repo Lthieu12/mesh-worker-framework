@@ -15,7 +15,7 @@ use crate::mwf::{MWF, MWF_DATA, MWF_WRK_CLOSE_NOTIFY, MWF_WRK_DATA, MWF_WRK_INIT
 use crate::mwf_log::{LogAction, LogStatus};
 use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerList, WorkerState, WorkerStatus, WorkerTypeID};
 use crate::worker_registry::Registry;
-use crate::worker_task::{current_message_inheritance_context, current_parent_id, current_worker_id, spawn_worker_task};
+use crate::worker_task::{current_message_inheritance_context, current_parent_id, current_worker_context, current_worker_id, scope_worker_context, spawn_worker_task};
 
 /// Internal MWFWrk runtime data.
 #[derive(Debug)]
@@ -257,7 +257,15 @@ impl MWFWrk {
         // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
         drop(MWF::validate_api_context()?);
 
-        tokio::task::spawn_blocking(f).await.map_err(|e| MWFError::BlockingTask_Failed(anyhow::anyhow!(e)))
+        let worker_context = current_worker_context();
+        let message_context = current_message_inheritance_context();
+
+        tokio::task::spawn_blocking(move || match worker_context {
+            Some(worker_context) => scope_worker_context(worker_context, message_context, f),
+            None => f(),
+        })
+        .await
+        .map_err(|e| MWFError::BlockingTask_Failed(anyhow::anyhow!(e)))
     }
 
     /// Suspend the current worker for the specified duration.

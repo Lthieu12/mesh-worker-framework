@@ -49,7 +49,7 @@ tokio::task_local! {
 
 /// Execution context associated with a worker task.
 #[derive(Debug)]
-struct WorkerExecutionContext {
+pub(crate) struct WorkerExecutionContext {
     /// ID of the worker executing the current task.
     worker_id: WorkerID,
 
@@ -95,6 +95,19 @@ pub(crate) fn current_message_inheritance_context() -> MessageInheritanceContext
     // `try_with()` provides a reference to the stored context.
     // Dereferencing it copies the value because MessageInheritanceContext implements Copy.
     CURRENT_MESSAGE_INHERITANCE_CONTEXT.try_with(|context| *context).unwrap_or_default()
+}
+
+/// Returns the current worker execution context, if available.
+pub(crate) fn current_worker_context() -> Option<WorkerExecutionContext> {
+    CURRENT_WORKER_CONTEXT.try_with(|context| WorkerExecutionContext { worker_id: context.worker_id.clone(), parent_id: context.parent_id.clone() }).ok()
+}
+
+/// Executes a closure with the specified worker and message contexts installed.
+pub(crate) fn scope_worker_context<F, R>(worker_context: WorkerExecutionContext, message_context: MessageInheritanceContext, f: F) -> R
+where
+    F: FnOnce() -> R,
+{
+    CURRENT_WORKER_CONTEXT.sync_scope(worker_context, || CURRENT_MESSAGE_INHERITANCE_CONTEXT.sync_scope(message_context, f))
 }
 
 /// Internal command queue owned by WorkerTask.
