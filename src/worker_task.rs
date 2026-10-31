@@ -244,8 +244,9 @@ pub(crate) fn spawn_worker_task(worker: Box<dyn Worker + Send>, normal_receiver_
 
                         drop(mwf_data_guard);
 
-                        // Wake up all waiters interested in worker shutdown events.
+                        // Wake up all waiters interested in worker initialization and shutdown events.
                         MWF_WRK_CLOSE_NOTIFY.notify_waiters();
+                        MWF_WRK_INIT_NOTIFY.notify_waiters();
                     }
                 }
             })

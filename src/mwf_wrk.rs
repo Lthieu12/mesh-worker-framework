@@ -707,8 +707,9 @@ impl MWFWrk {
 
         drop(mwf_data_guard);
 
-        // Wake up all waiters interested in worker shutdown events.
+        // Wake up all waiters interested in worker initialization and shutdown events.
         MWF_WRK_CLOSE_NOTIFY.notify_waiters();
+        MWF_WRK_INIT_NOTIFY.notify_waiters();
 
         match first_error {
             Some(error) => Err(error),
