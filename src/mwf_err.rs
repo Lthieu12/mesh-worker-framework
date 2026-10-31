@@ -275,12 +275,16 @@ impl MWFErr {
     /// in the MWFErr buffer, they are returned
     /// immediately without waiting.
     ///
-    /// Returns Framework_NotInitialized if MWFErr
-    /// has not been initialized through MWF::init().
+    /// Returns `Ok(None)` if MWF is closed while waiting.
+    /// Returns Framework_NotInitialized if called when MWF is already closed.
     pub async fn wait_error(last_error_instance_id: Option<ErrorInstanceID>) -> Result<Option<ErrorList>, MWFError> {
         drop(MWF::validate_api_context()?);
 
-        MWFErr::wait_error_internal(last_error_instance_id).await.map(Some)
+        match MWFErr::wait_error_internal(last_error_instance_id).await {
+            Ok(error_list) => Ok(Some(error_list)),
+            Err(MWFError::Framework_NotInitialized) => Ok(None),
+            Err(error) => Err(error),
+        }
     }
 
     // Waits for error events without validating the API context.

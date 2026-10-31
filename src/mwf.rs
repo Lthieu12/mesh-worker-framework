@@ -315,6 +315,10 @@ impl MWF {
         *mwf_log_data_guard = None;
         *message_wait_data_guard = None;
 
+        // Wake up all tasks waiting for log or error events.
+        MWF_LOG_NOTIFY.notify_waiters();
+        MWF_ERR_NOTIFY.notify_waiters();
+
         Ok(())
     }
 

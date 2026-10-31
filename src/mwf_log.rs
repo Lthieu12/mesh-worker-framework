@@ -463,12 +463,16 @@ impl MWFLog {
     /// in the MWFLog buffer, they are returned
     /// immediately without waiting.
     ///
-    /// Returns Framework_NotInitialized if MWFLog
-    /// has not been initialized through MWF::init().
+    /// Returns `Ok(None)` if MWF is closed while waiting.
+    /// Returns Framework_NotInitialized if called when MWF is already closed.
     pub async fn wait_log(last_log_instance_id: Option<LogInstanceID>) -> Result<Option<LogList>, MWFError> {
         drop(MWF::validate_api_context()?);
 
-        MWFLog::wait_log_internal(last_log_instance_id).await.map(Some)
+        match MWFLog::wait_log_internal(last_log_instance_id).await {
+            Ok(log_list) => Ok(Some(log_list)),
+            Err(MWFError::Framework_NotInitialized) => Ok(None),
+            Err(error) => Err(error),
+        }
     }
 
     // Waits for log events without validating the API context.
