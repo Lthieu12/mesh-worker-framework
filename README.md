@@ -621,13 +621,13 @@ Example output:
 =====================================================
 Workers : 1000
 
-Spawn                   :  4.784ms (4.78 µs/worker)
-Init                    : 974.200µs (0.97 µs/worker)
-SendAndWait (parallel)  :  1.406ms (1.41 µs/message)
-Close                   :  3.979ms (3.98 µs/worker)
+Spawn                   :  4.733ms (4.73 µs/worker)
+Init                    :  1.640ms (1.64 µs/worker)
+SendAndWait (parallel)  :  1.816ms (1.82 µs/message)
+Close                   :  3.326ms (3.33 µs/worker)
 
-Total                   : 11.143ms
-Throughput              : 711389 msg/s
+Total                   : 11.515ms
+Throughput              : 550721 msg/s
 =====================================================
 ```
 
