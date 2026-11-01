@@ -1,0 +1,35 @@
+//! Worker management and messaging methods exposed by MWFWrk.
+
+mod abort_children;
+mod abort_worker;
+mod abort_worker_list;
+mod close_worker;
+mod deduplicate_worker_ids;
+mod generate_message_instance_id;
+mod get_children_count;
+mod get_children_ids;
+mod get_current_parent_id;
+mod get_current_worker_id;
+mod get_message_inheritance_context_for_receiver;
+mod get_parent_id;
+mod get_worker_info_list;
+mod get_worker_status;
+mod get_worker_type_rust_path;
+mod init_worker;
+mod message_flow_end;
+mod send_message;
+mod send_message_and_wait;
+mod send_message_and_wait_internal;
+mod send_message_internal;
+mod send_priority_message;
+mod send_priority_message_and_wait;
+mod send_unique_message;
+mod sleep;
+mod spawn_blocking;
+mod spawn_worker;
+mod wait_children_close;
+mod wait_children_init;
+mod wait_worker_close;
+mod wait_worker_init;
+mod wait_worker_list_close;
+mod wait_worker_list_init;
