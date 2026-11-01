@@ -16,7 +16,7 @@ use crate::MWFErr;
 use crate::framework_error::{MWFError, MWFPanic};
 use crate::log_file::write_log_event;
 use crate::message::{MessageID, MessageInstanceID};
-use crate::mwf::{MWF_DATA, MWF_LOG_DATA, MWF_LOG_INSTANCE_COUNTER, MWF_LOG_MODE, MWF_LOG_NOTIFY};
+use crate::mwf::{MWF_DATA, MWF_INSTANCE_COUNTER, MWF_LOG_DATA, MWF_LOG_INSTANCE_COUNTER, MWF_LOG_MODE, MWF_LOG_NOTIFY};
 use crate::string_helper;
 use crate::worker::{EntityID, WorkerID};
 
@@ -483,9 +483,11 @@ impl MWFLog {
     /// Returns `Ok(None)` if MWF is closed while waiting.
     /// Returns Framework_NotInitialized if called when MWF is already closed.
     pub async fn wait_log(last_log_instance_id: Option<LogInstanceID>) -> Result<Option<LogList>, MWFError> {
-        drop(MWF::validate_api_context()?);
+        let mwf_wrk_data_guard = MWF::validate_api_context()?;
+        let mwf_instance_counter = MWF_INSTANCE_COUNTER.load(Ordering::Relaxed);
+        drop(mwf_wrk_data_guard);
 
-        match MWFLog::wait_log_internal(last_log_instance_id).await {
+        match MWFLog::wait_log_internal(mwf_instance_counter, last_log_instance_id).await {
             Ok(log_list) => Ok(Some(log_list)),
             Err(MWFError::Framework_NotInitialized) => Ok(None),
             Err(error) => Err(error),
@@ -494,13 +496,13 @@ impl MWFLog {
 
     // Waits for log events without validating the API context.
     // Used internally by the terminal logging task during shutdown.
-    async fn wait_log_internal(last_log_instance_id: Option<LogInstanceID>) -> Result<LogList, MWFError> {
+    async fn wait_log_internal(mwf_instance_counter: u64, last_log_instance_id: Option<LogInstanceID>) -> Result<LogList, MWFError> {
         loop {
             let log_notify = MWF_LOG_NOTIFY.notified();
             tokio::pin!(log_notify);
             log_notify.as_mut().enable();
 
-            let log_list = MWFLog::get_log_list(last_log_instance_id)?;
+            let log_list = MWFLog::get_log_list(mwf_instance_counter, last_log_instance_id)?;
 
             if !log_list.log_event_list.is_empty() {
                 return Ok(log_list);
@@ -525,9 +527,14 @@ impl MWFLog {
     ///
     /// Returns Framework_NotInitialized if MWFLog has
     /// not been initialized through MWF::init().
-    fn get_log_list(last_log_instance_id: Option<LogInstanceID>) -> Result<LogList, MWFError> {
+    fn get_log_list(mwf_instance_counter: u64, last_log_instance_id: Option<LogInstanceID>) -> Result<LogList, MWFError> {
         let mwf_log_data_guard = MWF_LOG_DATA.read().expect(MWFPanic::MWFLogData_ReadLockPoisoned.message());
         let mwf_log_data = mwf_log_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+
+        // Make sure the log buffer still belongs to the original MWF instance.
+        if MWF_INSTANCE_COUNTER.load(Ordering::Relaxed) != mwf_instance_counter {
+            return Err(MWFError::Framework_NotInitialized);
+        }
 
         // No log event is currently stored in MWFLog.
         if mwf_log_data.log_event_list.is_empty() {
@@ -636,6 +643,8 @@ impl MWFLog {
                 return Err(MWFError::Framework_NotInitialized);
             }
 
+            let mwf_instance_counter = MWF_INSTANCE_COUNTER.load(Ordering::Relaxed);
+
             // Create a one-shot channel used to delay log consumption until the
             // terminal logging task has been fully registered.
             let (start_sender, start_receiver) = oneshot::channel();
@@ -658,7 +667,7 @@ impl MWFLog {
 
                 loop {
                     tokio::select! {
-                        log_result = MWFLog::wait_log_internal(last_log_instance_id) => {
+                        log_result = MWFLog::wait_log_internal(mwf_instance_counter, last_log_instance_id) => {
                             match log_result {
                                 Ok(log_list) => {
                                     // Print all newly received log events.
@@ -680,7 +689,7 @@ impl MWFLog {
 
                         _ = &mut shutdown_receiver => {
                             // Print all log events that remain in the MWF log buffer.
-                            if let Ok(log_list) = MWFLog::get_log_list(last_log_instance_id) {
+                            if let Ok(log_list) = MWFLog::get_log_list(mwf_instance_counter, last_log_instance_id) {
                                 for log_event in &log_list.log_event_list {
                                     println!("{}", log_event.to_terminal_string());
                                 }
