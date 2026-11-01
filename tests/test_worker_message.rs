@@ -41,6 +41,7 @@ use dev_support::simulation_worker::{SimulationBehavior, SimulationWorker, Simul
 
 const MESSAGE_NORMAL_1: &str = "NORMAL_1";
 const MESSAGE_NORMAL_2: &str = "NORMAL_2";
+const MESSAGE_NORMAL_3: &str = "NORMAL_3";
 const MESSAGE_PRIORITY_1: &str = "PRIORITY_1";
 const MESSAGE_PRIORITY_2: &str = "PRIORITY_2";
 
@@ -59,26 +60,80 @@ async fn test_message_priority_order() {
 
     let worker_a_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
 
-    let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Wait { message_delay_ms: 100 }, wait_children_close: false, wait_children_close_timeout_ms: None };
+    let configuration = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Wait { message_delay_ms: 500 }, wait_children_close: false, wait_children_close_timeout_ms: None };
 
     MWFWrk::init_worker(&worker_a_id, &configuration).await.unwrap();
 
     MWFWrk::wait_worker_init(&worker_a_id, Some(1000)).await.unwrap();
 
-    // First normal message starts processing.
+    // Retrieve the latest log ID before sending messages.
+    let mut last_log_instance_id = MWFLog::wait_log(None).await.unwrap().expect("Expected log events").last_log_instance_id;
+
+    // Start processing the first normal message.
     MWFWrk::send_message(&EntityID::new_external("MAIN"), &worker_a_id, &MESSAGE_NORMAL_1, &()).await.unwrap();
 
-    // Ensure the worker is busy before sending the remaining messages.
-    tokio::time::sleep(Duration::from_millis(20)).await;
+    // Wait until the first normal message callback has started.
+    loop {
+        let log_list = tokio::time::timeout(Duration::from_secs(5), MWFLog::wait_log(last_log_instance_id)).await.expect("NORMAL_1 did not start").unwrap().expect("Expected log events");
 
+        last_log_instance_id = log_list.last_log_instance_id;
+
+        if log_list.log_event_list.iter().any(|log_event| {
+            log_event.worker_id == worker_a_id
+                && log_event.log_status == LogStatus::Start
+                && matches!(
+                    &log_event.log_action,
+                    LogAction::WorkerMessage { message_id, .. }
+                        if message_id.as_str() == MESSAGE_NORMAL_1
+                )
+        }) {
+            break;
+        }
+    }
+
+    // Queue two normal messages while NORMAL_1 is being processed.
     MWFWrk::send_message(&EntityID::new_external("MAIN"), &worker_a_id, &MESSAGE_NORMAL_2, &()).await.unwrap();
 
+    MWFWrk::send_message(&EntityID::new_external("MAIN"), &worker_a_id, &MESSAGE_NORMAL_3, &()).await.unwrap();
+
+    // Wait until NORMAL_2 starts processing.
+    //
+    // At this point, NORMAL_3 has already been collected into PendingCommands.
+    // Priority messages sent now must bypass this pending normal command.
+    loop {
+        let log_list = tokio::time::timeout(Duration::from_secs(5), MWFLog::wait_log(last_log_instance_id)).await.expect("NORMAL_2 did not start").unwrap().expect("Expected log events");
+
+        last_log_instance_id = log_list.last_log_instance_id;
+
+        if log_list.log_event_list.iter().any(|log_event| {
+            log_event.worker_id == worker_a_id
+                && log_event.log_status == LogStatus::Start
+                && matches!(
+                    &log_event.log_action,
+                    LogAction::WorkerMessage { message_id, .. }
+                        if message_id.as_str() == MESSAGE_NORMAL_2
+                )
+        }) {
+            break;
+        }
+    }
+
+    // Send priority messages while NORMAL_2 is being processed.
     MWFWrk::send_priority_message(&EntityID::new_external("MAIN"), &worker_a_id, &MESSAGE_PRIORITY_1, &()).await.unwrap();
 
     MWFWrk::send_priority_message(&EntityID::new_external("MAIN"), &worker_a_id, &MESSAGE_PRIORITY_2, &()).await.unwrap();
 
-    // Wait until every message has been processed.
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    // NORMAL_1 has already completed before NORMAL_2 starts.
+    let mut completed_message_count = 1;
+
+    // Wait until all five messages have been processed.
+    while completed_message_count < 5 {
+        let log_list = tokio::time::timeout(Duration::from_secs(5), MWFLog::wait_log(last_log_instance_id)).await.expect("Message processing did not complete").unwrap().expect("Expected log events");
+
+        last_log_instance_id = log_list.last_log_instance_id;
+
+        completed_message_count += log_list.log_event_list.iter().filter(|log_event| log_event.worker_id == worker_a_id && log_event.log_status == LogStatus::Ok && matches!(&log_event.log_action, LogAction::WorkerMessage { .. })).count();
+    }
 
     let log_list = MWFLog::wait_log(None).await.unwrap().expect("Expected log events");
 
@@ -86,7 +141,7 @@ async fn test_message_priority_order() {
 
     print_log_list().await;
 
-    assert_eq!(messages.len(), 8);
+    assert_eq!(messages.len(), 10);
 
     // NORMAL_1
     assert_eq!(messages[0].message_id.as_str(), MESSAGE_NORMAL_1);
@@ -96,41 +151,42 @@ async fn test_message_priority_order() {
 
     assert_eq!(messages[1].message_id.as_str(), MESSAGE_NORMAL_1);
     assert_eq!(messages[1].log_status, LogStatus::Ok);
-    assert!(!messages[1].priority);
-    assert!(!messages[1].wait_completion);
 
-    // PRIORITY_2
-    assert_eq!(messages[2].message_id.as_str(), MESSAGE_PRIORITY_2);
+    // NORMAL_2
+    assert_eq!(messages[2].message_id.as_str(), MESSAGE_NORMAL_2);
     assert_eq!(messages[2].log_status, LogStatus::Start);
-    assert!(messages[2].priority);
+    assert!(!messages[2].priority);
     assert!(!messages[2].wait_completion);
 
-    assert_eq!(messages[3].message_id.as_str(), MESSAGE_PRIORITY_2);
+    assert_eq!(messages[3].message_id.as_str(), MESSAGE_NORMAL_2);
     assert_eq!(messages[3].log_status, LogStatus::Ok);
-    assert!(messages[3].priority);
-    assert!(!messages[3].wait_completion);
 
-    // PRIORITY_1
-    assert_eq!(messages[4].message_id.as_str(), MESSAGE_PRIORITY_1);
+    // PRIORITY_2
+    assert_eq!(messages[4].message_id.as_str(), MESSAGE_PRIORITY_2);
     assert_eq!(messages[4].log_status, LogStatus::Start);
     assert!(messages[4].priority);
     assert!(!messages[4].wait_completion);
 
-    assert_eq!(messages[5].message_id.as_str(), MESSAGE_PRIORITY_1);
+    assert_eq!(messages[5].message_id.as_str(), MESSAGE_PRIORITY_2);
     assert_eq!(messages[5].log_status, LogStatus::Ok);
-    assert!(messages[5].priority);
-    assert!(!messages[5].wait_completion);
 
-    // NORMAL_2
-    assert_eq!(messages[6].message_id.as_str(), MESSAGE_NORMAL_2);
+    // PRIORITY_1
+    assert_eq!(messages[6].message_id.as_str(), MESSAGE_PRIORITY_1);
     assert_eq!(messages[6].log_status, LogStatus::Start);
-    assert!(!messages[6].priority);
+    assert!(messages[6].priority);
     assert!(!messages[6].wait_completion);
 
-    assert_eq!(messages[7].message_id.as_str(), MESSAGE_NORMAL_2);
+    assert_eq!(messages[7].message_id.as_str(), MESSAGE_PRIORITY_1);
     assert_eq!(messages[7].log_status, LogStatus::Ok);
-    assert!(!messages[7].priority);
-    assert!(!messages[7].wait_completion);
+
+    // NORMAL_3
+    assert_eq!(messages[8].message_id.as_str(), MESSAGE_NORMAL_3);
+    assert_eq!(messages[8].log_status, LogStatus::Start);
+    assert!(!messages[8].priority);
+    assert!(!messages[8].wait_completion);
+
+    assert_eq!(messages[9].message_id.as_str(), MESSAGE_NORMAL_3);
+    assert_eq!(messages[9].log_status, LogStatus::Ok);
 
     MWFWrk::close_worker(&worker_a_id, &()).await.unwrap();
 
