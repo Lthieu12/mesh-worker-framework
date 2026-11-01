@@ -335,14 +335,9 @@ async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: Wo
     let mut pending_commands = PendingCommands::new();
 
     loop {
-        // Wait until at least one command is available.
-        //
-        // Once awakened, drain both Tokio channels so every
-        // currently pending command is collected into the
-        // internal queue before execution.
+        // Wait until at least one command is available when the internal queue is empty.
         if pending_commands.is_empty() {
             tokio::select! {
-
                 command = priority_receiver_channel.recv() => {
                     pending_commands.push_priority(
                         command.expect(MWFPanic::Worker_PriorityChannelClosed.message())
@@ -356,18 +351,25 @@ async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: Wo
                 }
             }
 
-            // Collect all remaining priority commands.
-            while let Ok(command) = priority_receiver_channel.try_recv() {
-                pending_commands.push_priority(command);
-            }
-
-            // Collect all remaining normal commands.
+            // Collect all currently available normal commands.
+            // Normal commands are inserted in FIFO order.
             while let Ok(command) = normal_receiver_channel.try_recv() {
                 pending_commands.push_normal(command);
             }
         }
 
-        // Execute the next scheduled command.
+        // Always check the priority channel before selecting the next command.
+        // This allows newly received priority commands to bypass normal commands
+        // already waiting in the internal queue.
+        //
+        // Priority commands are inserted using a LIFO policy.
+        while let Ok(command) = priority_receiver_channel.try_recv() {
+            pending_commands.push_priority(command);
+        }
+
+        // Select the next command according to the queue priority policy:
+        // 1. Priority commands (LIFO).
+        // 2. Normal commands (FIFO).
         let command = pending_commands.pop_next().expect(MWFPanic::Worker_PendingCommandsEmpty.message());
 
         match command {
