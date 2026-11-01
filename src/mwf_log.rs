@@ -222,11 +222,10 @@ pub enum LogOutputFormat {
     CSV,
 }
 
-/// Result returned by MWFErr::get_log_list().
+/// Snapshot of log events retrieved from MWFLog.
 ///
-/// This structure contains the log events requested
-/// by the caller together with metadata describing
-/// the state of the circular buffer.
+/// This structure contains the requested log events together with metadata
+/// describing the state of the circular buffer.
 #[derive(Debug, Clone)]
 pub struct LogList {
     pub first_log_instance_id: Option<LogInstanceID>,
@@ -467,20 +466,26 @@ impl MWFLog {
         Ok(())
     }
 
-    /// Wait until new log events are available.
+    /// Wait until new log events are available for the current MWF instance.
     ///
-    /// If last_log_instance_id is None, all log
-    /// events currently stored in MWFLog are returned.
+    /// If last_log_instance_id is None, all log events currently stored in the
+    /// current MWF instance are returned.
     ///
-    /// If last_log_instance_id is provided, only
-    /// events with a greater LogInstanceID are
-    /// returned.
+    /// If last_log_instance_id is provided, only events with a greater
+    /// LogInstanceID are returned.
     ///
-    /// If matching log events are already present
-    /// in the MWFLog buffer, they are returned
-    /// immediately without waiting.
+    /// If matching events are already available, they are returned immediately.
+    /// Otherwise, the function waits for the next log notification.
     ///
-    /// Returns `Ok(None)` if MWF is closed while waiting.
+    /// Each wait is bound to the MWF instance in which it starts. If that
+    /// instance is closed while the wait is pending, including when MWF is
+    /// reinitialized before the wait resumes, the function returns Ok(None).
+    /// It never switches to the newly initialized instance.
+    ///
+    /// LogInstanceID values restart for each MWF instance. After reinitializing
+    /// MWF, start a new retrieval sequence with None instead of reusing an ID
+    /// from the previous instance.
+    ///
     /// Returns Framework_NotInitialized if called when MWF is already closed.
     pub async fn wait_log(last_log_instance_id: Option<LogInstanceID>) -> Result<Option<LogList>, MWFError> {
         let mwf_wrk_data_guard = MWF::validate_api_context()?;
@@ -582,12 +587,19 @@ impl MWFLog {
         Ok(LogList { first_log_instance_id: Some(first_buffer_log_instance_id), last_log_instance_id: Some(last_buffer_log_instance_id), missing_log_count, log_event_list })
     }
 
-    /// Enables or disables MWF file logging.
+    /// Enables or disables writing captured log events to the configured file.
     ///
-    /// When enabled, every log event is immediately written to the log file
-    /// and flushed to disk. This improves crash diagnostics, especially for
-    /// native DLL failures, but introduces additional disk I/O and may reduce
-    /// overall framework performance.
+    /// The logging mode determines which worker events are captured by MWFLog.
+    /// This setting independently controls whether captured events are also written
+    /// to the log file.
+    ///
+    /// When enabled, each captured event is immediately written and flushed to disk.
+    ///
+    /// File logging is automatically disabled and the file handle is closed when
+    /// the maximum file size is reached or a write operation fails.
+    ///
+    /// Once the file handle has been closed automatically, file logging cannot be
+    /// re-enabled until MWF is initialized again.
     pub fn set_log_file_enabled(enabled: bool) -> Result<(), MWFError> {
         // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
         drop(MWF::validate_api_context()?);
@@ -596,8 +608,14 @@ impl MWFLog {
 
         let logging_data = mwf_log_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
 
-        if enabled && logging_data.log_file_path.is_none() {
-            return Err(MWFError::Logging_LogFileNotConfigured);
+        if enabled {
+            if logging_data.log_file_path.is_none() {
+                return Err(MWFError::Logging_LogFileNotConfigured);
+            }
+
+            if logging_data.log_file.is_none() {
+                return Err(MWFError::Logging_LogFileAccessFailed(anyhow::anyhow!("The log file is no longer available. File logging cannot be re-enabled until MWF is initialized again.")));
+            }
         }
 
         logging_data.log_file_enabled = enabled;

@@ -57,6 +57,7 @@ async fn test_file_logging() {
     let log_list = MWFLog::wait_log(None).await.unwrap().expect("Expected log events");
 
     assert!(log_list.log_event_list.iter().any(|log_event| { matches!(&log_event.log_action, LogAction::WorkerClose) && log_event.log_status == LogStatus::Ok }));
+    assert!(matches!(MWFLog::set_log_file_enabled(true), Err(MWFError::Logging_LogFileAccessFailed(_))));
 
     MWF::close().unwrap();
 

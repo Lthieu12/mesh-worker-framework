@@ -6,7 +6,7 @@
 //! Supported behaviors include:
 //! - Initialization delays.
 //! - Message processing delays.
-//! - Chained send_message_and_wait_reply() calls.
+//! - Chained send_message_and_wait() calls.
 //! - Shutdown delays.
 //! - Parent waiting for child shutdown.
 //! - ...
@@ -47,11 +47,11 @@ pub enum SimulationBehavior {
 
     Message_CheckMyContext { expected_worker_id: WorkerID, expected_parent_id: EntityID },
 
-    Message_WorkflowEnd { message_delay_ms: u64 },
+    MessageFlow_End { message_delay_ms: u64 },
 
-    Message_WorkflowEndFail { message_delay_ms: u64 },
+    MessageFlow_EndFail { message_delay_ms: u64 },
 
-    Message_WorkflowEndChained { message_delay_ms: u64 },
+    MessageFlow_EndChained { message_delay_ms: u64 },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,7 +89,7 @@ pub struct SimulationWorker {
     pub wait_children_close_timeout_ms: Option<u64>,
 
     /// Number of messages processed by the worker
-    /// during on_message(Message_WorkflowEndChained)
+    /// during on_message(MessageFlow_EndChained)
     message_count: usize,
 }
 
@@ -195,7 +195,7 @@ impl Worker for SimulationWorker {
                 }
             }
 
-            SimulationBehavior::Message_WorkflowEnd { message_delay_ms } => {
+            SimulationBehavior::MessageFlow_End { message_delay_ms } => {
                 // Simulate message work before explicitly completing the message flow.
                 if *message_delay_ms > 0 {
                     tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
@@ -204,7 +204,7 @@ impl Worker for SimulationWorker {
                 MWFWrk::message_flow_end(Ok(()))?;
             }
 
-            SimulationBehavior::Message_WorkflowEndFail { message_delay_ms } => {
+            SimulationBehavior::MessageFlow_EndFail { message_delay_ms } => {
                 // Simulate message work before explicitly failing the flow.
                 if *message_delay_ms > 0 {
                     tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
@@ -213,7 +213,7 @@ impl Worker for SimulationWorker {
                 MWFWrk::message_flow_end(Err(anyhow::anyhow!("Simulation message failure")))?;
             }
 
-            SimulationBehavior::Message_WorkflowEndChained { message_delay_ms } => {
+            SimulationBehavior::MessageFlow_EndChained { message_delay_ms } => {
                 // Simulate message processing work.
                 if *message_delay_ms > 0 {
                     tokio::time::sleep(Duration::from_millis(*message_delay_ms)).await;
@@ -225,7 +225,7 @@ impl Worker for SimulationWorker {
                     let worker_id = self.worker_id.as_ref().expect("worker_id should be initialized");
 
                     // Send the next message to the same worker.
-                    MWFWrk::send_message(&EntityID::new_worker(worker_id.clone()), worker_id, &MessageID::new("WORKFLOW_END_CHAINED"), &()).await?;
+                    MWFWrk::send_message(&EntityID::new_worker(worker_id.clone()), worker_id, &MessageID::new("MESSAGE_FLOW_END_CHAINED"), &()).await?;
                 } else {
                     // Complete the message flow after the third message.
                     MWFWrk::message_flow_end(Ok(()))?;

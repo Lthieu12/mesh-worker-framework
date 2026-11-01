@@ -84,7 +84,7 @@ pub enum MWFError {
     Worker_Panicked(anyhow::Error),
 
     /// Error returned by a worker while processing
-    /// a message sent through send_message_and_wait_reply().
+    /// a message sent through send_message_and_wait.
     Worker_MessageError(anyhow::Error),
 
     /// A worker cannot initialize or close itself.
@@ -148,7 +148,7 @@ pub enum MWFError {
     /// Log file path is not configured.
     Logging_LogFileNotConfigured,
 
-    /// Failed to access to log file.
+    /// Failed to access log file.
     Logging_LogFileAccessFailed(anyhow::Error),
 
     /// Blocking task execution failed.
@@ -308,15 +308,15 @@ impl fmt::Display for MWFError {
             }
 
             MWFError::Logging_LogFileInvalidPath => {
-                write!(f, "Log file path is not configured.")
-            }
-
-            MWFError::Logging_LogFileNotConfigured => {
                 write!(f, "Invalid log file path.")
             }
 
+            MWFError::Logging_LogFileNotConfigured => {
+                write!(f, "Log file path is not configured.")
+            }
+
             MWFError::Logging_LogFileAccessFailed(error) => {
-                write!(f, "Failed to access to log file: {}", error)
+                write!(f, "Failed to access log file: {}", error)
             }
 
             MWFError::BlockingTask_Failed(error) => {

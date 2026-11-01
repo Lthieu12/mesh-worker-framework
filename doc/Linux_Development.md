@@ -216,25 +216,30 @@ At this point, MWF can be compiled and tested on both supported operating system
 
 ---
 
-# Next Step
+# Verification Script
 
-The next step is to create a single PowerShell script that automatically performs the complete validation pipeline.
+The repository includes a PowerShell verification script:
 
-The script will:
+`scripts/verify.ps1`
 
-1. Execute all Windows verification steps:
+Run the script from the project root using PowerShell:
 
-   * `cargo fmt --check`
-   * `cargo clippy`
-   * `cargo test`
-   * `cargo test --doc`
-   * `cargo build --examples`
-   * `cargo doc`
+```powershell
+.\scripts\verify.ps1
 
-2. Execute the Linux verification steps through WSL:
+The script performs the complete verification pipeline on both Windows
+and Linux (WSL2).
 
-   * `cargo test`
-   * `cargo test --doc`
-   * `cargo build --examples`
+For each platform, it executes:
+1. cargo fmt --check
+2. cargo clippy with warnings treated as errors.
+3. cargo test across all targets and features.
+4. cargo test --doc
+5. cargo build --examples
+6. Execution of the getting_started examples and runtime benchmark.
+7. cargo doc
+Separate Cargo target directories are used for Windows and Linux
+to avoid sharing incompatible build artifacts.
 
-This provides a single command capable of validating MWF on both officially supported platforms before each release.
+The script provides a single validation command to run before each
+release.

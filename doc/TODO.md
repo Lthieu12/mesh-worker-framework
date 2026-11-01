@@ -28,25 +28,3 @@ impl FileSearch {
 ```
 
 La macro `Worker` devrait générer automatiquement l’implémentation nécessaire du trait `mwf::Worker`.
-
-### 2. Accepter `&str` à la place de `&String`
-
-Dans certaines fonctions, comme `send_message_and_wait`, `spawn_worker` ou `wait_worker_init`, je souhaite pouvoir passer directement une valeur de type `&str` au lieu d’une référence vers une `String`.
-
-Par exemple, cette signature :
-
-```rust
-pub async fn wait_worker_init(
-    worker_id: &String,
-    timeout_ms: Option<u64>,
-)
-```
-
-devrait devenir :
-
-```rust
-pub async fn wait_worker_init(
-    worker_id: &str,
-    timeout_ms: Option<u64>,
-)
-```

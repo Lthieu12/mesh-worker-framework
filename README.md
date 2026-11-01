@@ -321,10 +321,18 @@ Priority messages are handled using a Last-In, First-Out
 
 Send a message and wait for the requested completion mode:
 
-* WaitThisMessage: wait until the target worker finishes processing the message.
-* WaitThisMessageFlow: wait until the target worker explicitly completes the message flow using `message_flow_end()`.
+* `WaitThisMessage`: wait until the target worker finishes its `on_message()` callback.
+* `WaitThisMessageFlow`: wait until the target worker explicitly completes the message flow using `message_flow_end()`.
 
-The caller receives the processing result or a timeout error.
+The timeout applies to the entire operation, including waiting for channel capacity and waiting for the requested completion.
+
+A timeout does not cancel a message that has already been accepted by the worker. The worker continues processing it.
+
+For `WaitThisMessageFlow`, a timeout after message admission does not cancel the MessageFlow. It remains active until the worker calls `message_flow_end()` or its WorkerTask terminates.
+
+The worker must explicitly complete every MessageFlow, including when application-level processing fails.
+
+The same timeout and completion semantics apply to `send_priority_message_and_wait()`.
 
 ---
 
@@ -373,19 +381,31 @@ Each error event contains:
 
 ## 6. Logging and Observability
 
-MWF provides a centralized logging and observability system.
+MWF provides a centralized logging and observability system through MWFLog.
 
-When logging is enabled, framework lifecycle events and message processing are recorded by MWFLog.
+The logging mode controls which worker events are captured:
 
-Supported framework events include:
+* `NoLog`: disables worker event logging.
+* `LogAll`: captures events from all workers.
+* `LogSelected`: captures events only from the selected workers.
 
-* Worker spawn
-* Worker initialization
-* Worker shutdown
-* Worker abort
-* Message reception
+Captured log events are stored in an in-memory circular buffer and can be retrieved asynchronously by monitoring tools, loggers or application code.
 
-Log events are stored in a circular buffer and can be retrieved asynchronously by monitoring tools, loggers or application code.
+### File Logging
+
+File logging is independent of the logging mode.
+
+The `log_file_path` configuration field determines whether a log file is created during MWF initialization. By default, MWF creates `mwf.log` next to the executable. Setting `log_file_path` to `None` prevents the file from being created.
+
+File logging is disabled by default and can be enabled through `MWFLog::set_log_file_enabled(true)`.
+
+When enabled, captured log events are written to the file and immediately flushed to disk.
+
+If the configured maximum file size is reached or a file write operation fails, MWF automatically disables file logging and closes the file handle. In-memory logging continues normally.
+
+File logging is not automatically restarted after this shutdown and cannot be re-enabled until MWF is initialized again.
+
+### Log Event Content
 
 Each log event contains:
 

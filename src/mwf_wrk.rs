@@ -3,6 +3,7 @@
 //! This API exposes the framework entry points used to
 //! manage workers and send messages.
 
+use std::collections::HashSet;
 use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
@@ -111,6 +112,20 @@ impl MWFWrk {
             Some(parent_id) => Ok(parent_id),
             None => Err(MWFError::Worker_CurrentContextUnavailable),
         }
+    }
+
+    /// Removes duplicate WorkerIDs while preserving their original order.
+    fn deduplicate_worker_ids(worker_ids: &[WorkerID]) -> Vec<WorkerID> {
+        let mut seen = HashSet::with_capacity(worker_ids.len());
+        let mut unique_worker_ids = Vec::with_capacity(worker_ids.len());
+
+        for worker_id in worker_ids {
+            if seen.insert(worker_id) {
+                unique_worker_ids.push(worker_id.clone());
+            }
+        }
+
+        unique_worker_ids
     }
 
     /// Create and register a new worker instance from its WorkerTypeID.
@@ -468,16 +483,22 @@ impl MWFWrk {
         Ok(children_count)
     }
 
-    /// Wait until all workers in the list reach the Initialized state.
+    /// Wait until all workers in the list have reached the Initialized state.
+    ///
+    /// Duplicate WorkerIDs are ignored.
+    ///
+    /// Returns Worker_InitializationFailed if any worker failed during initialization.
     ///
     /// timeout_ms:
     /// - None => wait indefinitely.
     /// - Some(value) => return Operation_Timeout if the delay expires.
     ///
     /// A worker cannot wait for its own initialization.
-    pub async fn wait_worker_list_init(worker_ids: &Vec<WorkerID>, timeout_ms: Option<u64>) -> Result<(), MWFError> {
+    pub async fn wait_worker_list_init(worker_ids: &[WorkerID], timeout_ms: Option<u64>) -> Result<(), MWFError> {
         // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
         drop(MWF::validate_api_context()?);
+
+        let worker_ids = Self::deduplicate_worker_ids(worker_ids);
 
         // A worker cannot wait for its own initialization.
         if let Some(current_id) = current_worker_id() {
@@ -507,7 +528,7 @@ impl MWFWrk {
 
                     // Initialization is complete only when all workers
                     // have reached the Initialized or InitFailed state.
-                    for worker_id in worker_ids {
+                    for worker_id in &worker_ids {
                         match mwf_data.worker_registry.get_worker_state(worker_id)? {
                             WorkerState::Initialized => {}
 
@@ -549,7 +570,7 @@ impl MWFWrk {
     /// - None => wait indefinitely.
     /// - Some(value) => return Operation_Timeout if the delay expires.
     pub async fn wait_worker_init(worker_id: &WorkerID, timeout_ms: Option<u64>) -> Result<(), MWFError> {
-        MWFWrk::wait_worker_list_init(&vec![worker_id.to_owned()], timeout_ms).await
+        MWFWrk::wait_worker_list_init(std::slice::from_ref(worker_id), timeout_ms).await
     }
 
     /// Wait until all direct children of an entity reach the
@@ -566,16 +587,14 @@ impl MWFWrk {
 
     /// Wait until all workers in the list are no longer registered in MWF.
     ///
-    /// A worker is considered finished when it has been removed from the Registry.
-    /// This normally happens after on_close() completes, but can also happen
-    /// following a worker abort or panic.
+    /// Duplicate WorkerIDs are ignored.
     ///
-    /// During a normal shutdown, the worker task completes its lifecycle
+    /// During a normal shutdown, a worker completes its lifecycle, including on_close(),
     /// before being removed from the Registry.
     ///
-    /// If the worker is aborted, it is removed from the Registry without
-    /// waiting for its Tokio task to terminate. Tasks blocked in synchronous
-    /// code or native DLL calls may continue executing.
+    /// When aborted, a worker is removed from the Registry without waiting for its Tokio
+    /// task to terminate. Tasks blocked in synchronous code or native DLL calls may
+    /// continue executing.
     ///
     /// Returns Worker_CloseFailed if a worker failed during on_close().
     ///
@@ -584,9 +603,11 @@ impl MWFWrk {
     /// - Some(value) => return Operation_Timeout if the delay expires.
     ///
     /// A worker cannot wait for its own closure.
-    pub async fn wait_worker_list_close(worker_ids: &Vec<WorkerID>, timeout_ms: Option<u64>) -> Result<(), MWFError> {
+    pub async fn wait_worker_list_close(worker_ids: &[WorkerID], timeout_ms: Option<u64>) -> Result<(), MWFError> {
         // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
         drop(MWF::validate_api_context()?);
+
+        let worker_ids = Self::deduplicate_worker_ids(worker_ids);
 
         // A worker cannot wait for its own closure.
         if let Some(current_id) = current_worker_id() {
@@ -617,7 +638,7 @@ impl MWFWrk {
                     // Closing is complete only when all workers
                     // have either been removed from the Registry
                     // or reached the CloseFailed or the Panicked state.
-                    for worker_id in worker_ids {
+                    for worker_id in &worker_ids {
                         match mwf_data.worker_registry.get_worker_state(worker_id) {
                             // A worker not found has been properly closed.
                             Err(MWFError::Worker_NotFound) => {}
@@ -661,7 +682,7 @@ impl MWFWrk {
     /// - None => wait indefinitely.
     /// - Some(value) => return Operation_Timeout if the delay expires.
     pub async fn wait_worker_close(worker_id: &WorkerID, timeout_ms: Option<u64>) -> Result<(), MWFError> {
-        MWFWrk::wait_worker_list_close(&vec![worker_id.to_owned()], timeout_ms).await
+        MWFWrk::wait_worker_list_close(std::slice::from_ref(worker_id), timeout_ms).await
     }
 
     /// Wait until all direct children of an entity are no longer registered in MWF.
@@ -679,26 +700,31 @@ impl MWFWrk {
 
     /// Aborts a list of workers.
     ///
+    /// Duplicate WorkerIDs are ignored; each unique worker is processed once.
+    ///
     /// This is a best-effort operation intended as a last resort when workers cannot be closed
-    /// normally. It requests immediate task cancellation through Tokio when possible and removes
-    /// each worker from the Registry, even if its JoinHandle cannot be retrieved or task
-    /// cancellation cannot complete.
+    /// normally. It requests immediate task cancellation through Tokio and removes the workers
+    /// from the Registry.
     ///
     /// It does not wait for task termination. Tasks blocked in synchronous code or native DLL
-    /// calls may continue executing.
+    /// calls may continue executing. MWF-managed resources are cleaned up as far as possible,
+    /// but resources owned by code that remains blocked cannot be guaranteed to be released.
     ///
-    /// MWF-managed resources are cleaned up as far as possible, but resources owned by code that
-    /// remains blocked cannot be guaranteed to be released.
+    /// Each registered worker is expected to have an associated JoinHandle. A missing handle
+    /// is an internal invariant violation and causes a panic.
     ///
-    /// Any worker-related error is recorded, but does not prevent the remaining workers from
-    /// being processed. The first encountered error is returned after all workers have been processed.
+    /// Errors encountered while processing the list do not prevent the remaining workers from
+    /// being processed. The first encountered error is returned after all workers have been
+    /// processed. Abort events are also recorded in MWFLog when logging is enabled.
     ///
-    /// Aborted workers that continue executing may still emit log events, even after MWF has been
-    /// reinitialized. Such events retain their original WorkerID and can be identified as belonging
-    /// to a previous MWF instance.
-    pub fn abort_worker_list(worker_ids: &Vec<WorkerID>) -> Result<(), MWFError> {
+    /// If an aborted worker continues executing after MWF has been reinitialized, it may still
+    /// emit log and error events into the current MWF instance. These events retain the original
+    /// WorkerID, including the MWF instance ID, so their origin remains identifiable.
+    pub fn abort_worker_list(worker_ids: &[WorkerID]) -> Result<(), MWFError> {
         // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
         drop(MWF::validate_api_context()?);
+
+        let worker_ids = Self::deduplicate_worker_ids(worker_ids);
 
         let mut first_error: Option<MWFError> = None;
         let mut worker_action_list = Vec::with_capacity(worker_ids.len());
@@ -707,7 +733,7 @@ impl MWFWrk {
         let mwf_data = mwf_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
 
         // Request cancellation of all worker tasks.
-        for worker_id in worker_ids {
+        for worker_id in &worker_ids {
             let action_start_timer = Instant::now();
 
             match mwf_data.worker_registry.take_join_handle(worker_id) {
@@ -764,13 +790,13 @@ impl MWFWrk {
     ///
     /// See abort_worker_list() for details.
     pub fn abort_worker(worker_id: &WorkerID) -> Result<(), MWFError> {
-        MWFWrk::abort_worker_list(&vec![worker_id.to_owned()])
+        MWFWrk::abort_worker_list(std::slice::from_ref(worker_id))
     }
 
-    /// Aborts all children of an entity.
+    /// Aborts all direct child workers of an entity.
     ///
-    /// This is a best-effort operation intended as a last resort when a workers cannot be closed
-    /// normally.
+    /// This is a best-effort operation intended as a last resort when child workers cannot
+    /// be closed normally.
     ///
     /// See abort_worker_list() for details.
     pub fn abort_children(entity_id: &EntityID) -> Result<(), MWFError> {
@@ -873,13 +899,27 @@ impl MWFWrk {
     /// `message_id` may be any type implementing `Into<MessageID>`.
     ///
     /// The completion mode determines what the caller waits for:
-    /// - `WaitThisMessage`: completion of the receiver's `on_message()` callback.
-    /// - `WaitThisMessageFlow`: explicit completion of the message flow through `message_flow_end()`.
+    /// - `WaitThisMessage`: completion of the receiver's on_message() callback.
+    /// - `WaitThisMessageFlow`: explicit completion of the message flow through message_flow_end().
+    ///
+    /// The timeout covers the entire operation, including waiting for channel capacity
+    /// and waiting for the requested completion.
+    ///
+    /// A timeout does not cancel a message that has already been accepted by the worker.
+    /// The worker continues processing it.
+    ///
+    /// For WaitThisMessageFlow, a timeout after message admission does not cancel the
+    /// MessageFlow. It remains active until message_flow_end() is called or the WorkerTask
+    /// terminates.
+    ///
+    /// timeout_ms:
+    /// - None => wait indefinitely.
+    /// - Some(value) => return Operation_Timeout if the delay expires.
     ///
     /// Returns:
     /// - Ok(()) if the requested completion succeeds.
-    /// - An MWFError if the callback or message flow returns an error,
-    ///   the worker terminates, or the operation times out.
+    /// - An MWFError if the callback or message flow returns an error, the worker terminates,
+    ///   or the operation times out.
     pub async fn send_message_and_wait<TMessageID, TMessageData>(sender_id: &EntityID, receiver_id: &WorkerID, message_id: &TMessageID, wait_mode: MessageWaitMode, message_data: &TMessageData, timeout_ms: Option<u64>) -> Result<(), MWFError>
     where
         TMessageID: Into<MessageID> + Clone,
@@ -904,19 +944,32 @@ impl MWFWrk {
 
     /// Send a priority message and wait for the requested completion mode.
     ///
-    /// Priority messages are always processed before pending
-    /// normal messages.
+    /// Priority messages are processed before pending normal messages.
     ///
     /// `message_id` may be any type implementing `Into<MessageID>`.
     ///
     /// The completion mode determines what the caller waits for:
-    /// - `WaitThisMessage`: completion of the receiver's `on_message()` callback.
-    /// - `WaitThisMessageFlow`: explicit completion of the message flow through `message_flow_end()`.
+    /// - `WaitThisMessage`: completion of the receiver's on_message() callback.
+    /// - `WaitThisMessageFlow`: explicit completion of the message flow through message_flow_end().
+    ///
+    /// The timeout covers the entire operation, including waiting for channel capacity
+    /// and waiting for the requested completion.
+    ///
+    /// A timeout does not cancel a message that has already been accepted by the worker.
+    /// The worker continues processing it.
+    ///
+    /// For WaitThisMessageFlow, a timeout after message admission does not cancel the
+    /// MessageFlow. It remains active until message_flow_end() is called or the WorkerTask
+    /// terminates.
+    ///
+    /// timeout_ms:
+    /// - None => wait indefinitely.
+    /// - Some(value) => return Operation_Timeout if the delay expires.
     ///
     /// Returns:
     /// - Ok(()) if the requested completion succeeds.
-    /// - An MWFError if the callback or message flow returns an error,
-    ///   the worker terminates, or the operation times out.
+    /// - An MWFError if the callback or message flow returns an error, the worker terminates,
+    ///   or the operation times out.
     pub async fn send_priority_message_and_wait<TMessageID, TMessageData>(sender_id: &EntityID, receiver_id: &WorkerID, message_id: &TMessageID, wait_mode: MessageWaitMode, message_data: &TMessageData, timeout_ms: Option<u64>) -> Result<(), MWFError>
     where
         TMessageID: Into<MessageID> + Clone,
@@ -964,12 +1017,17 @@ impl MWFWrk {
         send_worker_command(sender_id, receiver_id, WorkerChannel::Normal, WorkerCommand::Message { message: framework_message, priority: false, unique: true }).await
     }
 
-    /// Complete the message flow associated with the current message and forward its result.
+    /// Complete the MessageFlow associated with the currently processed message.
     ///
-    /// `message flow_result` is returned by the caller waiting for the message flow.
+    /// The supplied result represents the outcome of the application-level processing
+    /// and is forwarded to the caller waiting with WaitThisMessageFlow.
     ///
-    /// The message flow result represents the outcome of the application-level processing.
-    /// The returned MWFError only indicates that the framework could not signal completion.
+    /// MessageFlow completion is explicit. Returning an error from on_message() does not
+    /// automatically complete the flow. The worker must call this function when its
+    /// application-level processing is finished, including when that processing fails.
+    ///
+    /// If the caller has already timed out after the message was accepted, the MessageFlow
+    /// remains active until this function is called or the WorkerTask terminates.
     ///
     /// Returns:
     /// - Worker_CurrentContextUnavailable if called outside an MWF worker task.

@@ -102,8 +102,13 @@ manage each worker. An entry contains the worker type, parent entity,
 lifecycle state, normal and priority channel senders, and an optional
 Tokio `JoinHandle`.
 
-The task handle is optional because ownership can be transferred out of
-the registry when an operation needs to await task termination.
+The task handle is optional because abort_worker_list() takes ownership
+of it to request task cancellation through Tokio.
+
+MWF does not await the JoinHandle during an abort operation. The worker is
+removed from the Registry without waiting for its task to terminate.
+A task blocked in synchronous code or a native DLL call may therefore
+continue executing after its removal.
 
 Parent/child relationships are maintained separately from the worker
 entries through a child-worker index keyed by parent `EntityID`. This

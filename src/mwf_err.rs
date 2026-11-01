@@ -27,20 +27,21 @@ mod terminal_error_column {
     pub const ERROR_CONTEXT_LEN: usize = 80;
 }
 
-/// Error event recorded by MWFErr.
+/// Represents an error reported to MWFErr.
 ///
-/// An ErrorEvent is generated whenever a worker callback
-/// (on_init, on_message or on_close) returns an error.
+/// Errors returned by worker lifecycle and message callbacks are recorded
+/// automatically. Application code can also publish additional errors through
+/// MWFErr::add_error().
 ///
-/// Error events are stored in a circular buffer and can
-/// later be retrieved for diagnostics, logging or monitoring.
+/// Error events are stored in a circular buffer and can later be retrieved
+/// for diagnostics, logging or monitoring.
 #[derive(Debug, Clone)]
 pub struct ErrorEvent {
     /// Unique identifier assigned by MWFErr.
     pub error_instance_id: ErrorInstanceID,
 
-    /// UTC timestamp when the error was recorded,
-    /// formatted according to RFC 3339.
+    /// Timestamp when the error was recorded, formatted according to the
+    /// configured timestamp format (local time or UTC) using RFC 3339.
     pub timestamp_rfc3339: String,
 
     /// Origin of the error.
@@ -110,11 +111,10 @@ pub enum ErrorOutputFormat {
     CSV,
 }
 
-/// Result returned by MWFErr::get_error_list().
+/// Snapshot of error events retrieved from MWFErr.
 ///
-/// This structure contains the error events requested
-/// by the caller together with metadata describing
-/// the state of the circular buffer.
+/// This structure contains the requested error events together with metadata
+/// describing the state of the circular buffer.
 #[derive(Debug, Clone)]
 pub struct ErrorList {
     pub first_error_instance_id: Option<ErrorInstanceID>,
@@ -262,20 +262,26 @@ impl MWFErr {
         MWFErr::add_error_internal(error_source, None, error)
     }
 
-    /// Wait until new error events are available.
+    /// Wait until new error events are available for the current MWF instance.
     ///
-    /// If last_error_instance_id is None, all error
-    /// events currently stored in MWFErr are returned.
+    /// If last_error_instance_id is None, all error events currently stored in the
+    /// current MWF instance are returned.
     ///
-    /// If last_error_instance_id is provided, only
-    /// events with a greater ErrorInstanceID are
-    /// returned.
+    /// If last_error_instance_id is provided, only events with a greater
+    /// ErrorInstanceID are returned.
     ///
-    /// If matching error events are already present
-    /// in the MWFErr buffer, they are returned
-    /// immediately without waiting.
+    /// If matching events are already available, they are returned immediately.
+    /// Otherwise, the function waits for the next error notification.
     ///
-    /// Returns `Ok(None)` if MWF is closed while waiting.
+    /// Each wait is bound to the MWF instance in which it starts. If that
+    /// instance is closed while the wait is pending, including when MWF is
+    /// reinitialized before the wait resumes, the function returns Ok(None).
+    /// It never switches to the newly initialized instance.
+    ///
+    /// ErrorInstanceID values restart for each MWF instance. After reinitializing
+    /// MWF, start a new retrieval sequence with None instead of reusing an ID
+    /// from the previous instance.
+    ///
     /// Returns Framework_NotInitialized if called when MWF is already closed.
     pub async fn wait_error(last_error_instance_id: Option<ErrorInstanceID>) -> Result<Option<ErrorList>, MWFError> {
         let mwf_wrk_data_guard = MWF::validate_api_context()?;
