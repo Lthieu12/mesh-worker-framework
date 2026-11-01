@@ -10,7 +10,7 @@ use tokio::task::JoinHandle;
 
 use crate::MWF;
 use crate::framework_error::{MWFError, MWFPanic};
-use crate::mwf::{MWF_DATA, MWF_ERR_DATA, MWF_ERR_INSTANCE_COUNTER, MWF_ERR_NOTIFY};
+use crate::mwf::{MWF_DATA, MWF_ERR_DATA, MWF_ERR_INSTANCE_COUNTER, MWF_ERR_NOTIFY, MWF_INSTANCE_COUNTER};
 use crate::string_helper;
 use crate::worker::EntityID;
 
@@ -278,9 +278,11 @@ impl MWFErr {
     /// Returns `Ok(None)` if MWF is closed while waiting.
     /// Returns Framework_NotInitialized if called when MWF is already closed.
     pub async fn wait_error(last_error_instance_id: Option<ErrorInstanceID>) -> Result<Option<ErrorList>, MWFError> {
-        drop(MWF::validate_api_context()?);
+        let mwf_wrk_data_guard = MWF::validate_api_context()?;
+        let mwf_instance_counter = MWF_INSTANCE_COUNTER.load(Ordering::Relaxed);
+        drop(mwf_wrk_data_guard);
 
-        match MWFErr::wait_error_internal(last_error_instance_id).await {
+        match MWFErr::wait_error_internal(mwf_instance_counter, last_error_instance_id).await {
             Ok(error_list) => Ok(Some(error_list)),
             Err(MWFError::Framework_NotInitialized) => Ok(None),
             Err(error) => Err(error),
@@ -289,13 +291,13 @@ impl MWFErr {
 
     // Waits for error events without validating the API context.
     // Used internally by the terminal error task during shutdown.
-    async fn wait_error_internal(last_error_instance_id: Option<ErrorInstanceID>) -> Result<ErrorList, MWFError> {
+    async fn wait_error_internal(mwf_instance_counter: u64, last_error_instance_id: Option<ErrorInstanceID>) -> Result<ErrorList, MWFError> {
         loop {
             let error_notify = MWF_ERR_NOTIFY.notified();
             tokio::pin!(error_notify);
             error_notify.as_mut().enable();
 
-            let error_list = MWFErr::get_error_list(last_error_instance_id)?;
+            let error_list = MWFErr::get_error_list(mwf_instance_counter, last_error_instance_id)?;
 
             if !error_list.error_event_list.is_empty() {
                 return Ok(error_list);
@@ -320,9 +322,14 @@ impl MWFErr {
     ///
     /// Returns Framework_NotInitialized if MWFErr has
     /// not been initialized through MWF::init().
-    fn get_error_list(last_error_instance_id: Option<ErrorInstanceID>) -> Result<ErrorList, MWFError> {
+    fn get_error_list(mwf_instance_counter: u64, last_error_instance_id: Option<ErrorInstanceID>) -> Result<ErrorList, MWFError> {
         let mwf_err_data_guard = MWF_ERR_DATA.read().expect(MWFPanic::MWFErrData_ReadLockPoisoned.message());
         let mwf_err_data = mwf_err_data_guard.as_ref().ok_or(MWFError::Framework_NotInitialized)?;
+
+        // Make sure the error buffer still belongs to the original MWF instance.
+        if MWF_INSTANCE_COUNTER.load(Ordering::Relaxed) != mwf_instance_counter {
+            return Err(MWFError::Framework_NotInitialized);
+        }
 
         // No error event is currently stored in MWFErr.
         if mwf_err_data.error_event_list.is_empty() {
@@ -396,6 +403,8 @@ impl MWFErr {
                 return Err(MWFError::Framework_NotInitialized);
             }
 
+            let mwf_instance_counter = MWF_INSTANCE_COUNTER.load(Ordering::Relaxed);
+
             // Create a one-shot channel used to delay error consumption until the
             // terminal error logging task has been fully registered.
             let (start_sender, start_receiver) = oneshot::channel();
@@ -418,7 +427,7 @@ impl MWFErr {
 
                 loop {
                     tokio::select! {
-                        error_result = MWFErr::wait_error_internal(last_error_instance_id) => {
+                        error_result = MWFErr::wait_error_internal(mwf_instance_counter, last_error_instance_id) => {
                             match error_result {
                                 Ok(error_list) => {
                                     // Print all newly received error events.
@@ -440,7 +449,7 @@ impl MWFErr {
 
                         _ = &mut shutdown_receiver => {
                             // Print all error events that remain in the MWF error buffer.
-                            if let Ok(error_list) = MWFErr::get_error_list(last_error_instance_id) {
+                            if let Ok(error_list) = MWFErr::get_error_list(mwf_instance_counter, last_error_instance_id) {
                                 for error_event in &error_list.error_event_list {
                                     println!("{}", error_event.to_terminal_string());
                                 }
