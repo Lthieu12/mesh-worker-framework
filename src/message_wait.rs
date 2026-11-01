@@ -226,23 +226,21 @@ where
 
     let (reply_sender, reply_receiver) = oneshot::channel::<Result<(), WorkerError>>();
 
-    // Submit a message whose completion is reported by the worker task.
-    send_worker_command(sender_id, receiver_id, channel, WorkerCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority }).await?;
+    // Submit the message and wait for the callback result.
+    let wait_future = async {
+        send_worker_command(sender_id, receiver_id, channel, WorkerCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority }).await?;
 
-    // Wait for the callback result or the timeout.
-    let worker_result = match timeout_ms {
-        Some(timeout_ms) => match tokio::time::timeout(Duration::from_millis(timeout_ms), reply_receiver).await {
-            Ok(Ok(worker_result)) => worker_result,
-            Ok(Err(_)) => return Err(MWFError::Worker_ChannelClosed),
-            Err(_) => return Err(MWFError::Operation_Timeout),
-        },
-        None => match reply_receiver.await {
-            Ok(worker_result) => worker_result,
-            Err(_) => return Err(MWFError::Worker_ChannelClosed),
-        },
+        match reply_receiver.await {
+            Ok(worker_result) => worker_result.map_err(MWFError::Worker_MessageError),
+            Err(_) => Err(MWFError::Worker_ChannelClosed),
+        }
     };
 
-    worker_result.map_err(MWFError::Worker_MessageError)
+    // Apply the timeout to the entire operation, including channel admission.
+    match timeout_ms {
+        Some(timeout_ms) => tokio::time::timeout(Duration::from_millis(timeout_ms), wait_future).await.map_err(|_| MWFError::Operation_Timeout)?,
+        None => wait_future.await,
+    }
 }
 
 /// Send a message and wait until its entire message flow has completed.
@@ -271,23 +269,23 @@ where
 
     let framework_message = WorkerMessage::new(sender_id, receiver_id, message_id, message_instance_id, message_data, inheritance_context);
 
-    // Submit a regular message: message_flow_end() reports completion.
-    send_worker_command(sender_id, receiver_id, channel, WorkerCommand::Message { message: framework_message, priority, unique: false }).await?;
+    // Submit the initial message and wait for explicit flow completion.
+    let wait_future = async {
+        send_worker_command(sender_id, receiver_id, channel, WorkerCommand::Message { message: framework_message, priority, unique: false }).await?;
 
-    // Preserve the registration after successful submission.
-    flow_registration_guard.disarm();
+        // Preserve the registration after successful submission.
+        flow_registration_guard.disarm();
 
-    // Wait for the result explicitly provided by message_flow_end().
-    match timeout_ms {
-        Some(timeout_ms) => match tokio::time::timeout(Duration::from_millis(timeout_ms), flow_reply_receiver).await {
-            Ok(Ok(worker_result)) => worker_result,
-            Ok(Err(_)) => Err(MWFError::Worker_ChannelClosed),
-            Err(_) => Err(MWFError::Operation_Timeout),
-        },
-        None => match flow_reply_receiver.await {
+        match flow_reply_receiver.await {
             Ok(worker_result) => worker_result,
             Err(_) => Err(MWFError::Worker_ChannelClosed),
-        },
+        }
+    };
+
+    // Apply the timeout to the entire operation, including channel admission.
+    match timeout_ms {
+        Some(timeout_ms) => tokio::time::timeout(Duration::from_millis(timeout_ms), wait_future).await.map_err(|_| MWFError::Operation_Timeout)?,
+        None => wait_future.await,
     }
 }
 

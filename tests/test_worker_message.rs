@@ -30,6 +30,8 @@
 //!   - Start another priority message send and verify that it waits for channel capacity.
 //!   - Request worker shutdown while the priority send is waiting.
 //!   - Verify that the pending send returns Worker_NotInitialized after the worker enters Closing.
+//!   - Verify that send_priority_message_and_wait() times out while waiting
+//!     for channel capacity for both message completion modes.
 //!   - Verify that messages accepted before shutdown are processed before the Close command.
 //!   - Verify that the rejected message is never processed.
 use serial_test::serial;
@@ -46,7 +48,7 @@ const MESSAGE_NORMAL_2: &str = "NORMAL_2";
 const MESSAGE_NORMAL_3: &str = "NORMAL_3";
 const MESSAGE_PRIORITY_1: &str = "PRIORITY_1";
 const MESSAGE_PRIORITY_2: &str = "PRIORITY_2";
-
+const MESSAGE_TIMEOUT: &str = "TIMEOUT";
 const MESSAGE_CHAIN: &str = "CHAIN";
 
 // MWF uses a global runtime instance.
@@ -416,6 +418,13 @@ async fn test_send_priority_message_racing_with_worker_close() {
     MWFWrk::send_priority_message(&EntityID::new_external("MAIN"), &worker_id, &MESSAGE_QUEUED_PRIORITY, &()).await.unwrap();
 
     assert_eq!(MWFWrk::get_worker_status(&worker_id).unwrap().priority_channel_size, 1);
+
+    // Verify that both wait modes apply the timeout while waiting for channel capacity.
+    for wait_mode in [MessageWaitMode::WaitThisMessage, MessageWaitMode::WaitThisMessageFlow] {
+        let wait_result = tokio::time::timeout(Duration::from_millis(250), MWFWrk::send_priority_message_and_wait(&EntityID::new_external("MAIN"), &worker_id, &MESSAGE_TIMEOUT, wait_mode, &(), Some(50))).await;
+
+        assert!(matches!(wait_result, Ok(Err(MWFError::Operation_Timeout))), "Expected Operation_Timeout for {wait_mode:?}, got: {wait_result:?}");
+    }
 
     // Create a priority send that must wait for an available channel slot.
     let (pending_sender, pending_receiver) = tokio::sync::oneshot::channel();
