@@ -32,7 +32,6 @@
 //!   - Verify that the pending send returns Worker_NotInitialized after the worker enters Closing.
 //!   - Verify that messages accepted before shutdown are processed before the Close command.
 //!   - Verify that the rejected message is never processed.
-
 use serial_test::serial;
 use std::future::Future;
 use std::time::Duration;
