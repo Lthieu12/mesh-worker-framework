@@ -352,13 +352,11 @@ pub(crate) enum MWFPanic {
     MWFErrData_WriteLockPoisoned,
 
     ErrorBuffer_Inconsistency,
-    ErrorBuffer_AddErrorFailed,
 
     MWFLogData_ReadLockPoisoned,
     MWFLogData_WriteLockPoisoned,
 
     LogBuffer_Inconsistency,
-    LogBuffer_AddLogFailed,
 
     MWFMessageWaitData_ReadLockPoisoned,
     MWFMessageWaitData_WriteLockPoisoned,
@@ -393,15 +391,11 @@ impl MWFPanic {
 
             MWFPanic::ErrorBuffer_Inconsistency => "Internal MWF error: error buffer is inconsistent.",
 
-            MWFPanic::ErrorBuffer_AddErrorFailed => "Internal MWF error: add error to buffer unexpectedly failed.",
-
             MWFPanic::MWFLogData_ReadLockPoisoned => "Internal MWF error: MWFLog_DATA read lock poisoned.",
 
             MWFPanic::MWFLogData_WriteLockPoisoned => "Internal MWF error: MWFLog_DATA write lock poisoned.",
 
             MWFPanic::LogBuffer_Inconsistency => "Internal MWF error: logging buffer is inconsistent.",
-
-            MWFPanic::LogBuffer_AddLogFailed => "Internal MWF error: add log to buffer unexpectedly failed.",
 
             MWFPanic::MWFMessageWaitData_ReadLockPoisoned => "Internal MWF error: MWFMessageWait_DATA read lock poisoned.",
 

@@ -222,10 +222,10 @@ pub(crate) fn spawn_worker_task(worker: Box<dyn Worker + Send>, normal_receiver_
                         };
 
                         // Store the panic in MWFErr if the framework is still initialized.
-                        let _ = MWFErr::add_error_internal(&EntityID::Worker(task_worker_id.clone()), Some("worker_task".into()), &panic_error);
+                        record_worker_error(&task_worker_id, Some("worker_task".into()), &panic_error);
 
                         // Log the panic in MWFLog if the framework is still initialized.
-                        let _ = MWFLog::add_log(Instant::now(), &task_worker_id, LogAction::WorkerPanic, LogStatus::Error);
+                        log_worker_event(Instant::now(), &task_worker_id, LogAction::WorkerPanic, LogStatus::Error);
 
                         // Abort or framework shutdown may already have removed the worker.
                         let mut mwf_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
@@ -254,6 +254,21 @@ pub(crate) fn spawn_worker_task(worker: Box<dyn Worker + Send>, normal_receiver_
     })
 }
 
+/// Records a worker error without allowing error reporting to interrupt worker execution.
+fn record_worker_error(worker_id: &WorkerID, callback_name: Option<String>, error: &anyhow::Error) {
+    // Error reporting is best-effort and must never affect the worker lifecycle.
+    let _ = MWFErr::add_error_internal(&EntityID::Worker(worker_id.clone()), callback_name, error);
+}
+
+/// Adds a worker log event without allowing logging failures to interrupt worker execution.
+fn log_worker_event(action_start_timer: Instant, worker_id: &WorkerID, log_action: LogAction, log_status: LogStatus) {
+    if let Err(log_error) = MWFLog::add_log(action_start_timer, worker_id, log_action, log_status) {
+        // Report logging failures through MWFErr when possible.
+        let log_error = anyhow::Error::new(log_error);
+        record_worker_error(worker_id, Some("MWFLog::add_log".into()), &log_error);
+    }
+}
+
 /// Execute a business message.
 ///
 /// This helper executes the message callback, reports errors and
@@ -264,7 +279,8 @@ async fn execute_message(worker: &mut Box<dyn Worker + Send>, worker_id: &Worker
     let sender_id = message.sender_id.clone();
     let message_id = message.message_id.clone();
 
-    MWFLog::add_log(action_start_timer, worker_id, log_action.clone(), LogStatus::Start).expect(MWFPanic::LogBuffer_AddLogFailed.message());
+    // Before callback
+    log_worker_event(action_start_timer, worker_id, log_action.clone(), LogStatus::Start);
 
     // Ignore the message flow context if its message flow has already been closed.
     let context_to_install = match message.inheritance_context.message_flow_id {
@@ -285,15 +301,18 @@ async fn execute_message(worker: &mut Box<dyn Worker + Send>, worker_id: &Worker
 
     match &result {
         Ok(()) => {
-            MWFLog::add_log(action_start_timer, worker_id, log_action, LogStatus::Ok).expect(MWFPanic::LogBuffer_AddLogFailed.message());
+            // Callback success
+            log_worker_event(action_start_timer, worker_id, log_action, LogStatus::Ok);
         }
 
         Err(error) => {
             let error_context = format!("on_message -> MessageID={}, SenderID={}", message_id, sender_id);
-            MWFErr::add_error_internal(&EntityID::Worker(worker_id.to_owned()), Some(error_context), error).expect(MWFPanic::ErrorBuffer_AddErrorFailed.message());
-            MWFLog::add_log(action_start_timer, worker_id, log_action, LogStatus::Error).expect(MWFPanic::LogBuffer_AddLogFailed.message());
+            // Callback error
+            record_worker_error(worker_id, Some(error_context), error);
+            log_worker_event(action_start_timer, worker_id, log_action, LogStatus::Error);
         }
     }
+
     result
 }
 
@@ -382,7 +401,8 @@ async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: Wo
             // as Initialized only after on_init() completes.
             WorkerCommand::Init { init_data } => {
                 let action_start_timer = Instant::now();
-                MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerInit, LogStatus::Start).expect(MWFPanic::LogBuffer_AddLogFailed.message());
+                // Before on_init().
+                log_worker_event(action_start_timer, &worker_id, LogAction::WorkerInit, LogStatus::Start);
 
                 let result_init = worker.on_init(init_data).await;
 
@@ -395,12 +415,12 @@ async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: Wo
                 match &result_init {
                     Ok(()) => {
                         mwf_data.worker_registry.set_worker_state(&worker_id, WorkerState::Initialized).expect(MWFPanic::Registry_WorkerMissing.message());
-                        MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerInit, LogStatus::Ok).expect(MWFPanic::LogBuffer_AddLogFailed.message());
+                        log_worker_event(action_start_timer, &worker_id, LogAction::WorkerInit, LogStatus::Ok);
                     }
                     Err(error) => {
-                        MWFErr::add_error_internal(&EntityID::new_worker(worker_id.clone()), Some("on_init".into()), error).expect(MWFPanic::ErrorBuffer_AddErrorFailed.message());
+                        record_worker_error(&worker_id, Some("on_init".into()), error);
                         mwf_data.worker_registry.set_worker_state(&worker_id, WorkerState::InitFailed).expect(MWFPanic::Registry_WorkerMissing.message());
-                        MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerInit, LogStatus::Error).expect(MWFPanic::LogBuffer_AddLogFailed.message());
+                        log_worker_event(action_start_timer, &worker_id, LogAction::WorkerInit, LogStatus::Error);
                     }
                 }
                 drop(mwf_data_guard);
@@ -448,7 +468,8 @@ async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: Wo
             // from the Registry only after on_close() completes.
             WorkerCommand::Close { close_data } => {
                 let action_start_timer = Instant::now();
-                MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerClose, LogStatus::Start).expect(MWFPanic::LogBuffer_AddLogFailed.message());
+                // Before on_close().
+                log_worker_event(action_start_timer, &worker_id, LogAction::WorkerClose, LogStatus::Start);
 
                 let result_close = worker.on_close(close_data).await;
 
@@ -461,7 +482,7 @@ async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: Wo
                 match &result_close {
                     Ok(()) => {
                         mwf_data.worker_registry.set_worker_state(&worker_id, WorkerState::Closed).expect(MWFPanic::Registry_WorkerMissing.message());
-                        MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerClose, LogStatus::Ok).expect(MWFPanic::LogBuffer_AddLogFailed.message());
+                        log_worker_event(action_start_timer, &worker_id, LogAction::WorkerClose, LogStatus::Ok);
                         // Remove the worker from the Registry.
                         //
                         // Once removed, the worker is no longer visible
@@ -470,9 +491,9 @@ async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: Wo
                         let _ = MWFLog::remove_logged_worker(&worker_id);
                     }
                     Err(error) => {
-                        MWFErr::add_error_internal(&EntityID::new_worker(worker_id.clone()), Some("on_close".into()), error).expect(MWFPanic::ErrorBuffer_AddErrorFailed.message());
+                        record_worker_error(&worker_id, Some("on_close".into()), error);
                         mwf_data.worker_registry.set_worker_state(&worker_id, WorkerState::CloseFailed).expect(MWFPanic::Registry_WorkerMissing.message());
-                        MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerClose, LogStatus::Error).expect(MWFPanic::LogBuffer_AddLogFailed.message());
+                        log_worker_event(action_start_timer, &worker_id, LogAction::WorkerClose, LogStatus::Error);
                     }
                 }
 
