@@ -564,10 +564,20 @@ impl MWFWrk {
         MWFWrk::wait_worker_list_init(&MWFWrk::get_children_ids(entity_id)?, timeout_ms).await
     }
 
-    /// Wait until all workers in the list have fully closed.
+    /// Wait until all workers in the list are no longer registered in MWF.
     ///
-    /// A worker is considered closed once it has been removed
-    /// from the Registry by WorkerTask.
+    /// A worker is considered finished when it has been removed from the Registry.
+    /// This normally happens after on_close() completes, but can also happen
+    /// following a worker abort or panic.
+    ///
+    /// During a normal shutdown, the worker task completes its lifecycle
+    /// before being removed from the Registry.
+    ///
+    /// If the worker is aborted, it is removed from the Registry without
+    /// waiting for its Tokio task to terminate. Tasks blocked in synchronous
+    /// code or native DLL calls may continue executing.
+    ///
+    /// Returns Worker_CloseFailed if a worker failed during on_close().
     ///
     /// timeout_ms:
     /// - None => wait indefinitely.
@@ -643,10 +653,9 @@ impl MWFWrk {
         }
     }
 
-    /// Wait until a worker has fully closed.
+    /// Wait until a worker is no longer registered in MWF.
     ///
-    /// A worker is considered closed once it has been removed
-    /// from the Registry by WorkerTask.
+    /// See wait_worker_list_close() for details.
     ///
     /// timeout_ms:
     /// - None => wait indefinitely.
@@ -655,10 +664,9 @@ impl MWFWrk {
         MWFWrk::wait_worker_list_close(&vec![worker_id.to_owned()], timeout_ms).await
     }
 
-    /// Wait until all direct children of an entity have fully closed.
+    /// Wait until all direct children of an entity are no longer registered in MWF.
     ///
-    /// A child is considered closed once it has been removed from
-    /// the Registry by WorkerTask.
+    /// See wait_worker_list_close() for details.
     ///
     /// timeout_ms:
     /// - None => wait indefinitely.
@@ -671,23 +679,23 @@ impl MWFWrk {
 
     /// Aborts a list of workers.
     ///
-    /// This function requests the immediate cancellation of each worker task through Tokio.
-    /// Workers are removed from the Registry regardless of whether their JoinHandle could be
-    /// retrieved or whether task cancellation can actually complete.
-    ///
     /// This is a best-effort operation intended as a last resort when workers cannot be closed
-    /// normally. It does not wait for task termination.
+    /// normally. It requests immediate task cancellation through Tokio when possible and removes
+    /// each worker from the Registry, even if its JoinHandle cannot be retrieved or task
+    /// cancellation cannot complete.
+    ///
+    /// It does not wait for task termination. Tasks blocked in synchronous code or native DLL
+    /// calls may continue executing.
+    ///
+    /// MWF-managed resources are cleaned up as far as possible, but resources owned by code that
+    /// remains blocked cannot be guaranteed to be released.
     ///
     /// Any worker-related error is recorded, but does not prevent the remaining workers from
     /// being processed. The first encountered error is returned after all workers have been processed.
     ///
-    /// # Important
-    ///
-    /// Removing a worker from the Registry does not guarantee that its Tokio task has terminated.
-    /// Tasks blocked in synchronous code or native DLL calls may continue executing.
-    ///
-    /// MWF-managed resources are cleaned up as far as possible, but resources owned by code that
-    /// remains blocked cannot be guaranteed to be released.
+    /// Aborted workers that continue executing may still emit log events, even after MWF has been
+    /// reinitialized. Such events retain their original WorkerID and can be identified as belonging
+    /// to a previous MWF instance.
     pub fn abort_worker_list(worker_ids: &Vec<WorkerID>) -> Result<(), MWFError> {
         // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
         drop(MWF::validate_api_context()?);
@@ -754,10 +762,7 @@ impl MWFWrk {
     /// This is a best-effort operation intended as a last resort when a worker cannot be closed
     /// normally.
     ///
-    /// The worker is removed from the Registry regardless of whether its Tokio task can actually
-    /// be terminated. This function does not wait for task termination.
-    ///
-    /// Tasks blocked in synchronous code or native DLL calls may continue executing.
+    /// See abort_worker_list() for details.
     pub fn abort_worker(worker_id: &WorkerID) -> Result<(), MWFError> {
         MWFWrk::abort_worker_list(&vec![worker_id.to_owned()])
     }
@@ -767,10 +772,7 @@ impl MWFWrk {
     /// This is a best-effort operation intended as a last resort when a workers cannot be closed
     /// normally.
     ///
-    /// Each child worker is removed from the Registry regardless of whether its Tokio task can
-    /// actually be terminated. This function does not wait for task termination.
-    ///
-    /// Tasks blocked in synchronous code or native DLL calls may continue executing.
+    /// See abort_worker_list() for details.
     pub fn abort_children(entity_id: &EntityID) -> Result<(), MWFError> {
         MWFWrk::abort_worker_list(&MWFWrk::get_children_ids(entity_id)?)
     }
