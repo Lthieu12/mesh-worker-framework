@@ -541,18 +541,19 @@ To help guarantee cross-platform compatibility, the repository includes a verifi
 ## 10. Quality Requirements
 
 The repository includes a verification script (`scripts/verify.ps1`)
-that runs the quality checks on both Windows and Linux (WSL2).
+that validates MWF on both Windows and Linux (WSL2).
 
-The script performs:
+The script performs the following checks on each platform:
 
-* Formatting (`cargo fmt`)
-* Linting (`cargo clippy`)
+* Formatting (`cargo fmt --check`)
+* Linting (`cargo clippy` with warnings treated as errors)
 * Unit and integration tests (`cargo test`)
-* Documentation generation (`cargo doc`)
-* Build (`cargo build`)
+* Documentation tests (`cargo test --doc`)
 * Example compilation (`cargo build --examples`)
+* Execution of the getting_started examples and runtime benchmark
+* API documentation generation (`cargo doc`)
 
-The process fails if any check fails.
+The verification process stops if any check fails.
 
 ---
 

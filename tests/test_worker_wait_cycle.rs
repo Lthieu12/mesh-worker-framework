@@ -169,7 +169,7 @@ async fn test_worker_abort_cleans_up_active_message_flow() {
     .await
     .expect("SimulationWorker did not start processing the message");
 
-    MWFWrk::abort_worker(&worker_id).unwrap();
+    MWFWrk::abort_worker_list(&[worker_id.clone(), worker_id.clone()]).unwrap();
 
     let result = tokio::time::timeout(std::time::Duration::from_secs(2), wait_handle).await.expect("Message flow waiter did not complete after worker abort").expect("Message flow waiter task panicked");
 

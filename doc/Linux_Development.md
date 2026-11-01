@@ -11,7 +11,7 @@ This environment will allow MWF to:
 * Run documentation tests (`cargo test --doc`).
 * Compile all examples.
 * Verify that MWF remains fully cross-platform (Windows + Linux).
-* Execute a future validation script that will automatically run all Windows checks followed by the Linux checks.
+* Run the repository verification script to validate both Windows and Linux (WSL2).
 
 WSL2 provides a lightweight Linux environment fully integrated into Windows while keeping the existing development workflow unchanged.
 
@@ -226,6 +226,7 @@ Run the script from the project root using PowerShell:
 
 ```powershell
 .\scripts\verify.ps1
+```
 
 The script performs the complete verification pipeline on both Windows
 and Linux (WSL2).

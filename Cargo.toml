@@ -2,17 +2,19 @@
 name = "mwf"
 version = "0.10.0"
 edition = "2024"
+rust-version = "1.85"
 description = "Mesh Worker Framework (MWF) is a Rust Tokio/Futures-based runtime for building applications composed of long-running software workers that communicate through asynchronous messages."
 license = "MIT"
 readme = "README.md"
+documentation = "https://docs.rs/mwf"
 keywords = ["async", "tokio", "worker", "messaging", "actor"]
+categories = ["asynchronous", "concurrency", "development-tools::debugging"]
 
 [dependencies]
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", default-features = false, features = ["macros", "rt", "rt-multi-thread", "sync", "time"] }
 async-trait = "0.1"
 futures = { version = "0.3", default-features = false, features = ["std"] }
 serde = { version = "1", features = ["derive"] }
-bincode = "1.3"
 anyhow = "1"
 chrono = "0.4"
 
@@ -22,6 +24,18 @@ serial_test = "3"
 [[example]]
 name = "getting_started"
 path = "examples/getting_started/main.rs"
+
+[[example]]
+name = "getting_started_with_logging"
+path = "examples/getting_started_with_logging/main.rs"
+
+[[example]]
+name = "getting_started_with_error_handling"
+path = "examples/getting_started_with_error_handling/main.rs"
+
+[[example]]
+name = "message_flow_with_logging"
+path = "examples/message_flow_with_logging/main.rs"
 
 [[example]]
 name = "runtime_overhead_benchmark"
