@@ -12,7 +12,7 @@ use crate::MWF;
 use crate::framework_error::{MWFError, MWFPanic};
 use crate::mwf::{MWF_DATA, MWF_ERR_DATA, MWF_ERR_INSTANCE_COUNTER, MWF_ERR_NOTIFY, MWF_INSTANCE_COUNTER};
 use crate::string_helper;
-use crate::worker::EntityID;
+use crate::worker::{EntityID, WorkerID};
 
 /// Unique identifier assigned to each error event.
 pub type ErrorInstanceID = u64;
@@ -260,6 +260,12 @@ impl MWFErr {
             return Err(MWFError::Entity_Invalid { entity_id: error_source.clone() });
         }
         MWFErr::add_error_internal(error_source, None, error)
+    }
+
+    /// Records a worker error without allowing error reporting to interrupt worker execution.
+    pub(crate) fn record_worker_error(worker_id: &WorkerID, callback_name: Option<String>, error: &anyhow::Error) {
+        // Error reporting is best-effort and must never affect the worker lifecycle.
+        let _ = MWFErr::add_error_internal(&EntityID::Worker(worker_id.clone()), callback_name, error);
     }
 
     /// Wait until new error events are available for the current MWF instance.

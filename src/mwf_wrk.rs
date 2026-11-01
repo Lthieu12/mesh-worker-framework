@@ -243,13 +243,13 @@ impl MWFWrk {
                 // an orphan worker running.
                 join_handle.abort();
 
-                MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerSpawn, LogStatus::Error)?;
+                MWFLog::log_worker_event(action_start_timer, &worker_id, LogAction::WorkerSpawn, LogStatus::Error);
 
                 return Err(error);
             }
         }
 
-        MWFLog::add_log(action_start_timer, &worker_id, LogAction::WorkerSpawn, LogStatus::Ok)?;
+        MWFLog::log_worker_event(action_start_timer, &worker_id, LogAction::WorkerSpawn, LogStatus::Ok);
 
         drop(mwf_data_guard);
 
