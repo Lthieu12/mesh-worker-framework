@@ -1,7 +1,16 @@
-//! Verifies persistent file logging, including file creation,
-//! log writing and automatic shutdown when the maximum file
-//! size is reached.
-
+//! Verifies that reaching the maximum log file size disables file logging
+//! without interrupting in-memory logging.
+//!
+//! Test scenario:
+//! 1. Initialize MWF with a small maximum log file size.
+//! 2. Enable logging for all workers and file logging.
+//! 3. Spawn and initialize a simulation worker.
+//! 4. Send enough messages to reach the maximum log file size.
+//! 5. Close the worker and verify that its close event is still available
+//!    in the in-memory log buffer.
+//! 6. Close MWF and read the generated log file.
+//! 7. Verify that the file contains the expected events and the size-limit
+//!    notification, but no events generated after file logging was disabled.
 use serial_test::serial;
 
 use dev_support::simulation_worker::{SimulationBehavior, SimulationWorker, SimulationWorkerConfig};
@@ -43,6 +52,12 @@ async fn test_file_logging() {
 
     MWFWrk::wait_worker_close(&worker_id, None).await.unwrap();
 
+    // Verify that worker close events remain available in memory
+    // after file logging has been disabled.
+    let log_list = MWFLog::wait_log(None).await.unwrap().expect("Expected log events");
+
+    assert!(log_list.log_event_list.iter().any(|log_event| { matches!(&log_event.log_action, LogAction::WorkerClose) && log_event.log_status == LogStatus::Ok }));
+
     MWF::close().unwrap();
 
     println!("{:?}", std::env::current_dir().unwrap());
@@ -59,4 +74,5 @@ async fn test_file_logging() {
     assert!(log_file.contains("MESSAGE"));
     assert!(log_file.contains("Maximum log file size reached."));
     assert!(log_file.contains("File logging disabled."));
+    assert!(!log_file.contains(",CLOSE,"));
 }

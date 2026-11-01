@@ -12,6 +12,7 @@ use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 
 use crate::MWF;
+use crate::MWFErr;
 use crate::framework_error::{MWFError, MWFPanic};
 use crate::log_file::write_log_event;
 use crate::message::{MessageID, MessageInstanceID};
@@ -433,7 +434,17 @@ impl MWFLog {
         let log_event = LogEvent { log_instance_id, timestamp_rfc3339, worker_id: worker_id.to_owned(), log_action, log_status, duration_ms };
 
         // Write the log event to the log file if enabled.
-        write_log_event(logging_data, &log_event)?;
+        let file_error = match write_log_event(logging_data, &log_event) {
+            Ok(()) => None,
+
+            Err(error) => {
+                // Disable file logging without affecting memory logging.
+                logging_data.log_file_enabled = false;
+                logging_data.log_file = None;
+
+                Some(error)
+            }
+        };
 
         // Circular buffer behavior.
         if logging_data.log_event_list.len() >= logging_data.log_event_buffer_capacity {
@@ -446,6 +457,12 @@ impl MWFLog {
         // Notify all waiters that a new log event
         // has been added to the buffer.
         MWF_LOG_NOTIFY.notify_waiters();
+
+        // Report file logging failures through MWFErr.
+        if let Some(error) = file_error {
+            let error = anyhow::Error::new(error);
+            let _ = MWFErr::add_error_internal(&EntityID::Worker(worker_id.clone()), Some("MWFLog::add_log".into()), &error);
+        }
 
         Ok(())
     }
