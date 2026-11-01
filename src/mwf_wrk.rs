@@ -480,8 +480,10 @@ impl MWFWrk {
         drop(MWF::validate_api_context()?);
 
         // A worker cannot wait for its own initialization.
-        if current_worker_id().is_some_and(|current_id| worker_ids.contains(&current_id)) {
-            return Err(MWFError::Worker_CannotWaitForSelf);
+        if let Some(current_id) = current_worker_id() {
+            if worker_ids.contains(&current_id) {
+                return Err(MWFError::Worker_CannotWaitForSelf);
+            }
         }
 
         let wait_future = async {
@@ -577,8 +579,10 @@ impl MWFWrk {
         drop(MWF::validate_api_context()?);
 
         // A worker cannot wait for its own closure.
-        if current_worker_id().is_some_and(|current_id| worker_ids.contains(&current_id)) {
-            return Err(MWFError::Worker_CannotWaitForSelf);
+        if let Some(current_id) = current_worker_id() {
+            if worker_ids.contains(&current_id) {
+                return Err(MWFError::Worker_CannotWaitForSelf);
+            }
         }
 
         let wait_future = async {
