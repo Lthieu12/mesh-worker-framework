@@ -145,8 +145,9 @@ pub(crate) fn write_log_event(logging_data: &mut LoggingData, log_event: &LogEve
 
         log_file.flush().map_err(|error| log_file_access_failed(error, log_file_path))?;
 
-        // Close the log file.
+        // Close the log file and disable file logging.
         logging_data.log_file = None;
+        logging_data.log_file_enabled = false;
     }
 
     Ok(())
