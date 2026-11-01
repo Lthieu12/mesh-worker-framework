@@ -350,12 +350,19 @@ impl MWFWrk {
     /// The worker state is immediately changed to Initializing.
     /// This function only queues the Init command and does not wait
     /// for on_init() completion.
+    ///
+    /// This function cannot be called by a worker to initialize itself.
     pub async fn init_worker<TInitData>(worker_id: &WorkerID, init_data: &TInitData) -> Result<(), MWFError>
     where
         TInitData: Clone + Send + Sync + 'static,
     {
         // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
         drop(MWF::validate_api_context()?);
+
+        // A worker cannot initialize itself.
+        if current_worker_id().as_ref() == Some(worker_id) {
+            return Err(MWFError::Worker_CannotManageSelf);
+        }
 
         // Change worker state to Initializing
         // and read MWF data to retrieve the worker channel
@@ -385,12 +392,19 @@ impl MWFWrk {
     /// The worker state is immediately changed to Closing.
     /// This function only queues the Close command and does not wait
     /// for on_close() completion.
+    ///
+    /// This function cannot be called by a worker to close itself.
     pub async fn close_worker<TCloseData>(worker_id: &WorkerID, close_data: &TCloseData) -> Result<(), MWFError>
     where
         TCloseData: Clone + Send + Sync + 'static,
     {
         // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
         drop(MWF::validate_api_context()?);
+
+        // A worker cannot close itself.
+        if current_worker_id().as_ref() == Some(worker_id) {
+            return Err(MWFError::Worker_CannotManageSelf);
+        }
 
         // Change worker state to Closing
         // and read MWF data to retrieve the worker channel
@@ -459,9 +473,16 @@ impl MWFWrk {
     /// timeout_ms:
     /// - None => wait indefinitely.
     /// - Some(value) => return Operation_Timeout if the delay expires.
+    ///
+    /// A worker cannot wait for its own initialization.
     pub async fn wait_worker_list_init(worker_ids: &Vec<WorkerID>, timeout_ms: Option<u64>) -> Result<(), MWFError> {
         // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
         drop(MWF::validate_api_context()?);
+
+        // A worker cannot wait for its own initialization.
+        if current_worker_id().is_some_and(|current_id| worker_ids.contains(&current_id)) {
+            return Err(MWFError::Worker_CannotWaitForSelf);
+        }
 
         let wait_future = async {
             loop {
@@ -549,9 +570,16 @@ impl MWFWrk {
     /// timeout_ms:
     /// - None => wait indefinitely.
     /// - Some(value) => return Operation_Timeout if the delay expires.
+    ///
+    /// A worker cannot wait for its own closure.
     pub async fn wait_worker_list_close(worker_ids: &Vec<WorkerID>, timeout_ms: Option<u64>) -> Result<(), MWFError> {
         // Ensure MWF is initialized and the current worker is still registered, when called from a worker context.
         drop(MWF::validate_api_context()?);
+
+        // A worker cannot wait for its own closure.
+        if current_worker_id().is_some_and(|current_id| worker_ids.contains(&current_id)) {
+            return Err(MWFError::Worker_CannotWaitForSelf);
+        }
 
         let wait_future = async {
             loop {

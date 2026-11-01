@@ -87,7 +87,10 @@ pub enum MWFError {
     /// a message sent through send_message_and_wait_reply().
     Worker_MessageError(anyhow::Error),
 
-    /// A worker cannot wait for a message sent to itself.
+    /// A worker cannot initialize or close itself.
+    Worker_CannotManageSelf,
+
+    /// A worker cannot wait for itself.
     Worker_CannotWaitForSelf,
 
     /// The worker already has an active message wait.
@@ -234,8 +237,12 @@ impl fmt::Display for MWFError {
                 write!(f, "Worker message processing failed: {}", error)
             }
 
+            MWFError::Worker_CannotManageSelf => {
+                write!(f, "A worker cannot initialize or close itself.")
+            }
+
             MWFError::Worker_CannotWaitForSelf => {
-                write!(f, "A worker cannot wait for a message sent to itself.")
+                write!(f, "A worker cannot wait for itself.")
             }
 
             MWFError::Worker_AlreadyWaiting { sender_id, waiting_receiver_id, waiting_message_id } => {
