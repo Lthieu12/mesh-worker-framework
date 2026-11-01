@@ -31,8 +31,6 @@ pub use mwf_wrk::MWFWrk;
 
 pub use framework_error::MWFError;
 
-pub use worker::WorkerError;
-
-pub use worker::{EntityID, ExternalID, Worker, WorkerID, WorkerInfo, WorkerList, WorkerOutputFormat, WorkerState, WorkerStatus, WorkerTypeID};
+pub use worker::{EntityID, ExternalID, Worker, WorkerID, WorkerInfo, WorkerList, WorkerOutputFormat, WorkerState, WorkerStatus, WorkerTypeID, WorkerError};
 
 pub use message::{MessageData, MessageID, MessageWaitMode, WorkerMessage};
