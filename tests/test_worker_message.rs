@@ -3,10 +3,13 @@
 //! Test scenarios:
 //!
 //! - `test_message_priority_order`:
-//!   - Send normal messages and priority messages to a worker.
+//!   - Start processing a normal message.
+//!   - Queue additional normal messages while the first message is being processed.
+//!   - Wait until the second normal message starts processing.
+//!   - Send priority messages while another normal message is pending.
 //!   - Verify that normal messages are processed using FIFO ordering.
 //!   - Verify that priority messages are processed using LIFO ordering.
-//!   - Verify that priority messages are processed before pending normal messages.
+//!   - Verify that priority messages are processed before normal messages already pending in the internal queue.
 //!
 //! - `test_send_message_and_wait`:
 //!   - Create two workers.
@@ -74,7 +77,11 @@ async fn test_message_priority_order() {
 
     // Wait until the first normal message callback has started.
     loop {
-        let log_list = tokio::time::timeout(Duration::from_secs(5), MWFLog::wait_log(last_log_instance_id)).await.expect("NORMAL_1 did not start").unwrap().expect("Expected log events");
+        let log_list = tokio::time::timeout(Duration::from_secs(5), MWFLog::wait_log(last_log_instance_id))
+            .await
+            .expect("NORMAL_1 did not start")
+            .unwrap()
+            .expect("Expected log events");
 
         last_log_instance_id = log_list.last_log_instance_id;
 
@@ -101,7 +108,11 @@ async fn test_message_priority_order() {
     // At this point, NORMAL_3 has already been collected into PendingCommands.
     // Priority messages sent now must bypass this pending normal command.
     loop {
-        let log_list = tokio::time::timeout(Duration::from_secs(5), MWFLog::wait_log(last_log_instance_id)).await.expect("NORMAL_2 did not start").unwrap().expect("Expected log events");
+        let log_list = tokio::time::timeout(Duration::from_secs(5), MWFLog::wait_log(last_log_instance_id))
+            .await
+            .expect("NORMAL_2 did not start")
+            .unwrap()
+            .expect("Expected log events");
 
         last_log_instance_id = log_list.last_log_instance_id;
 
@@ -128,11 +139,23 @@ async fn test_message_priority_order() {
 
     // Wait until all five messages have been processed.
     while completed_message_count < 5 {
-        let log_list = tokio::time::timeout(Duration::from_secs(5), MWFLog::wait_log(last_log_instance_id)).await.expect("Message processing did not complete").unwrap().expect("Expected log events");
+        let log_list = tokio::time::timeout(Duration::from_secs(5), MWFLog::wait_log(last_log_instance_id))
+            .await
+            .expect("Message processing did not complete")
+            .unwrap()
+            .expect("Expected log events");
 
         last_log_instance_id = log_list.last_log_instance_id;
 
-        completed_message_count += log_list.log_event_list.iter().filter(|log_event| log_event.worker_id == worker_a_id && log_event.log_status == LogStatus::Ok && matches!(&log_event.log_action, LogAction::WorkerMessage { .. })).count();
+        completed_message_count += log_list
+            .log_event_list
+            .iter()
+            .filter(|log_event| {
+                log_event.worker_id == worker_a_id
+                    && log_event.log_status == LogStatus::Ok
+                    && matches!(&log_event.log_action, LogAction::WorkerMessage { .. })
+            })
+            .count();
     }
 
     let log_list = MWFLog::wait_log(None).await.unwrap().expect("Expected log events");
