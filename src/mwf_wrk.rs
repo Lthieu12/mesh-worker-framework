@@ -3,7 +3,7 @@
 //! This API exposes the framework entry points used to
 //! manage workers and send messages.
 
-mod methods;
+mod functions;
 mod types;
 
 pub(crate) use types::WorkerData;
