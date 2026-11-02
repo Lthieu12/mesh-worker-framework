@@ -34,6 +34,17 @@
 //!     for channel capacity for both message completion modes.
 //!   - Verify that messages accepted before shutdown are processed before the Close command.
 //!   - Verify that the rejected message is never processed.
+//!
+//! - `test_multiple_workers_send_and_wait_to_same_receiver`:
+//!   - Create three workers.
+//!   - Configure two workers to send a message to the third worker
+//!     and wait for its completion.
+//!   - Trigger both senders concurrently.
+//!   - Verify that both senders can wait for the same receiver simultaneously.
+//!   - Verify that the receiver processes the messages sequentially.
+//!   - Verify that the second sender waits for the first message to finish
+//!     before its own message is processed.
+//!   - Verify that both senders receive successful completion results.
 use serial_test::serial;
 use std::future::Future;
 use std::time::Duration;
@@ -495,4 +506,105 @@ async fn test_send_priority_message_racing_with_worker_close() {
     // Both messages accepted before closing must have been processed.
     // The message waiting for capacity must never reach the callback.
     assert_eq!(processed_message_ids, vec![MESSAGE_BLOCKING.to_string(), MESSAGE_QUEUED_PRIORITY.to_string()]);
+}
+
+// MWF uses a global runtime instance.
+// Integration tests must run serially.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+async fn test_multiple_workers_send_and_wait_to_same_receiver() {
+    MWF::init().unwrap();
+
+    MWFLog::set_log_mode(LogMode::LogAll, None).unwrap();
+
+    MWF::register_worker_type::<SimulationWorker>().unwrap();
+
+    // Spawn and initialize receiver C.
+    let worker_c_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
+
+    let configuration_c = SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::Message_Wait { message_delay_ms: 250 }, wait_children_close: false, wait_children_close_timeout_ms: None };
+
+    MWFWrk::init_worker(&worker_c_id, &configuration_c).await.unwrap();
+    MWFWrk::wait_worker_init(&worker_c_id, Some(1000)).await.unwrap();
+
+    // Spawn and initialize senders A and B.
+    let worker_a_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
+
+    let worker_b_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &EntityID::new_external("MAIN")).unwrap();
+
+    let configuration_a = SimulationWorkerConfig {
+        init_delay_ms: 0,
+        close_delay_ms: 0,
+        simulation_behavior: SimulationBehavior::Message_SendAndWait { target_worker_id: worker_c_id.clone(), message_id: MESSAGE_CHAIN.into(), timeout_ms: Some(2000), message_delay_ms: 0 },
+        wait_children_close: false,
+        wait_children_close_timeout_ms: None,
+    };
+
+    let configuration_b = SimulationWorkerConfig {
+        init_delay_ms: 0,
+        close_delay_ms: 0,
+        simulation_behavior: SimulationBehavior::Message_SendAndWait { target_worker_id: worker_c_id.clone(), message_id: MESSAGE_CHAIN.into(), timeout_ms: Some(2000), message_delay_ms: 0 },
+        wait_children_close: false,
+        wait_children_close_timeout_ms: None,
+    };
+
+    MWFWrk::init_worker(&worker_a_id, &configuration_a).await.unwrap();
+    MWFWrk::init_worker(&worker_b_id, &configuration_b).await.unwrap();
+
+    MWFWrk::wait_worker_init(&worker_a_id, Some(1000)).await.unwrap();
+    MWFWrk::wait_worker_init(&worker_b_id, Some(1000)).await.unwrap();
+
+    let message_id_a = MESSAGE_CHAIN.to_string();
+    let message_id_b = MESSAGE_CHAIN.to_string();
+
+    let sender_id_a = EntityID::new_external("MAIN");
+    let sender_id_b = EntityID::new_external("MAIN");
+
+    // Trigger both senders concurrently and wait for their completion.
+    let (result_a, result_b) = tokio::join!(MWFWrk::send_message_and_wait(&sender_id_a, &worker_a_id, &message_id_a, MessageWaitMode::WaitThisMessage, &(), Some(2000),), MWFWrk::send_message_and_wait(&sender_id_b, &worker_b_id, &message_id_b, MessageWaitMode::WaitThisMessage, &(), Some(2000),),);
+
+    assert!(result_a.is_ok(), "Worker A failed: {result_a:?}");
+    assert!(result_b.is_ok(), "Worker B failed: {result_b:?}");
+
+    // Display framework logs after both message flows have completed.
+    print_log_list().await;
+
+    let log_list = MWFLog::wait_log(None).await.unwrap().expect("Expected log events");
+
+    let messages_a = filter_messages(&log_list, &worker_a_id);
+    let messages_b = filter_messages(&log_list, &worker_b_id);
+    let messages_c = filter_messages(&log_list, &worker_c_id);
+
+    // Each sender must have received its trigger and completed its send-and-wait.
+    assert_eq!(messages_a.len(), 2);
+    assert_eq!(messages_b.len(), 2);
+
+    assert_eq!(messages_a[0].log_status, LogStatus::Start);
+    assert_eq!(messages_a[1].log_status, LogStatus::Ok);
+
+    assert_eq!(messages_b[0].log_status, LogStatus::Start);
+    assert_eq!(messages_b[1].log_status, LogStatus::Ok);
+
+    // Receiver C must have processed both messages.
+    assert_eq!(messages_c.len(), 4);
+    assert_eq!(messages_c[0].log_status, LogStatus::Start);
+    assert_eq!(messages_c[1].log_status, LogStatus::Ok);
+    assert_eq!(messages_c[2].log_status, LogStatus::Start);
+    assert_eq!(messages_c[3].log_status, LogStatus::Ok);
+
+    // The second sender must include the first message's processing time in its wait duration.
+    let duration_a_ms = messages_a[1].log_event.duration_ms.unwrap();
+    let duration_b_ms = messages_b[1].log_event.duration_ms.unwrap();
+
+    let max_duration_ms = duration_a_ms.max(duration_b_ms);
+
+    assert!(max_duration_ms >= 400, "Expected the second sender to wait for the first message to finish, but durations were A={duration_a_ms}ms and B={duration_b_ms}ms");
+
+    MWFWrk::close_worker(&worker_a_id, &()).await.unwrap();
+    MWFWrk::close_worker(&worker_b_id, &()).await.unwrap();
+    MWFWrk::close_worker(&worker_c_id, &()).await.unwrap();
+
+    MWFWrk::wait_children_close(&EntityID::new_external("MAIN"), Some(1000)).await.unwrap();
+
+    MWF::close().unwrap();
 }
