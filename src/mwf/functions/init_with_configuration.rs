@@ -10,6 +10,7 @@ use super::super::MWF_TIMESTAMP_FORMAT;
 use super::super::MWF_WRK_DATA;
 use super::super::MWF_WRK_MESSAGE_FLOW_COUNTER;
 use super::super::MWF_WRK_MESSAGE_INSTANCE_COUNTER;
+use super::super::MWF_WRK_MESSAGE_WAIT_DATA;
 use super::super::MWFConfiguration;
 use super::super::MWFData;
 use crate::log_file;
@@ -19,7 +20,7 @@ use crate::mwf_err::ErrorData;
 use crate::mwf_log::LogMode;
 use crate::mwf_log::LoggingData;
 use crate::mwf_wrk::WorkerData;
-use crate::wait_registry::{MWF_MESSAGE_WAIT_DATA, MessageWaitData};
+use crate::mwf_wrk::types::MessageWaitData;
 use crate::worker_task::current_worker_id;
 use std::collections::VecDeque;
 use std::sync::atomic::Ordering;
@@ -95,7 +96,7 @@ impl MWF {
         drop(mwf_log_data_guard);
 
         // Initialize message wait and flow data.
-        let mut message_wait_data_guard = MWF_MESSAGE_WAIT_DATA.write().expect(MWFPanic::MWFMessageWaitData_WriteLockPoisoned.message());
+        let mut message_wait_data_guard = MWF_WRK_MESSAGE_WAIT_DATA.write().expect(MWFPanic::MWFMessageWaitData_WriteLockPoisoned.message());
         *message_wait_data_guard = Some(MessageWaitData::new());
         drop(message_wait_data_guard);
 

@@ -6,8 +6,7 @@
 mod functions;
 mod types;
 
-pub(crate) use types::ErrorData;
-pub(crate) use types::terminal_error_column;
+pub(crate) use types::{ErrorData, terminal_error_column};
 pub use types::{ErrorEvent, ErrorInstanceID, ErrorList, ErrorOutputFormat};
 
 pub use types::MWFErr;

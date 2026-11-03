@@ -5,11 +5,11 @@ use super::super::MWF_ERR_NOTIFY;
 use super::super::MWF_LOG_DATA;
 use super::super::MWF_LOG_NOTIFY;
 use super::super::MWF_WRK_DATA;
+use super::super::MWF_WRK_MESSAGE_WAIT_DATA;
 use crate::MWFErr;
 use crate::MWFLog;
 use crate::mwf::MWFError;
 use crate::mwf::MWFPanic;
-use crate::wait_registry::MWF_MESSAGE_WAIT_DATA;
 use crate::worker_task::current_worker_id;
 
 impl MWF {
@@ -55,7 +55,7 @@ impl MWF {
         let mut mwf_wrk_data_guard = MWF_WRK_DATA.write().expect(MWFPanic::MWFWrkData_WriteLockPoisoned.message());
         let mut mwf_err_data_guard = MWF_ERR_DATA.write().expect(MWFPanic::MWFErrData_WriteLockPoisoned.message());
         let mut mwf_log_data_guard = MWF_LOG_DATA.write().expect(MWFPanic::MWFLogData_WriteLockPoisoned.message());
-        let mut message_wait_data_guard = MWF_MESSAGE_WAIT_DATA.write().expect(MWFPanic::MWFMessageWaitData_WriteLockPoisoned.message());
+        let mut message_wait_data_guard = MWF_WRK_MESSAGE_WAIT_DATA.write().expect(MWFPanic::MWFMessageWaitData_WriteLockPoisoned.message());
 
         // Make sure no worker has been spawned during the shutdown sequence.
         let mwf_wrk_data = mwf_wrk_data_guard.as_ref().expect(MWFPanic::MWFWrkData_Missing.message());

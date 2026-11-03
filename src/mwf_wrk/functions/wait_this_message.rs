@@ -2,7 +2,8 @@ use std::time::Duration;
 use tokio::sync::oneshot;
 
 use crate::channel::{WorkerChannel, WorkerCommand, send_worker_command};
-use crate::mwf::{MWFError, WorkerError};
+use crate::mwf::MWFError;
+use crate::mwf_wrk::types::WorkerError;
 use crate::mwf_wrk::types::{EntityID, MessageID, MessageInheritanceContext, MessageInstanceID, WorkerID, WorkerMessage};
 
 /// Send a message and wait until its callback has completed.

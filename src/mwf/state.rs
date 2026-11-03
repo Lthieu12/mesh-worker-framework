@@ -8,6 +8,7 @@ use super::types::{MWFData, TimestampFormat};
 use crate::mwf_err::ErrorData;
 use crate::mwf_log::{LogMode, LoggingData};
 use crate::mwf_wrk::WorkerData;
+use crate::mwf_wrk::types::MessageWaitData;
 
 /// Global MWF instance counter.
 pub(crate) static MWF_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -30,6 +31,9 @@ pub(crate) static MWF_WRK_MESSAGE_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(1
 
 /// Global MWF message flow counter used to identify message flows.
 pub(crate) static MWF_WRK_MESSAGE_FLOW_COUNTER: AtomicU64 = AtomicU64::new(1);
+
+/// Global MWF message wait and flow storage.
+pub(crate) static MWF_WRK_MESSAGE_WAIT_DATA: LazyLock<RwLock<Option<MessageWaitData>>> = LazyLock::new(|| RwLock::new(None));
 
 /// Global MWF error event storage.
 pub(crate) static MWF_ERR_DATA: LazyLock<RwLock<Option<ErrorData>>> = LazyLock::new(|| RwLock::new(None));

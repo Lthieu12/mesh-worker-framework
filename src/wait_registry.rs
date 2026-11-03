@@ -4,32 +4,11 @@
 //! and the operations used to register, complete and clean up waits and flows.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::{LazyLock, RwLock};
 use std::time::Instant;
 use tokio::sync::oneshot;
 
-use crate::mwf::{MWFError, MWFPanic, WorkerError};
-use crate::mwf_wrk::types::{MessageFlowID, MessageID, MessageInstanceID, MessageWaitMode, WorkerID};
-
-/// Global MWF message wait and flow storage.
-pub(crate) static MWF_MESSAGE_WAIT_DATA: LazyLock<RwLock<Option<MessageWaitData>>> = LazyLock::new(|| RwLock::new(None));
-
-/// Internal data used to manage message waits and flows.
-#[derive(Debug)]
-pub(crate) struct MessageWaitData {
-    /// Active message flows and their reply channels.
-    pub(crate) message_flow_registry: HashMap<MessageFlowID, MessageFlowState>,
-
-    /// Workers currently waiting for message completion.
-    pub(crate) waiting_worker_registry: HashMap<WorkerID, WorkerWaitState>,
-}
-
-impl MessageWaitData {
-    /// Create an empty message wait registry.
-    pub(crate) fn new() -> Self {
-        Self { message_flow_registry: HashMap::new(), waiting_worker_registry: HashMap::new() }
-    }
-}
+use crate::mwf::{MWF_WRK_MESSAGE_WAIT_DATA, MWFError, MWFPanic};
+use crate::mwf_wrk::types::{MessageFlowID, MessageID, MessageInstanceID, MessageWaitMode, WorkerError, WorkerID};
 
 /// Runtime state associated with an active message flow.
 #[derive(Debug)]
@@ -88,7 +67,7 @@ impl Drop for MessageFlowRegistrationGuard {
         }
 
         // Do not panic during cleanup if the registry lock is poisoned.
-        let Ok(mut message_wait_data_guard) = MWF_MESSAGE_WAIT_DATA.write() else {
+        let Ok(mut message_wait_data_guard) = MWF_WRK_MESSAGE_WAIT_DATA.write() else {
             return;
         };
 
@@ -118,7 +97,7 @@ pub(crate) struct WorkerWaitGuard {
 impl Drop for WorkerWaitGuard {
     fn drop(&mut self) {
         // Do not panic during cleanup if the registry lock is poisoned.
-        let Ok(mut message_wait_data_guard) = MWF_MESSAGE_WAIT_DATA.write() else {
+        let Ok(mut message_wait_data_guard) = MWF_WRK_MESSAGE_WAIT_DATA.write() else {
             return;
         };
 
@@ -138,7 +117,7 @@ impl Drop for WorkerWaitGuard {
 
 /// Register a new message flow before submitting its initial message.
 pub(crate) fn register_message_flow(message_flow_id: MessageFlowID, worker_id: WorkerID, reply_sender: oneshot::Sender<Result<(), MWFError>>) -> Result<MessageFlowRegistrationGuard, MWFError> {
-    let mut message_wait_data_guard = MWF_MESSAGE_WAIT_DATA.write().expect(MWFPanic::MWFMessageWaitData_WriteLockPoisoned.message());
+    let mut message_wait_data_guard = MWF_WRK_MESSAGE_WAIT_DATA.write().expect(MWFPanic::MWFMessageWaitData_WriteLockPoisoned.message());
 
     let message_wait_data = message_wait_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
 
@@ -167,7 +146,7 @@ pub(crate) fn register_worker_wait(sender_id: &WorkerID, wait_state: WorkerWaitS
     let message_instance_id = wait_state.message_instance_id;
 
     // Lock the registry to check and register the wait atomically.
-    let mut message_wait_data_guard = MWF_MESSAGE_WAIT_DATA.write().expect(MWFPanic::MWFMessageWaitData_WriteLockPoisoned.message());
+    let mut message_wait_data_guard = MWF_WRK_MESSAGE_WAIT_DATA.write().expect(MWFPanic::MWFMessageWaitData_WriteLockPoisoned.message());
 
     let message_wait_data = message_wait_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
 
@@ -244,7 +223,7 @@ pub(crate) fn complete_message_flow(message_flow_id: MessageFlowID, worker_id: &
 ///
 /// Only the worker that owns the flow may remove it.
 fn take_message_flow(message_flow_id: MessageFlowID, worker_id: &WorkerID) -> Result<MessageFlowState, MWFError> {
-    let mut message_wait_data_guard = MWF_MESSAGE_WAIT_DATA.write().expect(MWFPanic::MWFMessageWaitData_WriteLockPoisoned.message());
+    let mut message_wait_data_guard = MWF_WRK_MESSAGE_WAIT_DATA.write().expect(MWFPanic::MWFMessageWaitData_WriteLockPoisoned.message());
 
     let message_wait_data = message_wait_data_guard.as_mut().ok_or(MWFError::Framework_NotInitialized)?;
 
@@ -265,7 +244,7 @@ fn take_message_flow(message_flow_id: MessageFlowID, worker_id: &WorkerID) -> Re
 pub(crate) fn cleanup_worker_task_message_flows(worker_id: &WorkerID) -> Result<(), MWFError> {
     // Remove all flows owned by this worker while holding the registry lock.
     let flow_states = {
-        let mut message_wait_data_guard = MWF_MESSAGE_WAIT_DATA.write().map_err(|_| MWFError::MessageWait_RegistryInconsistent)?;
+        let mut message_wait_data_guard = MWF_WRK_MESSAGE_WAIT_DATA.write().map_err(|_| MWFError::MessageWait_RegistryInconsistent)?;
 
         // Nothing to clean up if the framework data has already been destroyed.
         let Some(message_wait_data) = message_wait_data_guard.as_mut() else {
@@ -287,7 +266,7 @@ pub(crate) fn cleanup_worker_task_message_flows(worker_id: &WorkerID) -> Result<
 
 /// Returns whether a message flow is active and owned by the specified worker.
 pub(crate) fn is_message_flow_active_for_worker(message_flow_id: MessageFlowID, worker_id: &WorkerID) -> bool {
-    let message_wait_data_guard = MWF_MESSAGE_WAIT_DATA.read().expect(MWFPanic::MWFMessageWaitData_ReadLockPoisoned.message());
+    let message_wait_data_guard = MWF_WRK_MESSAGE_WAIT_DATA.read().expect(MWFPanic::MWFMessageWaitData_ReadLockPoisoned.message());
 
     message_wait_data_guard.as_ref().and_then(|message_wait_data| message_wait_data.message_flow_registry.get(&message_flow_id)).is_some_and(|message_flow_state| &message_flow_state.worker_id == worker_id)
 }

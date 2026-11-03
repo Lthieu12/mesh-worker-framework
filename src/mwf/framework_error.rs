@@ -8,8 +8,6 @@ use std::fmt;
 use crate::mwf_wrk::types::MessageID;
 use crate::mwf_wrk::types::{EntityID, WorkerID, WorkerTypeID};
 
-pub type WorkerError = anyhow::Error;
-
 /// Errors returned by MWF functions.
 ///
 /// Naming convention:

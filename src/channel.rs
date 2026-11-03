@@ -18,7 +18,8 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
 use crate::mwf::MWF_WRK_DATA;
-use crate::mwf::{MWFError, MWFPanic, WorkerError};
+use crate::mwf::{MWFError, MWFPanic};
+use crate::mwf_wrk::types::WorkerError;
 use crate::mwf_wrk::types::{EntityID, WorkerID, WorkerState};
 use crate::mwf_wrk::types::{MessageData, MessageID, WorkerMessage};
 use crate::worker_registry::Registry;
