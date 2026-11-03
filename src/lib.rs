@@ -3,6 +3,7 @@
 mod channel;
 mod log_file;
 mod string_helper;
+mod wait_registry;
 mod worker_registry;
 mod worker_task;
 mod worker_type_registry;

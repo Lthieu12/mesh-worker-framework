@@ -1,7 +1,7 @@
 use super::super::MWFWrk;
-use crate::mwf_wrk::functions::is_message_flow_active_for_worker;
 use crate::mwf_wrk::types::MessageInheritanceContext;
 use crate::mwf_wrk::types::WorkerID;
+use crate::wait_registry::is_message_flow_active_for_worker;
 use crate::worker_task::current_message_inheritance_context;
 use crate::worker_task::current_worker_id;
 

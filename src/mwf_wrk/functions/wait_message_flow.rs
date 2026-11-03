@@ -5,7 +5,7 @@ use crate::channel::{WorkerChannel, WorkerCommand, send_worker_command};
 use crate::mwf::MWFError;
 use crate::mwf_wrk::types::{EntityID, MessageFlowID, MessageID, MessageInheritanceContext, MessageInstanceID, WorkerID, WorkerMessage};
 
-use super::register_message_flow;
+use crate::wait_registry::register_message_flow;
 
 /// Send a message and wait until its entire message flow has completed.
 #[allow(clippy::too_many_arguments)]

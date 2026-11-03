@@ -36,10 +36,10 @@ use crate::channel::{WorkerCommand, WorkerNormalReceiverChannel, WorkerPriorityR
 use crate::mwf::MWFPanic;
 use crate::mwf::{MWF_WRK_CLOSE_NOTIFY, MWF_WRK_DATA, MWF_WRK_INIT_NOTIFY};
 use crate::mwf_log::{LogAction, LogStatus};
-use crate::mwf_wrk::functions::{cleanup_worker_task_message_flows, is_message_flow_active_for_worker};
 use crate::mwf_wrk::traits::Worker;
 use crate::mwf_wrk::types::{EntityID, WorkerError, WorkerID, WorkerState};
 use crate::mwf_wrk::types::{MessageInheritanceContext, WorkerMessage};
+use crate::wait_registry::{cleanup_worker_task_message_flows, is_message_flow_active_for_worker};
 
 tokio::task_local! {
     /// Execution context of the current MWF worker task.

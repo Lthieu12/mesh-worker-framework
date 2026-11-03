@@ -4,12 +4,12 @@ use super::super::MWF_ERR_DATA;
 use super::super::MWF_ERR_NOTIFY;
 use super::super::MWF_LOG_DATA;
 use super::super::MWF_LOG_NOTIFY;
-use super::super::MWF_MESSAGE_WAIT_DATA;
 use super::super::MWF_WRK_DATA;
 use crate::MWFErr;
 use crate::MWFLog;
 use crate::mwf::MWFError;
 use crate::mwf::MWFPanic;
+use crate::wait_registry::MWF_MESSAGE_WAIT_DATA;
 use crate::worker_task::current_worker_id;
 
 impl MWF {
