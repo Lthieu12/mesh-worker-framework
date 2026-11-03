@@ -1,10 +1,10 @@
 use super::super::ErrorInstanceID;
 use super::super::ErrorList;
 use super::super::MWFErr;
-use crate::framework_error::MWFError;
-use crate::framework_error::MWFPanic;
 use crate::mwf::MWF_ERR_DATA;
 use crate::mwf::MWF_INSTANCE_COUNTER;
+use crate::mwf::MWFError;
+use crate::mwf::MWFPanic;
 use std::sync::atomic::Ordering;
 
 impl MWFErr {

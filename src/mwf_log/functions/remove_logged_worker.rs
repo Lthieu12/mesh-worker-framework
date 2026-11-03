@@ -1,8 +1,8 @@
 use super::super::MWFLog;
-use crate::framework_error::MWFError;
-use crate::framework_error::MWFPanic;
 use crate::mwf::MWF_LOG_DATA;
-use crate::worker::WorkerID;
+use crate::mwf::MWFError;
+use crate::mwf::MWFPanic;
+use crate::mwf_wrk::types::WorkerID;
 
 impl MWFLog {
     /// Remove a worker from the MWFLog selected worker list.

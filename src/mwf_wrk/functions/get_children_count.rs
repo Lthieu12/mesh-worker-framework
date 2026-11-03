@@ -1,7 +1,7 @@
 use super::super::MWFWrk;
-use crate::framework_error::MWFError;
 use crate::mwf::MWF;
-use crate::worker::EntityID;
+use crate::mwf::MWFError;
+use crate::mwf_wrk::types::EntityID;
 
 impl MWFWrk {
     /// Get the number of child workers of an entity.

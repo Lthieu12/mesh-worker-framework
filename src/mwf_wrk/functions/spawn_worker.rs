@@ -1,17 +1,17 @@
 use super::super::MWFWrk;
 use crate::MWFLog;
-use crate::framework_error::MWFError;
-use crate::framework_error::MWFPanic;
 use crate::mwf::MWF;
 use crate::mwf::MWF_DATA;
 use crate::mwf::MWF_WRK_DATA;
+use crate::mwf::MWFError;
+use crate::mwf::MWFPanic;
 use crate::mwf_log::LogAction;
 use crate::mwf_log::LogStatus;
-use crate::worker::EntityID;
-use crate::worker::Worker;
-use crate::worker::WorkerID;
-use crate::worker::WorkerState;
-use crate::worker::WorkerTypeID;
+use crate::mwf_wrk::traits::Worker;
+use crate::mwf_wrk::types::EntityID;
+use crate::mwf_wrk::types::WorkerID;
+use crate::mwf_wrk::types::WorkerState;
+use crate::mwf_wrk::types::WorkerTypeID;
 use crate::worker_task::spawn_worker_task;
 use std::time::Instant;
 

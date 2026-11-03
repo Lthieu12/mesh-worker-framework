@@ -5,8 +5,8 @@ use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Error, Write};
 use std::path::{Path, PathBuf};
 
-use crate::framework_error::MWFError;
 use crate::mwf::MWFConfiguration;
+use crate::mwf::MWFError;
 use crate::mwf_log::{LogEvent, LogList, LogOutputFormat, LoggingData};
 
 /// Header written at the beginning of every MWF log file.

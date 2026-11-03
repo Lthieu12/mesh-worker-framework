@@ -1,5 +1,5 @@
 use super::LogEvent;
-use crate::worker::WorkerID;
+use crate::mwf_wrk::types::WorkerID;
 use std::collections::VecDeque;
 use std::fs::File;
 use std::path::PathBuf;

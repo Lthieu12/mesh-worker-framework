@@ -1,7 +1,7 @@
 use super::ErrorInstanceID;
 use crate::mwf_err::terminal_error_column;
+use crate::mwf_wrk::types::EntityID;
 use crate::string_helper;
-use crate::worker::EntityID;
 
 /// Represents an error reported to MWFErr.
 ///

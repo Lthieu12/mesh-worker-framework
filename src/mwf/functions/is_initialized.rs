@@ -1,6 +1,6 @@
 use super::super::MWF;
 use super::super::MWF_DATA;
-use crate::framework_error::MWFPanic;
+use crate::mwf::MWFPanic;
 
 impl MWF {
     /// Check whether the framework is initialized.

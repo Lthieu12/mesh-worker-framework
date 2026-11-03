@@ -1,5 +1,5 @@
 use super::super::MWFWrk;
-use crate::worker::WorkerID;
+use crate::mwf_wrk::types::WorkerID;
 use std::collections::HashSet;
 
 impl MWFWrk {

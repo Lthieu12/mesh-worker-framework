@@ -1,5 +1,5 @@
-use crate::message::{MessageID, MessageInstanceID};
-use crate::worker::EntityID;
+use crate::mwf_wrk::types::EntityID;
+use crate::mwf_wrk::types::{MessageID, MessageInstanceID};
 
 /// Logged MWF action.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

@@ -1,6 +1,6 @@
 use super::super::MWFWrk;
-use crate::framework_error::MWFError;
-use crate::worker::WorkerID;
+use crate::mwf::MWFError;
+use crate::mwf_wrk::types::WorkerID;
 
 impl MWFWrk {
     /// Aborts a worker.

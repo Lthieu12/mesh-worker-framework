@@ -1,12 +1,12 @@
 use super::super::ErrorEvent;
 use super::super::MWFErr;
 use crate::MWF;
-use crate::framework_error::MWFError;
-use crate::framework_error::MWFPanic;
 use crate::mwf::MWF_ERR_DATA;
 use crate::mwf::MWF_ERR_INSTANCE_COUNTER;
 use crate::mwf::MWF_ERR_NOTIFY;
-use crate::worker::EntityID;
+use crate::mwf::MWFError;
+use crate::mwf::MWFPanic;
+use crate::mwf_wrk::types::EntityID;
 use std::sync::atomic::Ordering;
 
 impl MWFErr {

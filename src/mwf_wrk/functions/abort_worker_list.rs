@@ -1,14 +1,14 @@
 use super::super::MWFWrk;
 use crate::MWFLog;
-use crate::framework_error::MWFError;
-use crate::framework_error::MWFPanic;
 use crate::mwf::MWF;
 use crate::mwf::MWF_WRK_CLOSE_NOTIFY;
 use crate::mwf::MWF_WRK_DATA;
 use crate::mwf::MWF_WRK_INIT_NOTIFY;
+use crate::mwf::MWFError;
+use crate::mwf::MWFPanic;
 use crate::mwf_log::LogAction;
 use crate::mwf_log::LogStatus;
-use crate::worker::WorkerID;
+use crate::mwf_wrk::types::WorkerID;
 use std::time::Instant;
 
 impl MWFWrk {

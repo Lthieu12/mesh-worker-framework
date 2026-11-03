@@ -1,9 +1,9 @@
 use super::super::MWFWrk;
-use crate::framework_error::MWFError;
-use crate::framework_error::MWFPanic;
 use crate::mwf::MWF;
 use crate::mwf::MWF_DATA;
-use crate::worker::WorkerID;
+use crate::mwf::MWFError;
+use crate::mwf::MWFPanic;
+use crate::mwf_wrk::types::WorkerID;
 
 impl MWFWrk {
     /// Returns the fully qualified Rust type path associated with a worker.

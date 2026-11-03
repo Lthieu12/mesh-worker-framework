@@ -1,10 +1,10 @@
 use super::super::MWFWrk;
 use crate::channel::WorkerChannel;
-use crate::framework_error::MWFError;
-use crate::message::MessageID;
-use crate::message::MessageWaitMode;
-use crate::worker::EntityID;
-use crate::worker::WorkerID;
+use crate::mwf::MWFError;
+use crate::mwf_wrk::types::EntityID;
+use crate::mwf_wrk::types::MessageID;
+use crate::mwf_wrk::types::MessageWaitMode;
+use crate::mwf_wrk::types::WorkerID;
 
 impl MWFWrk {
     /// Send a priority message and wait for the requested completion mode.

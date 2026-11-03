@@ -2,8 +2,8 @@ use super::super::LogInstanceID;
 use super::super::LogList;
 use super::super::MWFLog;
 use crate::MWF;
-use crate::framework_error::MWFError;
 use crate::mwf::MWF_INSTANCE_COUNTER;
+use crate::mwf::MWFError;
 use std::sync::atomic::Ordering;
 
 impl MWFLog {

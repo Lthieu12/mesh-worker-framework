@@ -1,7 +1,7 @@
 use super::{LogAction, LogInstanceID, LogStatus};
 use crate::mwf_log::terminal_log_column;
+use crate::mwf_wrk::types::WorkerID;
 use crate::string_helper;
-use crate::worker::WorkerID;
 
 /// Single log event stored in MWFLog.
 #[derive(Debug, Clone)]

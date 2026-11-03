@@ -1,10 +1,10 @@
 use super::super::LogMode;
 use super::super::MWFLog;
 use crate::MWF;
-use crate::framework_error::MWFError;
-use crate::framework_error::MWFPanic;
 use crate::mwf::MWF_LOG_DATA;
 use crate::mwf::MWF_LOG_MODE;
+use crate::mwf::MWFError;
+use crate::mwf::MWFPanic;
 use std::sync::atomic::Ordering;
 
 impl MWFLog {

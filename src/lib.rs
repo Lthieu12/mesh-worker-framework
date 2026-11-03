@@ -1,12 +1,8 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 mod channel;
-mod framework_error;
 mod log_file;
-mod message;
-mod message_wait;
 mod string_helper;
-mod worker;
 mod worker_registry;
 mod worker_task;
 mod worker_type_registry;
@@ -29,8 +25,9 @@ pub use mwf_err::{ErrorEvent, ErrorInstanceID, ErrorList, ErrorOutputFormat, MWF
 pub use mwf_log::{LogAction, LogEvent, LogInstanceID, LogList, LogMode, LogOutputFormat, LogStatus, MWFLog};
 pub use mwf_wrk::MWFWrk;
 
-pub use framework_error::MWFError;
+pub use mwf::MWFError;
 
-pub use worker::{EntityID, ExternalID, Worker, WorkerError, WorkerID, WorkerInfo, WorkerList, WorkerOutputFormat, WorkerState, WorkerStatus, WorkerTypeID};
+pub use mwf_wrk::Worker;
+pub use mwf_wrk::types::{EntityID, ExternalID, WorkerError, WorkerID, WorkerInfo, WorkerList, WorkerOutputFormat, WorkerState, WorkerStatus, WorkerTypeID};
 
-pub use message::{MessageData, MessageID, MessageWaitMode, WorkerMessage};
+pub use mwf_wrk::types::{MessageData, MessageID, MessageWaitMode, WorkerMessage};

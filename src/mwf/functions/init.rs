@@ -1,6 +1,6 @@
 use super::super::MWF;
 use super::super::MWFConfiguration;
-use crate::framework_error::MWFError;
+use crate::mwf::MWFError;
 
 impl MWF {
     /// Initialize MWF using the default configuration.

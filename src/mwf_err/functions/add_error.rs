@@ -1,7 +1,7 @@
 use super::super::MWFErr;
 use crate::MWF;
-use crate::framework_error::MWFError;
-use crate::worker::EntityID;
+use crate::mwf::MWFError;
+use crate::mwf_wrk::types::EntityID;
 
 impl MWFErr {
     /// Record a new application error event.

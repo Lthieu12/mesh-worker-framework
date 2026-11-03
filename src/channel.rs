@@ -17,10 +17,10 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-use crate::framework_error::{MWFError, MWFPanic, WorkerError};
-use crate::message::{MessageData, MessageID, WorkerMessage};
 use crate::mwf::MWF_WRK_DATA;
-use crate::worker::{EntityID, WorkerID, WorkerState};
+use crate::mwf::{MWFError, MWFPanic, WorkerError};
+use crate::mwf_wrk::types::{EntityID, WorkerID, WorkerState};
+use crate::mwf_wrk::types::{MessageData, MessageID, WorkerMessage};
 use crate::worker_registry::Registry;
 
 pub(crate) type WorkerSenderChannel = Sender<WorkerCommand>;

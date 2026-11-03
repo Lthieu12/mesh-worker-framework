@@ -1,8 +1,8 @@
 use super::super::MWFLog;
 use crate::MWF;
-use crate::framework_error::MWFError;
-use crate::framework_error::MWFPanic;
 use crate::mwf::MWF_LOG_DATA;
+use crate::mwf::MWFError;
+use crate::mwf::MWFPanic;
 
 impl MWFLog {
     /// Enables or disables writing captured log events to the configured file.

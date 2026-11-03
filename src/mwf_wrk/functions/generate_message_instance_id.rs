@@ -1,7 +1,7 @@
 use super::super::MWFWrk;
-use crate::framework_error::MWFError;
-use crate::message::MessageInstanceID;
 use crate::mwf::MWF_WRK_MESSAGE_INSTANCE_COUNTER;
+use crate::mwf::MWFError;
+use crate::mwf_wrk::types::MessageInstanceID;
 use std::sync::atomic::Ordering;
 
 impl MWFWrk {

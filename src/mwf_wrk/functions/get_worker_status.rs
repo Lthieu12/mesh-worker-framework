@@ -1,8 +1,8 @@
 use super::super::MWFWrk;
-use crate::framework_error::MWFError;
 use crate::mwf::MWF;
-use crate::worker::WorkerID;
-use crate::worker::WorkerStatus;
+use crate::mwf::MWFError;
+use crate::mwf_wrk::types::WorkerID;
+use crate::mwf_wrk::types::WorkerStatus;
 
 impl MWFWrk {
     /// Get the current status of a worker.

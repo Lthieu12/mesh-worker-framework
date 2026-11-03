@@ -2,12 +2,12 @@ use super::super::MWFWrk;
 use crate::channel::WorkerChannel;
 use crate::channel::WorkerCommand;
 use crate::channel::send_worker_command;
-use crate::framework_error::MWFError;
-use crate::message::MessageID;
-use crate::message::WorkerMessage;
 use crate::mwf::MWF;
-use crate::worker::EntityID;
-use crate::worker::WorkerID;
+use crate::mwf::MWFError;
+use crate::mwf_wrk::types::EntityID;
+use crate::mwf_wrk::types::MessageID;
+use crate::mwf_wrk::types::WorkerID;
+use crate::mwf_wrk::types::WorkerMessage;
 
 impl MWFWrk {
     /// Send a unique message to a worker.

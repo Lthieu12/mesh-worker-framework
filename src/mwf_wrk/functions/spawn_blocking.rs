@@ -1,6 +1,6 @@
 use super::super::MWFWrk;
-use crate::framework_error::MWFError;
 use crate::mwf::MWF;
+use crate::mwf::MWFError;
 use crate::worker_task::current_message_inheritance_context;
 use crate::worker_task::current_worker_context;
 use crate::worker_task::scope_worker_context;

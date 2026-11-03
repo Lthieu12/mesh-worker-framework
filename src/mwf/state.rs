@@ -5,10 +5,10 @@ use std::sync::{LazyLock, RwLock};
 use tokio::sync::Notify;
 
 use super::types::{MWFData, TimestampFormat};
-use crate::message_wait::MessageWaitData;
 use crate::mwf_err::ErrorData;
 use crate::mwf_log::{LogMode, LoggingData};
 use crate::mwf_wrk::WorkerData;
+use crate::mwf_wrk::types::MessageWaitData;
 
 /// Global MWF instance counter.
 pub(crate) static MWF_INSTANCE_COUNTER: AtomicU64 = AtomicU64::new(0);

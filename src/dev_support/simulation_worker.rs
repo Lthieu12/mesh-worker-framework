@@ -23,8 +23,9 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 use crate::MWFWrk;
-use crate::message::{MessageData, MessageID, MessageWaitMode, WorkerMessage};
-use crate::worker::{EntityID, Worker, WorkerError, WorkerID, WorkerTypeID};
+use crate::mwf_wrk::traits::Worker;
+use crate::mwf_wrk::types::{EntityID, WorkerError, WorkerID, WorkerTypeID};
+use crate::mwf_wrk::types::{MessageData, MessageID, MessageWaitMode, WorkerMessage};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(non_camel_case_types)]

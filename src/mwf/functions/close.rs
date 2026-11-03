@@ -8,8 +8,8 @@ use super::super::MWF_MESSAGE_WAIT_DATA;
 use super::super::MWF_WRK_DATA;
 use crate::MWFErr;
 use crate::MWFLog;
-use crate::framework_error::MWFError;
-use crate::framework_error::MWFPanic;
+use crate::mwf::MWFError;
+use crate::mwf::MWFPanic;
 use crate::worker_task::current_worker_id;
 
 impl MWF {

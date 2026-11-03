@@ -1,8 +1,8 @@
 use super::super::MWFWrk;
-use crate::framework_error::MWFError;
-use crate::message_wait::complete_message_flow;
 use crate::mwf::MWF;
-use crate::worker::WorkerError;
+use crate::mwf::MWFError;
+use crate::mwf_wrk::functions::complete_message_flow;
+use crate::mwf_wrk::types::WorkerError;
 use crate::worker_task::current_message_inheritance_context;
 use crate::worker_task::current_worker_id;
 

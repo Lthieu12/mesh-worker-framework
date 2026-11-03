@@ -1,7 +1,7 @@
 use super::super::MWF;
 use super::super::MWF_WRK_DATA;
-use crate::framework_error::MWFError;
-use crate::framework_error::MWFPanic;
+use crate::mwf::MWFError;
+use crate::mwf::MWFPanic;
 use crate::mwf_wrk::WorkerData;
 use crate::worker_task::current_worker_id;
 use std::sync::RwLockReadGuard;

@@ -2,8 +2,8 @@ use super::super::ErrorInstanceID;
 use super::super::ErrorList;
 use super::super::MWFErr;
 use crate::MWF;
-use crate::framework_error::MWFError;
 use crate::mwf::MWF_INSTANCE_COUNTER;
+use crate::mwf::MWFError;
 use std::sync::atomic::Ordering;
 
 impl MWFErr {

@@ -7,8 +7,8 @@
 
 use std::collections::HashMap;
 
-use crate::framework_error::MWFError;
-use crate::worker::{WorkerConstructor, WorkerTypeID};
+use crate::mwf::MWFError;
+use crate::mwf_wrk::types::{WorkerConstructor, WorkerTypeID};
 
 /// Information associated with a registered worker type.
 #[derive(Debug)]

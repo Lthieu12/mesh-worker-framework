@@ -2,7 +2,7 @@ use super::super::LogAction;
 use super::super::LogStatus;
 use super::super::MWFLog;
 use crate::MWFErr;
-use crate::worker::WorkerID;
+use crate::mwf_wrk::types::WorkerID;
 use std::time::Instant;
 
 impl MWFLog {

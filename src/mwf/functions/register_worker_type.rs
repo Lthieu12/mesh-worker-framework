@@ -1,9 +1,9 @@
 use super::super::MWF;
 use super::super::MWF_DATA;
-use crate::framework_error::MWFError;
-use crate::framework_error::MWFPanic;
-use crate::worker::Worker;
-use crate::worker::WorkerConstructor;
+use crate::mwf::MWFError;
+use crate::mwf::MWFPanic;
+use crate::mwf_wrk::traits::Worker;
+use crate::mwf_wrk::types::WorkerConstructor;
 
 impl MWF {
     /// Register a worker type.

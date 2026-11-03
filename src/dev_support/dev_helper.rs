@@ -10,9 +10,9 @@ use crate::MWFErr;
 use crate::MWFLog;
 use crate::MWFWrk;
 
-use crate::message::{MessageID, MessageInstanceID};
 use crate::mwf_log::{LogAction, LogEvent, LogList, LogStatus};
-use crate::worker::{EntityID, WorkerID};
+use crate::mwf_wrk::types::{EntityID, WorkerID};
+use crate::mwf_wrk::types::{MessageID, MessageInstanceID};
 
 #[allow(dead_code)]
 pub fn print_worker_list() {

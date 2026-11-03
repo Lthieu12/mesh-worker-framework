@@ -1,6 +1,6 @@
 use super::super::MWFErr;
 use crate::MWF;
-use crate::framework_error::MWFError;
+use crate::mwf::MWFError;
 
 impl MWFErr {
     /// Enables or disables MWF terminal error logging.

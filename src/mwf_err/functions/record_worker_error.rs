@@ -1,6 +1,6 @@
 use super::super::MWFErr;
-use crate::worker::EntityID;
-use crate::worker::WorkerID;
+use crate::mwf_wrk::types::EntityID;
+use crate::mwf_wrk::types::WorkerID;
 
 impl MWFErr {
     /// Records a worker error without allowing error reporting to interrupt worker execution.

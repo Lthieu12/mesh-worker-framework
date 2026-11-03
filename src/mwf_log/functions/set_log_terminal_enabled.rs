@@ -1,6 +1,6 @@
 use super::super::MWFLog;
 use crate::MWF;
-use crate::framework_error::MWFError;
+use crate::mwf::MWFError;
 
 impl MWFLog {
     /// Enables or disables MWF terminal logging.

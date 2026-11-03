@@ -1,8 +1,8 @@
 use super::super::ErrorInstanceID;
 use super::super::ErrorList;
 use super::super::MWFErr;
-use crate::framework_error::MWFError;
 use crate::mwf::MWF_ERR_NOTIFY;
+use crate::mwf::MWFError;
 
 impl MWFErr {
     pub(crate) async fn wait_error_internal(mwf_instance_counter: u64, last_error_instance_id: Option<ErrorInstanceID>) -> Result<ErrorList, MWFError> {

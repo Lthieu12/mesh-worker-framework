@@ -1,12 +1,12 @@
 use super::super::MWFWrk;
 use crate::channel::WorkerCommand;
-use crate::framework_error::MWFError;
-use crate::framework_error::MWFPanic;
-use crate::message::MessageData;
 use crate::mwf::MWF;
 use crate::mwf::MWF_WRK_DATA;
-use crate::worker::WorkerID;
-use crate::worker::WorkerState;
+use crate::mwf::MWFError;
+use crate::mwf::MWFPanic;
+use crate::mwf_wrk::types::MessageData;
+use crate::mwf_wrk::types::WorkerID;
+use crate::mwf_wrk::types::WorkerState;
 use crate::worker_task::current_worker_id;
 
 impl MWFWrk {

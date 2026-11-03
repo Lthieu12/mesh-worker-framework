@@ -1,7 +1,7 @@
 use super::super::MWFWrk;
-use crate::framework_error::MWFError;
 use crate::mwf::MWF;
-use crate::worker::WorkerID;
+use crate::mwf::MWFError;
+use crate::mwf_wrk::types::WorkerID;
 use crate::worker_task::current_worker_id;
 
 impl MWFWrk {

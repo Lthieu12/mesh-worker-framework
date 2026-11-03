@@ -8,9 +8,9 @@ use std::collections::HashMap;
 use tokio::task::JoinHandle;
 
 use crate::channel::{WorkerNormalSenderChannel, WorkerPrioritySenderChannel};
-use crate::framework_error::{MWFError, MWFPanic};
 use crate::mwf::MWFInstanceID;
-use crate::worker::{EntityID, WorkerID, WorkerInfo, WorkerState, WorkerTypeID};
+use crate::mwf::{MWFError, MWFPanic};
+use crate::mwf_wrk::types::{EntityID, WorkerID, WorkerInfo, WorkerState, WorkerTypeID};
 
 /// Information associated with a registered worker.
 #[derive(Debug)]

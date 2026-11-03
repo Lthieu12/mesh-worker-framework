@@ -1,8 +1,8 @@
 use super::super::MWFWrk;
-use crate::framework_error::MWFError;
 use crate::mwf::MWF;
-use crate::worker::EntityID;
-use crate::worker::WorkerID;
+use crate::mwf::MWFError;
+use crate::mwf_wrk::types::EntityID;
+use crate::mwf_wrk::types::WorkerID;
 
 impl MWFWrk {
     /// Get the child WorkerIDs of an entity.
