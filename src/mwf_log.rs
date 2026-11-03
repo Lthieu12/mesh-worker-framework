@@ -6,8 +6,7 @@
 mod functions;
 mod types;
 
-pub(crate) use types::LoggingData;
-pub(crate) use types::terminal_log_column;
+pub(crate) use types::{LoggingData, terminal_log_column};
 pub use types::{LogAction, LogEvent, LogInstanceID, LogList, LogMode, LogOutputFormat, LogStatus};
 
 pub use types::MWFLog;
