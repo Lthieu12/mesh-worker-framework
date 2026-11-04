@@ -28,14 +28,14 @@ where
 
     let mut flow_registration_guard = register_message_flow(message_flow_id, receiver_id.clone(), flow_reply_sender)?;
 
-    // Associate the new flow with its initial message.
+    // Associate the new flow with its initial message command.
     let inheritance_context = MessageInheritanceContext { message_flow_id: Some(message_flow_id) };
 
-    let framework_message = WorkerMessage::new(sender_id, receiver_id, message_id, message_instance_id, message_data, inheritance_context);
+    let framework_message = WorkerMessage::new(sender_id, receiver_id, message_id, message_instance_id, message_data);
 
     // Submit the initial message and wait for explicit flow completion.
     let wait_future = async {
-        send_worker_command(sender_id, receiver_id, channel, WorkerCommand::Message { message: framework_message, priority, unique: false }).await?;
+        send_worker_command(sender_id, receiver_id, channel, WorkerCommand::Message { message: framework_message, inheritance_context, priority, unique: false }).await?;
 
         // Preserve the registration after successful submission.
         flow_registration_guard.disarm();

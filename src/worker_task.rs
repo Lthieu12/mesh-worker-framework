@@ -257,9 +257,9 @@ pub(crate) fn spawn_worker_task(worker: Box<dyn Worker + Send>, normal_receiver_
 
 /// Execute a business message.
 ///
-/// This helper executes the message callback, reports errors and
-/// logs the complete message lifecycle.
-async fn execute_message(worker: &mut Box<dyn Worker + Send>, worker_id: &WorkerID, message: WorkerMessage, priority: bool, wait_completion: bool) -> Result<(), WorkerError> {
+/// This helper executes the message callback with its internal inheritance context,
+/// reports errors and logs the complete message lifecycle.
+async fn execute_message(worker: &mut Box<dyn Worker + Send>, worker_id: &WorkerID, message: WorkerMessage, inheritance_context: MessageInheritanceContext, priority: bool, wait_completion: bool) -> Result<(), WorkerError> {
     let action_start_timer = Instant::now();
     let log_action = LogAction::WorkerMessage { message_instance_id: message.message_instance_id, sender_id: message.sender_id.clone(), message_id: message.message_id.clone(), priority, wait_completion };
     let sender_id = message.sender_id.clone();
@@ -268,9 +268,9 @@ async fn execute_message(worker: &mut Box<dyn Worker + Send>, worker_id: &Worker
     // Before callback
     MWFLog::log_worker_event(action_start_timer, worker_id, log_action.clone(), LogStatus::Start);
 
-    // Ignore the message flow context if its message flow has already been closed.
-    let context_to_install = match message.inheritance_context.message_flow_id {
-        Some(message_flow_id) if is_message_flow_active_for_worker(message_flow_id, worker_id) => message.inheritance_context,
+    // Ignore the inherited message flow context if its flow has already been closed.
+    let context_to_install = match inheritance_context.message_flow_id {
+        Some(message_flow_id) if is_message_flow_active_for_worker(message_flow_id, worker_id) => inheritance_context,
         _ => MessageInheritanceContext::default(),
     };
 
@@ -424,8 +424,8 @@ async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: Wo
             // This guarantees that a message accepted before a
             // Close command is always processed before worker
             // shutdown begins.
-            WorkerCommand::Message { message, priority, unique: _ } => {
-                let _ = execute_message(&mut worker, &worker_id, message, priority, false).await;
+            WorkerCommand::Message { message, inheritance_context, priority, unique: _ } => {
+                let _ = execute_message(&mut worker, &worker_id, message, inheritance_context, priority, false).await;
             }
 
             // Execute a business message.
@@ -439,8 +439,8 @@ async fn worker_task(worker: Box<dyn Worker + Send>, normal_receiver_channel: Wo
             // This guarantees that a message accepted before a
             // Close command is always processed before worker
             // shutdown begins.
-            WorkerCommand::MessageAndWaitCompletion { reply_sender, message, priority } => {
-                let result_message = execute_message(&mut worker, &worker_id, message, priority, true).await;
+            WorkerCommand::MessageAndWaitCompletion { reply_sender, message, inheritance_context, priority } => {
+                let result_message = execute_message(&mut worker, &worker_id, message, inheritance_context, priority, true).await;
 
                 let _ = reply_sender.send(result_message);
             }

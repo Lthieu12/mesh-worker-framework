@@ -13,13 +13,13 @@ where
     TMessageData: Clone + Send + Sync + 'static,
 {
     // Messages waiting for a callback do not inherit a message flow.
-    let framework_message = WorkerMessage::new(sender_id, receiver_id, message_id, message_instance_id, message_data, MessageInheritanceContext::default());
+    let framework_message = WorkerMessage::new(sender_id, receiver_id, message_id, message_instance_id, message_data);
 
     let (reply_sender, reply_receiver) = oneshot::channel::<Result<(), WorkerError>>();
 
     // Submit the message and wait for the callback result.
     let wait_future = async {
-        send_worker_command(sender_id, receiver_id, channel, WorkerCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, priority }).await?;
+        send_worker_command(sender_id, receiver_id, channel, WorkerCommand::MessageAndWaitCompletion { reply_sender, message: framework_message, inheritance_context: MessageInheritanceContext::default(), priority }).await?;
 
         match reply_receiver.await {
             Ok(worker_result) => worker_result.map_err(MWFError::Worker_MessageError),

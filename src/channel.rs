@@ -20,7 +20,7 @@ use tokio::sync::oneshot;
 use crate::mwf::MWF_WRK_DATA;
 use crate::mwf::{MWFError, MWFPanic};
 use crate::mwf_wrk::types::WorkerError;
-use crate::mwf_wrk::types::{EntityID, WorkerID, WorkerState};
+use crate::mwf_wrk::types::{EntityID, MessageInheritanceContext, WorkerID, WorkerState};
 use crate::mwf_wrk::types::{MessageData, MessageID, WorkerMessage};
 use crate::worker_registry::Registry;
 
@@ -38,11 +38,14 @@ pub(crate) enum WorkerChannel {
 }
 
 /// Command processed by a WorkerTask.
+///
+/// Message-flow inheritance metadata is kept separate from `WorkerMessage`
+/// because it is internal execution state, not part of the callback API.
 #[derive(Debug)]
 pub(crate) enum WorkerCommand {
     Init { init_data: MessageData },
-    Message { message: WorkerMessage, priority: bool, unique: bool },
-    MessageAndWaitCompletion { reply_sender: oneshot::Sender<Result<(), WorkerError>>, message: WorkerMessage, priority: bool },
+    Message { message: WorkerMessage, inheritance_context: MessageInheritanceContext, priority: bool, unique: bool },
+    MessageAndWaitCompletion { reply_sender: oneshot::Sender<Result<(), WorkerError>>, message: WorkerMessage, inheritance_context: MessageInheritanceContext, priority: bool },
     Close { close_data: MessageData },
 }
 

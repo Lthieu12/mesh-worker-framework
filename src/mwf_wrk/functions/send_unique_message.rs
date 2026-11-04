@@ -43,9 +43,9 @@ impl MWFWrk {
         // Inherit the current message flow only when sending a message to this same worker.
         let inheritance_context = MWFWrk::get_message_inheritance_context_for_receiver(receiver_id);
 
-        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data, inheritance_context);
+        let framework_message = WorkerMessage::new(sender_id, receiver_id, &message_id, message_instance_id, message_data);
 
         // Send the unique message to the target worker.
-        send_worker_command(sender_id, receiver_id, WorkerChannel::Normal, WorkerCommand::Message { message: framework_message, priority: false, unique: true }).await
+        send_worker_command(sender_id, receiver_id, WorkerChannel::Normal, WorkerCommand::Message { message: framework_message, inheritance_context, priority: false, unique: true }).await
     }
 }
