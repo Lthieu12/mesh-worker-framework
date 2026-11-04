@@ -420,6 +420,23 @@ Each log event contains:
 * Status
 * Duration
 
+Example Log Output
+The following output is taken from `examples/getting_started_with_logging`:
+```text
+LogID        | Time         | WorkerID                       | Event   | MessageID                      | SenderID                       | P | W | STATUS | Duration
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+000000000001 | 20:44:32.584 | DemoWorker:0:00001             | SPAWN   | -                              | -                              | - | - | OK     | 0ms
+000000000002 | 20:44:32.585 | DemoWorker:0:00001             | INIT    | -                              | -                              | - | - | START  | -
+000000000003 | 20:44:32.585 | DemoWorker:0:00001             | INIT    | -                              | -                              | - | - | OK     | 0ms
+000000000004 | 20:44:32.585 | DemoWorker:0:00001             | MESSAGE | QUICK_CALCULATION              | MAIN                           | N | N | START  | -
+000000000005 | 20:44:32.595 | DemoWorker:0:00001             | MESSAGE | QUICK_CALCULATION              | MAIN                           | N | N | OK     | 10ms
+000000000006 | 20:44:32.595 | DemoWorker:0:00001             | MESSAGE | LONG_CALCULATION               | MAIN                           | N | N | START  | -
+000000000007 | 20:44:33.596 | DemoWorker:0:00001             | MESSAGE | LONG_CALCULATION               | MAIN                           | N | N | OK     | 1000ms
+000000000008 | 20:44:33.596 | DemoWorker:0:00001             | CLOSE   | -                              | -                              | - | - | START  | -
+000000000009 | 20:44:33.596 | DemoWorker:0:00001             | CLOSE   | -                              | -                              | - | - | OK     | 0ms
+```
+`P` indicates whether the message has priority (`Y`) or is normal (`N`). `W` indicates whether the sender requested message completion (`Y`) or sent the message without waiting (`N`). `STATUS` reports the event state, and `Duration` shows the time taken by a completed operation. Timestamps and durations vary between runs.
+
 ---
 
 ## 7. Architecture Overview

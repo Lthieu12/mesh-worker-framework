@@ -7,6 +7,7 @@ description = "Mesh Worker Framework (MWF) is a Rust Tokio/Futures-based runtime
 license = "MIT"
 readme = "README.md"
 documentation = "https://docs.rs/mwf"
+repository = "https://github.com/Lthieu12/mesh-worker-framework"
 keywords = ["async", "tokio", "worker", "messaging", "actor"]
 categories = ["asynchronous", "concurrency", "development-tools::debugging"]
 
