@@ -21,7 +21,7 @@ mod mwf_wrk;
 pub mod dev_support;
 
 // Public MWF API
-pub use mwf::{MWF, MWFConfiguration};
+pub use mwf::{MWF, MWFConfiguration, MWFInfo, TimestampFormat};
 pub use mwf_err::{ErrorEvent, ErrorInstanceID, ErrorList, ErrorOutputFormat, MWFErr};
 pub use mwf_log::{LogAction, LogEvent, LogInstanceID, LogList, LogMode, LogOutputFormat, LogStatus, MWFLog};
 pub use mwf_wrk::MWFWrk;
