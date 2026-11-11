@@ -44,6 +44,36 @@ mod tests {
         });
     }
 
+    /// Verify that MWF returns the configuration used during initialization.
+    #[test]
+    fn test_mwf_get_configuration() {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let mut configuration = MWFConfiguration::default();
+            configuration.worker_normal_channel_capacity = 23;
+            configuration.worker_priority_channel_capacity = 7;
+            configuration.timestamp_format = TimestampFormat::UtcTime;
+            configuration.error_event_buffer_capacity = 41;
+            configuration.log_event_buffer_capacity = 53;
+            configuration.log_file_path = None;
+            configuration.log_file_max_size_bytes = 2048;
+
+            assert!(MWF::init_with_configuration(configuration.clone()).is_ok());
+
+            let actual_configuration = MWF::get_configuration().unwrap();
+
+            assert_eq!(actual_configuration.worker_normal_channel_capacity, configuration.worker_normal_channel_capacity);
+            assert_eq!(actual_configuration.worker_priority_channel_capacity, configuration.worker_priority_channel_capacity);
+            assert_eq!(actual_configuration.timestamp_format, configuration.timestamp_format);
+            assert_eq!(actual_configuration.error_event_buffer_capacity, configuration.error_event_buffer_capacity);
+            assert_eq!(actual_configuration.log_event_buffer_capacity, configuration.log_event_buffer_capacity);
+            assert_eq!(actual_configuration.log_file_path, configuration.log_file_path);
+            assert_eq!(actual_configuration.log_file_max_size_bytes, configuration.log_file_max_size_bytes);
+
+            assert!(MWF::close().is_ok());
+        });
+    }
+
     /// Verify that MWF rejects multiple initialization attempts.
     #[test]
     fn test_mwf_double_init() {

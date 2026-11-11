@@ -7,13 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.10.1] - 2026-11-11
+## [0.11.0] - 2026-11-11
 
 ### Added
 
 - Add MWF::get_configuration() to retrieve a copy of the configuration used to initialize MWF.
 - Add the crate license to MWFInfo returned by MWF::get_info().
 - Include the complete getting_started example in the Rust documentation of MWF::init(), directly sourcing the example files.
+
+### Changed
+
+#### Breaking API changes
+
+Add the license field to the public MWFInfo structure. This may require code changes for applications that construct MWFInfo directly or destructure all its fields. Applications using MWF::get_info() without constructing MWFInfo remain unaffected.
 
 ## [0.10.0] - 2026-11-04
 
