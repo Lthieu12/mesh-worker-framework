@@ -2,6 +2,7 @@
 
 mod add_log;
 mod get_log_file_path;
+mod get_log_file_status;
 mod get_log_list;
 mod get_log_mode;
 mod get_logged_worker_list;

@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 
 use crate::mwf_wrk::types::{ExternalID, WorkerID};
-use crate::string_helper;
 
 /// Identifier of an entity interacting with MWF.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -49,10 +48,10 @@ impl EntityID {
     ///
     /// Worker entities preserve the worker counter whenever possible.
     /// External entities are truncated at the end.
-    pub(crate) fn to_short_string(&self, max_len: usize) -> String {
+    pub fn to_short_string(&self, max_len: usize) -> String {
         match self {
             EntityID::Worker(worker_id) => worker_id.to_short_string(max_len),
-            EntityID::External(external_id) => string_helper::to_short_string(external_id.as_str(), max_len),
+            EntityID::External(external_id) => external_id.to_short_string(max_len),
         }
     }
 }

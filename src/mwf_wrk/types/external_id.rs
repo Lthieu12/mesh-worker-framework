@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::string_helper;
+
 /// Unique identifier of an external entity.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct ExternalID(String);
@@ -13,6 +15,11 @@ impl ExternalID {
     /// Returns the identifier as a string slice.
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    /// Returns a shortened version of the identifier.
+    pub fn to_short_string(&self, max_len: usize) -> String {
+        string_helper::to_short_string(self.as_str(), max_len)
     }
 
     /// Returns true if the identifier is valid.

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-11
+
+### Added
+
+- Add `MWFLog::get_log_file_status()` to retrieve the current file logging status and configured file path.
+- Add `get_short_string()` to `EntityID` and `ExternalID` to retrieve shortened string representations.
+
 ## [0.11.0] - 2026-11-11
 
 ### Added
