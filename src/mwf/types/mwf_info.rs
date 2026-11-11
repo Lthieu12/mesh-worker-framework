@@ -12,6 +12,9 @@ pub struct MWFInfo {
 
     /// Build profile ("debug" or "release").
     pub build_profile: &'static str,
+
+    /// Crate license.
+    pub license: &'static str,
 }
 
 impl std::fmt::Display for MWFInfo {
@@ -23,6 +26,7 @@ impl std::fmt::Display for MWFInfo {
         writeln!(f, "Version : {}", self.crate_version)?;
         writeln!(f, "Commit  : {}", self.crate_git_commit)?;
         writeln!(f, "Profile : {}", self.build_profile)?;
+        writeln!(f, "License : {}", self.license)?;
         writeln!(f, "===============================")
     }
 }

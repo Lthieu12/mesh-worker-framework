@@ -1,6 +1,7 @@
 //! MWF runtime methods.
 
 mod close;
+mod get_configuration;
 mod get_info;
 mod get_timestamp_rfc3339;
 mod init;

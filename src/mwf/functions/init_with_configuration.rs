@@ -57,7 +57,7 @@ impl MWF {
         // Initialize the MWF log file if file logging is enabled.
         let log_file = if mwf_configuration.log_file_path.is_some() { Some(log_file::init_log_file(&mut mwf_configuration)?) } else { None };
 
-        *mwf_data_guard = Some(MWFData::new());
+        *mwf_data_guard = Some(MWFData::new(mwf_configuration.clone()));
 
         // Generate a unique identifier for this MWF instance.
         // This prevents workers from previous instances from being mistaken for current workers.

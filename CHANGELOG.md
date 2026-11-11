@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-11
+
+### Added
+
+- Add MWF::get_configuration() to retrieve a copy of the configuration used to initialize MWF.
+- Add the crate license to MWFInfo returned by MWF::get_info().
+- Include the complete getting_started example in the Rust documentation of MWF::init(), directly sourcing the example files.
+
 ## [0.10.0] - 2026-11-04
 
 ### Added
