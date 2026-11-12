@@ -41,7 +41,9 @@ pub enum MWFError {
     Framework_FunctionNotAvailableFromWorkerContext,
 
     /// The worker type identifier is invalid.
-    WorkerType_Invalid { worker_type_id: WorkerTypeID },
+    WorkerType_Invalid {
+        worker_type_id: WorkerTypeID,
+    },
 
     /// The requested worker type was not found.
     /// Internal registry lookup error.
@@ -92,29 +94,48 @@ pub enum MWFError {
     Worker_CannotWaitForSelf,
 
     /// The worker already has an active message wait.
-    Worker_AlreadyWaiting { sender_id: WorkerID, waiting_receiver_id: WorkerID, waiting_message_id: MessageID },
+    Worker_AlreadyWaiting {
+        sender_id: WorkerID,
+        waiting_receiver_id: WorkerID,
+        waiting_message_id: MessageID,
+    },
 
     /// The requested wait would create a deadlock cycle.
-    Worker_WaitWouldDeadlock { sender_id: WorkerID, waiting_receiver_id: WorkerID, waiting_message_id: MessageID, wait_chain: Vec<WorkerID> },
+    Worker_WaitWouldDeadlock {
+        sender_id: WorkerID,
+        waiting_receiver_id: WorkerID,
+        waiting_message_id: MessageID,
+        wait_chain: Vec<WorkerID>,
+    },
 
     /// The current execution is not associated with an MWF worker task.
     Worker_CurrentContextUnavailable,
 
+    // The number of data entries must match the number of worker IDs.
+    Worker_DataCountMismatch,
+
     /// The entity identifier is invalid.
-    Entity_Invalid { entity_id: EntityID },
+    Entity_Invalid {
+        entity_id: EntityID,
+    },
 
     /// The requested father worker was not found.
     ParentWorker_NotFound,
 
     /// The message identifier is invalid.
-    Message_Invalid { message_id: MessageID },
+    Message_Invalid {
+        message_id: MessageID,
+    },
 
     /// The MessageInstanceID counter has reached its maximum value
     /// and can no longer generate unique identifiers.
     Message_InstanceIDExhausted,
 
     /// The MessageData type mismatch.
-    Message_DataTypeMismatch { expected_type: &'static str, actual_type: &'static str },
+    Message_DataTypeMismatch {
+        expected_type: &'static str,
+        actual_type: &'static str,
+    },
 
     /// The message wait registry contains an inconsistent state.
     MessageWait_RegistryInconsistent,
@@ -130,7 +151,9 @@ pub enum MWFError {
     MessageFlow_NotActive,
 
     /// The worker task terminated while message flows were still active.
-    MessageFlow_WorkerTaskTerminated { worker_id: WorkerID },
+    MessageFlow_WorkerTaskTerminated {
+        worker_id: WorkerID,
+    },
 
     /// The ErrorInstanceID counter has reached its maximum value
     /// and can no longer generate unique identifiers.
@@ -255,6 +278,10 @@ impl fmt::Display for MWFError {
 
             MWFError::Worker_CurrentContextUnavailable => {
                 write!(f, "This operation requires an active MWF worker execution context.")
+            }
+
+            MWFError::Worker_DataCountMismatch => {
+                write!(f, "The number of data entries must match the number of worker IDs.")
             }
 
             MWFError::Entity_Invalid { entity_id } => {

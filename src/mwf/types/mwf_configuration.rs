@@ -37,6 +37,6 @@ impl Default for MWFConfiguration {
 
         let log_file_max_size_bytes = 10 * 1024 * 1024;
 
-        Self { worker_normal_channel_capacity: 50, worker_priority_channel_capacity: 10, timestamp_format: LocalTime, error_event_buffer_capacity: 100, log_event_buffer_capacity: 100, log_file_path: Some(log_file_path), log_file_max_size_bytes }
+        Self { worker_normal_channel_capacity: 50, worker_priority_channel_capacity: 10, timestamp_format: LocalTime, error_event_buffer_capacity: 100, log_event_buffer_capacity: 500, log_file_path: Some(log_file_path), log_file_max_size_bytes }
     }
 }

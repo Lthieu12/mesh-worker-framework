@@ -1,6 +1,6 @@
 [package]
 name = "mwf"
-version = "0.12.0"
+version = "0.13.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Mesh Worker Framework (MWF) is a Rust Tokio/Futures-based runtime for building applications composed of long-running software workers that communicate through asynchronous messages."

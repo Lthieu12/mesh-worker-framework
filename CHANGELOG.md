@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-12
+
+### Added
+
+- Added MWFWrk::init_worker_list() to request initialization of multiple workers using individual initialization data.
+- Added MWFWrk::close_worker_list() to request closure of multiple workers using individual closing data.
+
 ## [0.12.0] - 2026-11-11
 
 ### Added

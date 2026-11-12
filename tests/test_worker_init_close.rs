@@ -6,6 +6,7 @@
 //! - Shutdown failures are correctly propagated.
 
 use serial_test::serial;
+use std::time::{Duration, Instant};
 
 use dev_support::simulation_worker::{SimulationBehavior, SimulationWorker, SimulationWorkerConfig};
 use mwf::*;
@@ -97,4 +98,67 @@ async fn test_worker_close_failed() {
     MWFWrk::abort_children(&EntityID::new_external("MAIN")).unwrap();
 
     MWF::close().unwrap();
+}
+
+// MWF uses a global runtime instance.
+// Integration tests must run serially.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+async fn test_worker_list_init_and_close() -> Result<(), MWFError> {
+    // Initialize MWF.
+    MWF::init()?;
+
+    // Register the simulation worker.
+    MWF::register_worker_type::<SimulationWorker>()?;
+
+    // Spawn two workers.
+    let parent_id = EntityID::new_external("Test");
+    let worker_type_id = SimulationWorker::worker_type_id();
+
+    let worker_id_1 = MWFWrk::spawn_worker(&worker_type_id, &parent_id)?;
+    let worker_id_2 = MWFWrk::spawn_worker(&worker_type_id, &parent_id)?;
+
+    let worker_ids = [worker_id_1, worker_id_2];
+
+    // Prepare distinct initialization data for each worker.
+    let init_data = [
+        SimulationWorkerConfig { init_delay_ms: 0, close_delay_ms: 0, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: Some(0) },
+        SimulationWorkerConfig { init_delay_ms: 200, close_delay_ms: 200, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: Some(0) },
+    ];
+
+    // Start initialization.
+    let init_start = Instant::now();
+    MWFWrk::init_worker_list(&worker_ids, &init_data).await?;
+
+    // Wait for the second worker first.
+    MWFWrk::wait_worker_init(&worker_ids[1], None).await?;
+
+    let worker_2_init_duration = init_start.elapsed();
+
+    assert!(worker_2_init_duration >= Duration::from_millis(100), "Worker 2 initialization completed too quickly: {:?}", worker_2_init_duration);
+
+    // Wait for the first worker.
+    MWFWrk::wait_worker_init(&worker_ids[0], None).await?;
+
+    // Prepare closing data.
+    let close_data = [(), ()];
+
+    // Close both workers.
+    let close_start = Instant::now();
+    MWFWrk::close_worker_list(&worker_ids, &close_data).await?;
+
+    // Wait for the second worker first.
+    MWFWrk::wait_worker_close(&worker_ids[1], None).await?;
+
+    let worker_2_close_duration = close_start.elapsed();
+
+    assert!(worker_2_close_duration >= Duration::from_millis(100), "Worker 2 close completed too quickly: {:?}", worker_2_close_duration);
+
+    // Wait for the first worker.
+    MWFWrk::wait_worker_close(&worker_ids[0], None).await?;
+
+    // Close MWF.
+    MWF::close()?;
+
+    Ok(())
 }
