@@ -1,6 +1,7 @@
 # ============================================================================
 # Commit and push all repository changes.
 # ============================================================================
+#   .\scripts\git_push.ps1 "commit info"
 
 param(
     [Parameter(Mandatory = $true)]
