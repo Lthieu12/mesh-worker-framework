@@ -35,18 +35,15 @@ async fn test_worker_hierarchy() {
     MWFWrk::wait_worker_init(&worker_a_id, Some(500)).await.unwrap();
 
     let worker_b_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &EntityID::Worker(worker_a_id.clone())).unwrap();
-
-    let configuration = SimulationWorkerConfig { init_delay_ms: 200, close_delay_ms: 200, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
-
-    MWFWrk::init_worker(&worker_b_id, &configuration).await.unwrap();
-
     let worker_c_id = MWFWrk::spawn_worker(&SimulationWorker::worker_type_id(), &EntityID::Worker(worker_a_id.clone())).unwrap();
 
-    let configuration = SimulationWorkerConfig { init_delay_ms: 300, close_delay_ms: 300, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
+    let configuration_b = SimulationWorkerConfig { init_delay_ms: 200, close_delay_ms: 200, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
+    let configuration_c = SimulationWorkerConfig { init_delay_ms: 300, close_delay_ms: 300, simulation_behavior: SimulationBehavior::DoNothing, wait_children_close: false, wait_children_close_timeout_ms: None };
 
-    MWFWrk::init_worker(&worker_c_id, &configuration).await.unwrap();
+    let init_data = [configuration_b, configuration_c];
+    MWFWrk::init_children(&worker_a_id.as_entity_id(), &init_data).await.unwrap();
 
-    MWFWrk::wait_worker_list_init(&vec![worker_b_id.clone(), worker_c_id.clone()], Some(1000)).await.unwrap();
+    MWFWrk::wait_children_init(&worker_a_id.as_entity_id(), Some(1000)).await.unwrap();
 
     print_worker_list();
 
@@ -82,9 +79,10 @@ async fn test_worker_hierarchy() {
     println!("MAIN children(s) = {:?}", MWFWrk::get_children_ids(&EntityID::new_external("MAIN")));
     println!("worker_a children(s) = {:?}", MWFWrk::get_children_ids(&EntityID::Worker(worker_a_id.clone())));
 
+    let close_data = [(), ()];
+    MWFWrk::close_children(&worker_a_id.as_entity_id(), &close_data).await.unwrap();
+
     MWFWrk::close_worker(&worker_a_id, &()).await.unwrap();
-    MWFWrk::close_worker(&worker_b_id, &()).await.unwrap();
-    MWFWrk::close_worker(&worker_c_id, &()).await.unwrap();
 
     MWFWrk::wait_children_close(&EntityID::new_external("MAIN"), Some(1000)).await.unwrap();
 

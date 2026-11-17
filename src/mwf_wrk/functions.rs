@@ -3,6 +3,7 @@
 mod abort_children;
 mod abort_worker;
 mod abort_worker_list;
+mod close_children;
 mod close_worker;
 mod close_worker_list;
 mod deduplicate_worker_ids;
@@ -16,6 +17,7 @@ mod get_parent_id;
 mod get_worker_info_list;
 mod get_worker_status;
 mod get_worker_type_rust_path;
+mod init_children;
 mod init_worker;
 mod init_worker_list;
 mod message_flow_end;

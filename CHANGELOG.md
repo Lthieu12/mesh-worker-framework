@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-17
+
+### Added
+
+- Add MWFWrk::init_children() to request sequential initialization of all child workers of an entity, with individual initialization data for each worker.
+- Add MWFWrk::close_children() to request sequential closure of all child workers of an entity, with individual closing data for each worker.
+
 ## [0.13.0] - 2026-11-12
 
 ### Added
