@@ -2,7 +2,7 @@
 
 ## 1. Why MWF?
 
-Mesh Worker Framework (MWF) is a Rust Tokio/Futures-based runtime for building applications composed of long-running software workers that communicate through asynchronous messages.
+Mesh Worker Framework (MWF) is a Tokio/Futures-based runtime for building applications composed of long-running software workers that communicate through asynchronous messages.
 
 Typical applications include:
 

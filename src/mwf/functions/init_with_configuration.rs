@@ -30,6 +30,19 @@ impl MWF {
     ///
     /// Each successful initialization after a previous shutdown receives a new
     /// instance ID, used to ensure WorkerID uniqueness within the current process.
+    ///
+    /// # Examples
+    ///
+    #[doc = concat!(
+        "### getting_started\n\n",
+        "```rust,ignore\n",
+        include_str!("../../../examples/getting_started/main.rs"),
+        "\n```\n",
+        "### demo_worker\n\n",
+        "```rust,ignore\n",
+        include_str!("../../../examples/getting_started/workers/demo_worker.rs"),
+        "\n```\n\n",
+    )]
     pub fn init_with_configuration(mut mwf_configuration: MWFConfiguration) -> Result<(), MWFError> {
         // Verify that this function is not called from an MWF worker context.
         if current_worker_id().is_some() {
