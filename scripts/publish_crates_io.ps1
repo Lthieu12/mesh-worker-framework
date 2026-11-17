@@ -6,72 +6,44 @@
 param()
 
 Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
 
-# Handle native command failures through their exit codes instead of PowerShell's
-# interpretation of stderr output (Cargo may emit status messages on stderr).
+# Native command errors are checked explicitly through LASTEXITCODE.
+# Keep stderr output from Git and Cargo visible without treating it as a PowerShell exception.
+$ErrorActionPreference = 'Continue'
 $PSNativeCommandUseErrorActionPreference = $false
 
-function Invoke-Git {
+function Invoke-NativeCommand {
     param(
+        [Parameter(Mandatory = $true)]
+        [string]$Command,
+
         [Parameter(Mandatory = $true)]
         [string[]]$Arguments,
 
         [switch]$Quiet
     )
 
-    $previousErrorActionPreference = $ErrorActionPreference
-    try {
-        $ErrorActionPreference = 'Continue'
-        $output = & git @Arguments 2>&1
-        $exitCode = $LASTEXITCODE
-    }
-    finally {
-        $ErrorActionPreference = $previousErrorActionPreference
-    }
+    $output = & $Command @Arguments 2>&1
+    $exitCode = $LASTEXITCODE
 
     if ($exitCode -ne 0) {
         $details = ($output | Out-String).Trim()
-        throw "Git command failed (exit code ${exitCode}): git $($Arguments -join ' ')`n$details"
+        throw "$Command command failed (exit code ${exitCode}): $Command $($Arguments -join ' ')`n$details"
     }
 
-    if (-not $Quiet -and $output) {
-        $output | ForEach-Object { Write-Host $_ }
+    if (-not $Quiet) {
+        if ($output) {
+            $output | ForEach-Object { Write-Host $_ }
+        }
+        return
     }
 
-    return ($output -join [Environment]::NewLine)
-}
-
-function Invoke-Cargo {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string[]]$Arguments
-    )
-
-    Write-Host "`n> cargo $($Arguments -join ' ')" -ForegroundColor DarkCyan
-
-    $previousErrorActionPreference = $ErrorActionPreference
-    try {
-        $ErrorActionPreference = 'Continue'
-        $output = & cargo @Arguments 2>&1
-        $exitCode = $LASTEXITCODE
-    }
-    finally {
-        $ErrorActionPreference = $previousErrorActionPreference
-    }
-
-    if ($output) {
-        $output | ForEach-Object { Write-Host $_ }
-    }
-
-    if ($exitCode -ne 0) {
-        throw "Cargo command failed (exit code ${exitCode}): cargo $($Arguments -join ' ')"
-    }
+    return [string]::Join([Environment]::NewLine, [string[]]@($output))
 }
 
 try {
     # Resolve the repository root, regardless of the current working directory.
-    $repoRoot = (Invoke-Git -Arguments @('rev-parse', '--show-toplevel') -Quiet).Trim()
+    $repoRoot = (Invoke-NativeCommand -Command 'git' -Arguments @('rev-parse', '--show-toplevel') -Quiet).Trim()
     if ([string]::IsNullOrWhiteSpace($repoRoot)) {
         throw 'Unable to determine the Git repository root.'
     }
@@ -83,20 +55,8 @@ try {
         throw "Cargo.toml was not found at the repository root: $manifestPath"
     }
 
-    $previousErrorActionPreference = $ErrorActionPreference
-    try {
-        $ErrorActionPreference = 'Continue'
-        $metadataOutput = & cargo metadata --no-deps --format-version 1 --locked
-        $cargoExitCode = $LASTEXITCODE
-    }
-    finally {
-        $ErrorActionPreference = $previousErrorActionPreference
-    }
-    if ($cargoExitCode -ne 0) {
-        throw "cargo metadata failed (exit code ${cargoExitCode})."
-    }
-
-    $metadata = ($metadataOutput -join [Environment]::NewLine) | ConvertFrom-Json
+    $metadataJson = Invoke-NativeCommand -Command 'cargo' -Arguments @('metadata', '--no-deps', '--format-version', '1', '--locked') -Quiet
+    $metadata = $metadataJson | ConvertFrom-Json
     $rootPackages = @($metadata.packages | Where-Object {
         [System.IO.Path]::GetFullPath($_.manifest_path) -eq $manifestPath
     })
@@ -111,34 +71,48 @@ try {
         throw "The Cargo package version '$version' is not a valid semantic version."
     }
 
-    $tag = "v$version"
-
-    # Ensure the release tag exists and points to the current commit.
-    $headCommit = (Invoke-Git -Arguments @('rev-parse', 'HEAD') -Quiet).Trim()
-    $tagCommit = (Invoke-Git -Arguments @('rev-parse', "$tag^{commit}") -Quiet).Trim()
-    if ($tagCommit -ne $headCommit) {
-        throw "The release tag '$tag' does not point to the current HEAD. Run git_tag.ps1 for this version before publishing."
-    }
-
-    # Do not publish from a working tree that differs from the tagged commit.
-    $status = (Invoke-Git -Arguments @('status', '--porcelain') -Quiet).Trim()
+    # Do not publish while local changes remain uncommitted.
+    $status = (Invoke-NativeCommand -Command 'git' -Arguments @('status', '--porcelain') -Quiet).Trim()
     if (-not [string]::IsNullOrWhiteSpace($status)) {
         throw "The working tree is not clean. Commit or discard these changes before publishing:`n$status"
     }
 
-    $head = (Invoke-Git -Arguments @('log', '-1', '--oneline') -Quiet).Trim()
+    # Require the release tag for the Cargo package version to exist locally or on origin.
+    # The tag is not required to point to the current HEAD; later commits are allowed.
+    $tag = "v$version"
+    $localTag = (Invoke-NativeCommand -Command 'git' -Arguments @('tag', '--list', $tag) -Quiet).Trim()
+    $tagLocation = $null
+
+    if ($localTag -eq $tag) {
+        $tagLocation = 'local repository'
+    }
+    else {
+        $originUrl = (Invoke-NativeCommand -Command 'git' -Arguments @('remote', 'get-url', 'origin') -Quiet).Trim()
+        if ([string]::IsNullOrWhiteSpace($originUrl)) {
+            throw "Release tag '$tag' was not found locally and no origin remote is configured."
+        }
+
+        $remoteTag = (Invoke-NativeCommand -Command 'git' -Arguments @('ls-remote', '--tags', 'origin', "refs/tags/$tag") -Quiet).Trim()
+        if ([string]::IsNullOrWhiteSpace($remoteTag)) {
+            throw "Release tag '$tag' was not found in the local repository or on origin."
+        }
+
+        $tagLocation = 'origin'
+    }
+
+    $head = (Invoke-NativeCommand -Command 'git' -Arguments @('log', '-1', '--oneline') -Quiet).Trim()
 
     Write-Host ''
     Write-Host 'Crates.io publication' -ForegroundColor Cyan
     Write-Host "  Repository : $repoRoot"
     Write-Host "  Package    : $packageName"
     Write-Host "  Version    : $version"
-    Write-Host "  Git tag    : $tag"
+    Write-Host "  Git tag    : $tag ($tagLocation)"
     Write-Host "  Commit     : $head"
     Write-Host ''
 
-    # Validate the package before asking permission to publish it.
-    Invoke-Cargo -Arguments @('publish', '--dry-run', '--locked', '--package', $packageName)
+    # Validate the package before asking permission to publish.
+    Invoke-NativeCommand -Command 'cargo' -Arguments @('publish', '--dry-run', '--locked', '--package', $packageName)
 
     Write-Host ''
     Write-Host "The dry run completed successfully. Package '$packageName' version '$version' is ready to publish." -ForegroundColor Green
@@ -149,7 +123,7 @@ try {
     }
 
     # Publish only after explicit confirmation.
-    Invoke-Cargo -Arguments @('publish', '--locked', '--package', $packageName)
+    Invoke-NativeCommand -Command 'cargo' -Arguments @('publish', '--locked', '--package', $packageName)
 
     Write-Host ''
     Write-Host "Cargo successfully published '$packageName' version '$version' to crates.io." -ForegroundColor Green
